@@ -1,35 +1,69 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
+import { useState } from "react";
+import { SafeAreaView, StyleSheet } from "react-native";
+import { BottomNavigation } from "react-native-paper";
+import Dashboard from "./dashboard";
+import Deposits from "./deposits";
+import Support from "./support";
+import Users from "./users";
 
-import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+export default function TabsLayout() {
+  const [index, setIndex] = useState(0);
+  const [routes] = useState([
+    {
+      key: "dashboard",
+      title: "Home",
+      focusedIcon: "home",
+      unfocusedIcon: "home-outline",
+    },
+    {
+      key: "users",
+      title: "Users",
+      focusedIcon: "account-group",
+      unfocusedIcon: "account-group-outline",
+    },
+    {
+      key: "deposits",
+      title: "New Deposits",
+      focusedIcon: "cash-plus",
+      unfocusedIcon: "cash-plus",
+    },
+    {
+      key: "help",
+      title: "Support",
+      focusedIcon: "help-circle",
+      unfocusedIcon: "help-circle-outline",
+    },
+  ]);
 
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  const renderScene = BottomNavigation.SceneMap({
+    dashboard: Dashboard,
+    users: Users,
+    deposits: Deposits,
+    help: Support,
+  });
 
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: false,
-        tabBarButton: HapticTab,
-      }}>
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+    <SafeAreaView style={styles.container}>
+      <BottomNavigation
+        navigationState={{ index, routes }}
+        onIndexChange={setIndex}
+        renderScene={renderScene}
+        barStyle={{
+          backgroundColor: "#fff",
+          borderTopWidth: 1,
+          borderTopColor: "#e0e0e0",
         }}
+        activeColor="#4A90E2"
+        inactiveColor="#999"
+        labeled={true}
       />
-      <Tabs.Screen
-        name="explore"
-        options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
-        }}
-      />
-    </Tabs>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
+});
