@@ -19,7 +19,6 @@ api.interceptors.request.use(
       : null;
     const token = parsedUser?.success ? parsedUser.data.token : null;
 
-    console.debug('API Request:', config);
     config.headers['Content-Type'] = 'application/json';
     config.headers['Authorization'] = token || '';
     return config;

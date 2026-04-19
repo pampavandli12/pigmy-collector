@@ -9,6 +9,8 @@ import React, {
   useMemo,
   useState,
 } from 'react';
+import { View } from 'react-native';
+import { ActivityIndicator, useTheme } from 'react-native-paper';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -27,6 +29,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const theme = useTheme();
 
   useEffect(() => {
     const loadAuthState = async () => {
@@ -88,6 +91,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     [getToken, getUser, isLoading, login, logout, user],
   );
 
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator animating={true} color={theme.colors.primary} />
+      </View>
+    ); // Show loading
+  }
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 

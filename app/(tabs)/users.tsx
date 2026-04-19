@@ -1,127 +1,101 @@
-import { useRouter } from "expo-router";
-import { useState } from "react";
-import { Image, ScrollView, StyleSheet, View } from "react-native";
-import { Button, Card, IconButton, Searchbar, Text } from "react-native-paper";
-import { SafeAreaView } from "react-native-safe-area-context";
-
-interface Customer {
-  id: string;
-  name: string;
-  balance: number;
-  account: string;
-  image: string;
-  status: "all" | "active";
-}
-
-const MOCK_CUSTOMERS: Customer[] = [
-  {
-    id: "1",
-    name: "Sophia Clark",
-    balance: 5000.0,
-    account: "7890",
-    image: "https://i.pravatar.cc/150?img=1",
-    status: "active",
-  },
-  {
-    id: "2",
-    name: "Ethan Bennett",
-    balance: 2500.0,
-    account: "3210",
-    image: "https://i.pravatar.cc/150?img=13",
-    status: "active",
-  },
-  {
-    id: "3",
-    name: "Olivia Harper",
-    balance: 7500.0,
-    account: "0123",
-    image: "https://i.pravatar.cc/150?img=5",
-    status: "active",
-  },
-  {
-    id: "4",
-    name: "Liam Foster",
-    balance: 1200.0,
-    account: "3456",
-    image: "https://i.pravatar.cc/150?img=12",
-    status: "all",
-  },
-  {
-    id: "5",
-    name: "Ava Morgan",
-    balance: 3800.0,
-    account: "8901",
-    image: "https://i.pravatar.cc/150?img=9",
-    status: "active",
-  },
-];
+import { fetchCustomers } from '@/services/user';
+import { Customer } from '@/types/user';
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import {
+  Avatar,
+  Button,
+  Card,
+  IconButton,
+  Searchbar,
+  Text,
+} from 'react-native-paper';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '../providers/AuthProvider';
 
 export default function Users() {
   const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filter, setFilter] = useState<"all" | "active">("all");
-  const [customers] = useState<Customer[]>(MOCK_CUSTOMERS);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filter, setFilter] = useState<'all' | 'active'>('all');
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const { user } = useAuth();
+
+  const loadCustomers = useCallback(async () => {
+    if (!user) {
+      return;
+    }
+
+    const customers = await fetchCustomers({
+      agentCode: user.agentCode,
+      bankCode: user.bankCode,
+    });
+    setCustomers(customers);
+  }, [user]);
+
+  useEffect(() => {
+    loadCustomers();
+  }, [loadCustomers]);
 
   const filteredCustomers = customers.filter((customer) => {
-    const matchesSearch = customer.name
+    const matchesSearch = customer.customerName
       .toLowerCase()
       .includes(searchQuery.toLowerCase());
-    const matchesFilter = filter === "all" || customer.status === filter;
+    const matchesFilter = filter === 'all' || filter === 'active';
     return matchesSearch && matchesFilter;
   });
 
   const handleCustomerPress = (customer: Customer) => {
     router.push({
-      pathname: "/userDetail",
+      pathname: '/userDetail',
       params: {
-        id: customer.id,
-        name: customer.name,
-        balance: customer.balance.toString(),
-        account: customer.account,
-        image: customer.image,
+        id: customer.userId.toString(),
+        name: customer.customerName.trim(),
+        balance: customer.currentBalance.toString(),
+        account: customer.accountNumber.toString(),
       },
     });
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Searchbar
-          placeholder="Search customers"
+          placeholder='Search customers'
           onChangeText={setSearchQuery}
           value={searchQuery}
           style={styles.searchbar}
-          icon="magnify"
-          iconColor="#4A90E2"
+          icon='magnify'
+          iconColor='#4A90E2'
           inputStyle={styles.searchInput}
         />
 
         <View style={styles.filterContainer}>
           <Button
-            mode={filter === "all" ? "contained" : "outlined"}
-            onPress={() => setFilter("all")}
+            mode={filter === 'all' ? 'contained' : 'outlined'}
+            onPress={() => setFilter('all')}
             style={[
               styles.filterButton,
-              filter === "all" && styles.filterButtonActive,
+              filter === 'all' && styles.filterButtonActive,
             ]}
             labelStyle={[
               styles.filterButtonLabel,
-              filter === "all" && styles.filterButtonLabelActive,
+              filter === 'all' && styles.filterButtonLabelActive,
             ]}
             contentStyle={styles.filterButtonContent}
           >
             All
           </Button>
           <Button
-            mode={filter === "active" ? "contained" : "outlined"}
-            onPress={() => setFilter("active")}
+            mode={filter === 'active' ? 'contained' : 'outlined'}
+            onPress={() => setFilter('active')}
             style={[
               styles.filterButton,
-              filter === "active" && styles.filterButtonActive,
+              filter === 'active' && styles.filterButtonActive,
             ]}
             labelStyle={[
               styles.filterButtonLabel,
-              filter === "active" && styles.filterButtonLabelActive,
+              filter === 'active' && styles.filterButtonLabelActive,
             ]}
             contentStyle={styles.filterButtonContent}
           >
@@ -133,29 +107,40 @@ export default function Users() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {filteredCustomers.map((customer) => (
           <Card
-            key={customer.id}
+            key={customer.userId}
             style={styles.customerCard}
             onPress={() => handleCustomerPress(customer)}
           >
             <Card.Content style={styles.cardContent}>
               <View style={styles.customerInfo}>
-                <Image source={{ uri: customer.image }} style={styles.avatar} />
+                {/* <Image
+                  source={{
+                    uri: `https://i.pravatar.cc/150?u=${customer.userId}`,
+                  }}
+                  style={styles.avatar}
+                /> */}
+                <Avatar.Text
+                  size={45}
+                  label={customer.customerName.charAt(0).toUpperCase()}
+                  style={styles.avatar}
+                />
+
                 <View style={styles.customerDetails}>
-                  <Text variant="titleMedium" style={styles.customerName}>
-                    {customer.name}
+                  <Text variant='titleMedium' style={styles.customerName}>
+                    {customer.customerName.trim()}
                   </Text>
-                  <Text variant="bodyMedium" style={styles.balance}>
-                    Balance: ${customer.balance.toFixed(2)}
+                  <Text variant='bodyMedium' style={styles.balance}>
+                    Balance: ₹{customer.currentBalance.toFixed(2)}
                   </Text>
-                  <Text variant="bodyMedium" style={styles.account}>
-                    Acct: ****{customer.account}
+                  <Text variant='bodyMedium' style={styles.account}>
+                    Acct: {customer.accountNumber}
                   </Text>
                 </View>
               </View>
               <IconButton
-                icon="chevron-right"
+                icon='chevron-right'
                 size={24}
-                iconColor="#4A90E2"
+                iconColor='#4A90E2'
                 style={styles.chevron}
               />
             </Card.Content>
@@ -164,7 +149,7 @@ export default function Users() {
 
         {filteredCustomers.length === 0 && (
           <View style={styles.emptyState}>
-            <Text variant="bodyLarge" style={styles.emptyText}>
+            <Text variant='bodyLarge' style={styles.emptyText}>
               No customers found
             </Text>
           </View>
@@ -177,7 +162,7 @@ export default function Users() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: '#F5F5F5',
   },
   header: {
     paddingHorizontal: 16,
@@ -185,29 +170,29 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   searchbar: {
-    backgroundColor: "#fff",
+    backgroundColor: '#fff',
     elevation: 0,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
+    borderColor: '#E0E0E0',
     borderRadius: 8,
   },
   searchInput: {
     fontSize: 16,
-    color: "#4A90E2",
+    color: '#4A90E2',
   },
   filterContainer: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: 12,
     marginTop: 16,
   },
   filterButton: {
     borderRadius: 20,
-    borderColor: "#E0E0E0",
-    backgroundColor: "transparent",
+    borderColor: '#E0E0E0',
+    backgroundColor: 'transparent',
   },
   filterButtonActive: {
-    backgroundColor: "#4A90E2",
-    borderColor: "#4A90E2",
+    backgroundColor: '#4A90E2',
+    borderColor: '#4A90E2',
   },
   filterButtonContent: {
     paddingHorizontal: 12,
@@ -215,12 +200,12 @@ const styles = StyleSheet.create({
   },
   filterButtonLabel: {
     fontSize: 14,
-    fontWeight: "500",
-    color: "#666",
+    fontWeight: '500',
+    color: '#666',
     marginHorizontal: 8,
   },
   filterButtonLabelActive: {
-    color: "#fff",
+    color: '#fff',
   },
   content: {
     flex: 1,
@@ -229,20 +214,20 @@ const styles = StyleSheet.create({
   },
   customerCard: {
     marginBottom: 12,
-    backgroundColor: "#fff",
+    backgroundColor: '#fff',
     borderRadius: 12,
     elevation: 1,
   },
   cardContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingVertical: 8,
     paddingHorizontal: 12,
   },
   customerInfo: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
   },
   avatar: {
@@ -255,28 +240,28 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   customerName: {
-    fontWeight: "700",
-    color: "#000",
+    fontWeight: '700',
+    color: '#000',
     marginBottom: 4,
   },
   balance: {
-    color: "#4A90E2",
+    color: '#4A90E2',
     fontSize: 14,
     marginBottom: 2,
   },
   account: {
-    color: "#4A90E2",
+    color: '#4A90E2',
     fontSize: 14,
   },
   chevron: {
     margin: 0,
   },
   emptyState: {
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 60,
   },
   emptyText: {
-    color: "#999",
+    color: '#999',
   },
 });

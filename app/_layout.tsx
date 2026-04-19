@@ -9,7 +9,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { MD3LightTheme, PaperProvider } from 'react-native-paper';
 import { PrinterProvider } from '../contexts/PrinterContext';
-import { AuthProvider } from './providers/AuthProvider';
+import { AuthProvider, useAuth } from './providers/AuthProvider';
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -74,6 +74,20 @@ const theme = {
   },
 };
 
+const InitialLayout = () => {
+  const { isAuthenticated } = useAuth();
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Protected guard={!isAuthenticated}>
+        <Stack.Screen name='index' options={{ headerShown: false }} />
+      </Stack.Protected>
+      <Stack.Protected guard={isAuthenticated}>
+        <Stack.Screen name='(tabs)' options={{ headerShown: false }} />
+      </Stack.Protected>
+    </Stack>
+  );
+};
+
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     Roboto_400Regular,
@@ -95,10 +109,7 @@ export default function RootLayout() {
     <PaperProvider theme={theme}>
       <PrinterProvider>
         <AuthProvider>
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name='index' options={{ headerShown: false }} />
-            <Stack.Screen name='(tabs)' options={{ headerShown: false }} />
-          </Stack>
+          <InitialLayout />
         </AuthProvider>
       </PrinterProvider>
     </PaperProvider>

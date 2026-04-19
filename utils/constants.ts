@@ -6,6 +6,7 @@ export const API_BASE_URL = __DEV__
   : PRODUCTION_API_BASE_URL;
 
 export const API_ENDPOINTS = {
-  login: `/pigmyMobile/v2/login`,
+  LOGIN: `/pigmyMobile/v2/login`,
+  FETCH_CUSTOMERS: '/pigmyMobile/v2/user',
 } as const;
 export const SECURE_STORE_KEY = 'userInfo';

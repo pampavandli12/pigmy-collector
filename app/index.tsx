@@ -1,6 +1,5 @@
 import { useAuth } from '@/app/providers/AuthProvider';
 import { userLogin } from '@/services/login';
-import { API_ENDPOINTS } from '@/utils/constants';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -42,12 +41,9 @@ export default function SignIn() {
 
   const handleSignIn = async (values: LoginFormValues) => {
     setLoading(true);
-    console.log('API Endpoint:', API_ENDPOINTS.login);
-
     try {
       const user = await userLogin(values.phoneNumber, values.password);
       await login(user);
-      router.replace('/(tabs)/dashboard');
     } catch (error) {
       console.error('Sign-in failed:', error);
     } finally {
