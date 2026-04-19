@@ -1,4 +1,5 @@
 import { Status } from '@/types/sharedEnums';
+import { Picker } from '@react-native-picker/picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -39,7 +40,9 @@ export default function UserDetail() {
   };
 
   const [amount, setAmount] = useState('');
+  const [scheme, setScheme] = useState('');
   const [date, setDate] = useState('');
+  const schemeOptions = ['Pigmy Deposit', 'Daily Deposit'];
 
   useEffect(() => {
     setDate(
@@ -51,16 +54,16 @@ export default function UserDetail() {
     );
   }, [setDate]);
   const handleConfirm = async () => {
-    console.log('Confirm deposit', { customer, amount, date });
+    console.log('Confirm deposit', { customer, amount, scheme, date });
     const payload = {
-      userId: parseInt(customer.id),
+      userId: parseInt(customer.id, 10),
       agentCode: customer.agentCode,
       bankCode: customer.bankCode,
       collectedAmount: parseFloat(amount),
-      schemename: 'Default Scheme',
-      collectiontype: 'Cash',
+      schemename: `#sym:${scheme}`,
+      collectiontype: 'cash',
       customerName: customer.name,
-      accountNumber: parseInt(customer.account),
+      accountNumber: parseInt(customer.account, 10),
     };
     await createTransaction(payload);
     // Handle deposit confirmation
@@ -132,6 +135,25 @@ export default function UserDetail() {
               />
             </View>
 
+            {/* Scheme Field */}
+            <View style={styles.fieldContainer}>
+              <Text variant='bodyMedium' style={styles.fieldLabel}>
+                Scheme
+              </Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={scheme}
+                  onValueChange={(itemValue) => setScheme(itemValue)}
+                  style={styles.picker}
+                >
+                  <Picker.Item label='Select scheme' value='' />
+                  {schemeOptions.map((option) => (
+                    <Picker.Item key={option} label={option} value={option} />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+
             {/* Date Field */}
             <View style={styles.fieldContainer}>
               <Text variant='titleMedium' style={styles.fieldLabel}>
@@ -151,6 +173,7 @@ export default function UserDetail() {
           <Button
             mode='contained'
             onPress={handleConfirm}
+            disabled={!amount || !scheme}
             style={styles.confirmButton}
             loading={isTransactionLoading}
             labelStyle={styles.confirmButtonText}
@@ -267,6 +290,16 @@ const styles = StyleSheet.create({
   bottomContainer: {
     padding: 16,
     backgroundColor: '#F5F5F5',
+  },
+  pickerContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    height: 60,
+    justifyContent: 'center',
+  },
+  picker: {
+    height: 60,
+    color: '#000',
   },
   confirmButton: {
     borderRadius: 12,
