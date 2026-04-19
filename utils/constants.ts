@@ -8,5 +8,6 @@ export const API_BASE_URL = __DEV__
 export const API_ENDPOINTS = {
   LOGIN: `/pigmyMobile/v2/login`,
   FETCH_CUSTOMERS: '/pigmyMobile/v2/user',
+  ADD_TRANSACTION: '/pigmyMobile/v2/transaction',
 } as const;
 export const SECURE_STORE_KEY = 'userInfo';

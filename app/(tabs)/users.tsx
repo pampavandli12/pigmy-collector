@@ -1,36 +1,45 @@
-import { fetchCustomers } from '@/services/user';
+import { Status } from '@/types/sharedEnums';
 import { Customer } from '@/types/user';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import {
   Avatar,
-  Button,
   Card,
   IconButton,
   Searchbar,
   Text,
+  useTheme,
 } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../providers/AuthProvider';
+import useUser from '../store/userStore';
 
 export default function Users() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'active'>('all');
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const customerLoading = useUser((state) => state.loadCustomerStatus);
+  const fetchCustomers = useUser((state) => state.loadCustomers);
+  const customers = useUser((state) => state.customers);
   const { user } = useAuth();
+  const theme = useTheme();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadCustomers().finally(() => setRefreshing(false));
+  }, []);
 
   const loadCustomers = useCallback(async () => {
     if (!user) {
       return;
     }
 
-    const customers = await fetchCustomers({
+    await fetchCustomers({
       agentCode: user.agentCode,
       bankCode: user.bankCode,
     });
-    setCustomers(customers);
   }, [user]);
 
   useEffect(() => {
@@ -50,12 +59,17 @@ export default function Users() {
       pathname: '/userDetail',
       params: {
         id: customer.userId.toString(),
+        agentCode: customer.agentCode.toString(),
+        bankCode: customer.bankCode,
         name: customer.customerName.trim(),
         balance: customer.currentBalance.toString(),
         account: customer.accountNumber.toString(),
       },
     });
   };
+  const isCustomerLoading = useMemo(() => {
+    return customerLoading === Status.Loading;
+  }, [customerLoading]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -69,88 +83,63 @@ export default function Users() {
           iconColor='#4A90E2'
           inputStyle={styles.searchInput}
         />
-
-        <View style={styles.filterContainer}>
-          <Button
-            mode={filter === 'all' ? 'contained' : 'outlined'}
-            onPress={() => setFilter('all')}
-            style={[
-              styles.filterButton,
-              filter === 'all' && styles.filterButtonActive,
-            ]}
-            labelStyle={[
-              styles.filterButtonLabel,
-              filter === 'all' && styles.filterButtonLabelActive,
-            ]}
-            contentStyle={styles.filterButtonContent}
-          >
-            All
-          </Button>
-          <Button
-            mode={filter === 'active' ? 'contained' : 'outlined'}
-            onPress={() => setFilter('active')}
-            style={[
-              styles.filterButton,
-              filter === 'active' && styles.filterButtonActive,
-            ]}
-            labelStyle={[
-              styles.filterButtonLabel,
-              filter === 'active' && styles.filterButtonLabelActive,
-            ]}
-            contentStyle={styles.filterButtonContent}
-          >
-            Active
-          </Button>
-        </View>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {filteredCustomers.map((customer) => (
-          <Card
-            key={customer.userId}
-            style={styles.customerCard}
-            onPress={() => handleCustomerPress(customer)}
-          >
-            <Card.Content style={styles.cardContent}>
-              <View style={styles.customerInfo}>
-                {/* <Image
-                  source={{
-                    uri: `https://i.pravatar.cc/150?u=${customer.userId}`,
-                  }}
-                  style={styles.avatar}
-                /> */}
-                <Avatar.Text
-                  size={45}
-                  label={customer.customerName.charAt(0).toUpperCase()}
-                  style={styles.avatar}
-                />
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        {filteredCustomers &&
+          filteredCustomers.map((customer) => (
+            <Card
+              key={customer.userId}
+              style={styles.customerCard}
+              onPress={() => handleCustomerPress(customer)}
+            >
+              <Card.Content style={styles.cardContent}>
+                <View style={styles.customerInfo}>
+                  <Avatar.Text
+                    size={45}
+                    label={customer.customerName.charAt(0).toUpperCase()}
+                    style={styles.avatar}
+                  />
 
-                <View style={styles.customerDetails}>
-                  <Text variant='titleMedium' style={styles.customerName}>
-                    {customer.customerName.trim()}
-                  </Text>
-                  <Text variant='bodyMedium' style={styles.balance}>
-                    Balance: ₹{customer.currentBalance.toFixed(2)}
-                  </Text>
-                  <Text variant='bodyMedium' style={styles.account}>
-                    Acct: {customer.accountNumber}
-                  </Text>
+                  <View style={styles.customerDetails}>
+                    <Text variant='titleMedium' style={styles.customerName}>
+                      {customer.customerName.trim()}
+                    </Text>
+                    <Text variant='bodyMedium' style={styles.balance}>
+                      Balance: ₹{customer.currentBalance.toFixed(2)}
+                    </Text>
+                    <Text variant='bodyMedium' style={styles.account}>
+                      Acct: {customer.accountNumber}
+                    </Text>
+                  </View>
                 </View>
-              </View>
-              <IconButton
-                icon='chevron-right'
-                size={24}
-                iconColor='#4A90E2'
-                style={styles.chevron}
-              />
-            </Card.Content>
-          </Card>
-        ))}
+                <IconButton
+                  icon='chevron-right'
+                  size={24}
+                  iconColor='#4A90E2'
+                  style={styles.chevron}
+                />
+              </Card.Content>
+            </Card>
+          ))}
 
-        {filteredCustomers.length === 0 && (
+        {filteredCustomers.length === 0 && !isCustomerLoading && (
           <View style={styles.emptyState}>
             <Text variant='bodyLarge' style={styles.emptyText}>
               No customers found
+            </Text>
+          </View>
+        )}
+        {isCustomerLoading && (
+          <View style={styles.emptyState}>
+            <Text variant='bodyLarge' style={styles.emptyText}>
+              Loading customers...
             </Text>
           </View>
         )}
@@ -179,33 +168,6 @@ const styles = StyleSheet.create({
   searchInput: {
     fontSize: 16,
     color: '#4A90E2',
-  },
-  filterContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 16,
-  },
-  filterButton: {
-    borderRadius: 20,
-    borderColor: '#E0E0E0',
-    backgroundColor: 'transparent',
-  },
-  filterButtonActive: {
-    backgroundColor: '#4A90E2',
-    borderColor: '#4A90E2',
-  },
-  filterButtonContent: {
-    paddingHorizontal: 12,
-    height: 36,
-  },
-  filterButtonLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#666',
-    marginHorizontal: 8,
-  },
-  filterButtonLabelActive: {
-    color: '#fff',
   },
   content: {
     flex: 1,

@@ -2,6 +2,7 @@ import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { authUserSchema } from '../types/auth';
 import { API_BASE_URL, SECURE_STORE_KEY } from '../utils/constants';
+import { notifyUnauthorized } from './authSession';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -29,13 +30,14 @@ api.interceptors.request.use(
   },
 );
 
-// Interceptor for redirecting on 401 and logging responses/errors
+// Interceptor for logging out on forbidden responses and logging errors
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error.response && error.response.status === 403) {
-      console.warn('Unauthorized! Clearing auth state.');
+      console.warn('Unauthorized! Logging out.');
       await SecureStore.deleteItemAsync(SECURE_STORE_KEY);
+      await notifyUnauthorized();
     }
     console.error('API Error:', error);
     return Promise.reject(error);

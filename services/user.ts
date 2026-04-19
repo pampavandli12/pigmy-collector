@@ -1,4 +1,4 @@
-import { Customer } from '@/types/user';
+import { Customer, TransactionPayload } from '@/types/user';
 import { API_ENDPOINTS } from '@/utils/constants';
 import { api } from './axios';
 
@@ -16,5 +16,10 @@ export const fetchCustomers = async ({
         bankCode,
       },
     })
+    .then((response) => response.data);
+};
+export const createTransaction = async (payload: TransactionPayload) => {
+  return api
+    .post(API_ENDPOINTS.ADD_TRANSACTION, payload)
     .then((response) => response.data);
 };

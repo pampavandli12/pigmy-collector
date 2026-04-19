@@ -1,6 +1,7 @@
 import { AuthUser, authUserSchema } from '@/types/auth';
 import { SECURE_STORE_KEY } from '@/utils/constants';
 import * as SecureStore from 'expo-secure-store';
+import { setUnauthorizedHandler } from '@/services/authSession';
 import React, {
   createContext,
   useCallback,
@@ -74,6 +75,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     await SecureStore.deleteItemAsync(SECURE_STORE_KEY);
     setUser(null);
   }, []);
+
+  useEffect(() => {
+    setUnauthorizedHandler(logout);
+
+    return () => {
+      setUnauthorizedHandler(null);
+    };
+  }, [logout]);
 
   const getToken = useCallback(() => user?.token ?? null, [user]);
   const getUser = useCallback(() => user, [user]);
