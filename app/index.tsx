@@ -1,126 +1,136 @@
-import { useRouter } from "expo-router";
-import { useState } from "react";
-import { KeyboardAvoidingView, Platform, StyleSheet, View } from "react-native";
-import { Button, Text, TextInput } from "react-native-paper";
+import { useAuth } from '@/app/providers/AuthProvider';
+import { userLogin } from '@/services/login';
+import { API_ENDPOINTS } from '@/utils/constants';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import { Controller, useForm } from 'react-hook-form';
+import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
+import { Button, Text, TextInput } from 'react-native-paper';
+import { z } from 'zod';
+
+const loginSchema = z.object({
+  phoneNumber: z
+    .string()
+    .trim()
+    .min(1, 'Phone number is required')
+    .regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit phone number'),
+  password: z
+    .string()
+    .min(1, 'Password is required')
+    .min(6, 'Password must be at least 6 characters'),
+});
+
+type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function SignIn() {
   const router = useRouter();
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const { login } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [language, setLanguage] = useState<"english" | "kannada">("english");
+  const {
+    control,
+    handleSubmit,
+    formState: { errors, isValid },
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      phoneNumber: '',
+      password: '',
+    },
+    mode: 'onChange',
+  });
 
-  const handleSignIn = async () => {
+  const handleSignIn = async (values: LoginFormValues) => {
     setLoading(true);
-    // Simulate sign-in process
-    setTimeout(() => {
-      setLoading(false);
-      // Navigate to tabs after sign-in
-      router.replace("/(tabs)/dashboard");
-    }, 1000);
-  };
+    console.log('API Endpoint:', API_ENDPOINTS.login);
 
-  const handleOTPLogin = () => {
-    // Handle OTP login
-    console.log("Login with OTP");
+    try {
+      const user = await userLogin(values.phoneNumber, values.password);
+      await login(user);
+      router.replace('/(tabs)/dashboard');
+    } catch (error) {
+      console.error('Sign-in failed:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.content}>
-        <Text variant="headlineLarge" style={styles.title}>
+        <Text variant='headlineLarge' style={styles.title}>
           Agent Login
         </Text>
 
         <View style={styles.formContainer}>
-          <TextInput
-            placeholder="Username"
-            value={username}
-            onChangeText={setUsername}
-            mode="flat"
-            style={styles.input}
-            autoCapitalize="none"
-            left={<TextInput.Icon icon="account-outline" />}
-            underlineStyle={{ height: 0 }}
-            contentStyle={styles.inputContent}
-          />
+          <View style={styles.fieldContainer}>
+            <Controller
+              control={control}
+              name='phoneNumber'
+              render={({ field: { onBlur, onChange, value } }) => (
+                <TextInput
+                  placeholder='Phone Number'
+                  value={value}
+                  onBlur={onBlur}
+                  onChangeText={onChange}
+                  mode='flat'
+                  style={styles.input}
+                  autoCapitalize='none'
+                  keyboardType='phone-pad'
+                  left={<TextInput.Icon icon='phone' />}
+                  underlineStyle={{ height: 0 }}
+                  contentStyle={styles.inputContent}
+                  error={Boolean(errors.phoneNumber)}
+                />
+              )}
+            />
+            <Text variant='bodySmall' style={styles.errorText}>
+              {errors.phoneNumber?.message}
+            </Text>
+          </View>
 
-          <TextInput
-            placeholder="Password"
-            value={password}
-            onChangeText={setPassword}
-            mode="flat"
-            secureTextEntry
-            style={styles.input}
-            left={<TextInput.Icon icon="lock-outline" />}
-            underlineStyle={{ height: 0 }}
-            contentStyle={styles.inputContent}
-          />
+          <View style={styles.fieldContainer}>
+            <Controller
+              control={control}
+              name='password'
+              render={({ field: { onBlur, onChange, value } }) => (
+                <TextInput
+                  placeholder='Password'
+                  value={value}
+                  onBlur={onBlur}
+                  onChangeText={onChange}
+                  mode='flat'
+                  secureTextEntry
+                  style={styles.input}
+                  left={<TextInput.Icon icon='lock-outline' />}
+                  underlineStyle={{ height: 0 }}
+                  contentStyle={styles.inputContent}
+                  right={<TextInput.Icon icon='eye' />}
+                  error={Boolean(errors.password)}
+                />
+              )}
+            />
+            <Text variant='bodySmall' style={styles.errorText}>
+              {errors.password?.message}
+            </Text>
+          </View>
 
           <Button
-            mode="contained"
-            onPress={handleSignIn}
+            mode='contained'
+            onPress={handleSubmit(handleSignIn)}
             loading={loading}
-            disabled={loading || !username || !password}
+            disabled={loading || !isValid}
             style={styles.loginButton}
             labelStyle={styles.loginButtonText}
           >
             Login
           </Button>
-
-          <Button
-            mode="outlined"
-            onPress={handleOTPLogin}
-            style={styles.otpButton}
-            labelStyle={styles.otpButtonText}
-            contentStyle={styles.otpButtonContent}
-          >
-            Login with OTP
-          </Button>
         </View>
 
-        <View style={styles.languageSection}>
-          <Text variant="bodyMedium" style={styles.languageLabel}>
-            Select Language
-          </Text>
-          <View style={styles.languageButtons}>
-            <Button
-              mode={language === "english" ? "contained" : "outlined"}
-              onPress={() => setLanguage("english")}
-              style={[
-                styles.languageButton,
-                language === "english" && styles.languageButtonActive,
-              ]}
-              labelStyle={[
-                styles.languageButtonText,
-                language === "english" && styles.languageButtonTextActive,
-              ]}
-              contentStyle={styles.languageButtonContent}
-            >
-              English
-            </Button>
-            <Button
-              mode={language === "kannada" ? "contained" : "outlined"}
-              onPress={() => setLanguage("kannada")}
-              style={[
-                styles.languageButton,
-                language === "kannada" && styles.languageButtonActive,
-              ]}
-              labelStyle={[
-                styles.languageButtonText,
-                language === "kannada" && styles.languageButtonTextActive,
-              ]}
-              contentStyle={styles.languageButtonContent}
-            >
-              ಕನ್ನಡ
-            </Button>
-          </View>
-        </View>
-
-        <Text variant="bodySmall" style={styles.footer}>
+        <Text variant='bodySmall' style={styles.footer}>
           © 2024 Bank Co. All rights reserved.
         </Text>
       </View>
@@ -131,28 +141,30 @@ export default function SignIn() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#EFEFEF",
+    backgroundColor: '#EFEFEF',
   },
   content: {
     flex: 1,
-    justifyContent: "space-between",
+    justifyContent: 'space-between',
     paddingHorizontal: 28,
     paddingTop: 80,
     paddingBottom: 40,
   },
   title: {
-    textAlign: "center",
-    fontWeight: "700",
-    color: "#000",
+    textAlign: 'center',
+    fontWeight: '700',
+    color: '#000',
     marginBottom: 60,
   },
   formContainer: {
     flex: 1,
-    justifyContent: "center",
+    justifyContent: 'center',
+  },
+  fieldContainer: {
+    marginBottom: 12,
   },
   input: {
-    backgroundColor: "#D9D9D9",
-    marginBottom: 20,
+    backgroundColor: '#D9D9D9',
     borderRadius: 8,
     height: 60,
   },
@@ -160,72 +172,36 @@ const styles = StyleSheet.create({
     paddingLeft: 8,
   },
   loginButton: {
-    marginTop: 20,
+    marginTop: 8,
     marginBottom: 16,
     borderRadius: 25,
     height: 56,
-    backgroundColor: "#4A90E2",
-    justifyContent: "center",
+    backgroundColor: '#4A90E2',
+    justifyContent: 'center',
   },
   loginButtonText: {
     fontSize: 18,
-    fontWeight: "600",
+    fontWeight: '600',
     letterSpacing: 0,
   },
   otpButton: {
     borderRadius: 25,
     height: 56,
-    backgroundColor: "#D6E9F8",
-    borderColor: "#D6E9F8",
-    justifyContent: "center",
+    backgroundColor: '#D6E9F8',
+    borderColor: '#D6E9F8',
+    justifyContent: 'center',
   },
   otpButtonContent: {
     height: 56,
   },
-  otpButtonText: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#4A90E2",
-    letterSpacing: 0,
-  },
-  languageSection: {
-    alignItems: "center",
-    marginBottom: 40,
-  },
-  languageLabel: {
-    color: "#666",
-    marginBottom: 16,
-    fontSize: 16,
-  },
-  languageButtons: {
-    flexDirection: "row",
-    gap: 16,
-  },
-  languageButton: {
-    borderRadius: 25,
-    borderColor: "#D9D9D9",
-    backgroundColor: "transparent",
-    minWidth: 120,
-  },
-  languageButtonActive: {
-    backgroundColor: "#4A90E2",
-    borderColor: "#4A90E2",
-  },
-  languageButtonContent: {
-    paddingHorizontal: 20,
-    height: 44,
-  },
-  languageButtonText: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: "#666",
-  },
-  languageButtonTextActive: {
-    color: "#FFF",
-  },
   footer: {
-    textAlign: "center",
-    color: "#999",
+    textAlign: 'center',
+    color: '#999',
     fontSize: 13,
+  },
+  errorText: {
+    color: '#B00020',
+    minHeight: 20,
+    paddingTop: 4,
   },
 });
