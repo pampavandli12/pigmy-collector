@@ -1,44 +1,36 @@
-import { useState } from "react";
-import { SafeAreaView, StyleSheet } from "react-native";
-import { BottomNavigation } from "react-native-paper";
-import Dashboard from "./dashboard";
-import Deposits from "./deposits";
-import Support from "./support";
-import Users from "./users";
+import { useState } from 'react';
+import { SafeAreaView, StyleSheet } from 'react-native';
+import { BottomNavigation } from 'react-native-paper';
+import Dashboard from './dashboard';
+import Support from './support';
+import Users from './users';
 
 export default function TabsLayout() {
   const [index, setIndex] = useState(0);
   const [routes] = useState([
     {
-      key: "dashboard",
-      title: "Home",
-      focusedIcon: "home",
-      unfocusedIcon: "home-outline",
+      key: 'dashboard',
+      title: 'Home',
+      focusedIcon: 'home',
+      unfocusedIcon: 'home-outline',
     },
     {
-      key: "users",
-      title: "Users",
-      focusedIcon: "account-group",
-      unfocusedIcon: "account-group-outline",
+      key: 'users',
+      title: 'Users',
+      focusedIcon: 'account-group',
+      unfocusedIcon: 'account-group-outline',
     },
     {
-      key: "deposits",
-      title: "New Deposits",
-      focusedIcon: "cash-plus",
-      unfocusedIcon: "cash-plus",
-    },
-    {
-      key: "help",
-      title: "Support",
-      focusedIcon: "help-circle",
-      unfocusedIcon: "help-circle-outline",
+      key: 'help',
+      title: 'Support',
+      focusedIcon: 'help-circle',
+      unfocusedIcon: 'help-circle-outline',
     },
   ]);
 
   const renderScene = BottomNavigation.SceneMap({
     dashboard: Dashboard,
     users: Users,
-    deposits: Deposits,
     help: Support,
   });
 
@@ -49,12 +41,12 @@ export default function TabsLayout() {
         onIndexChange={setIndex}
         renderScene={renderScene}
         barStyle={{
-          backgroundColor: "#fff",
+          backgroundColor: '#fff',
           borderTopWidth: 1,
-          borderTopColor: "#e0e0e0",
+          borderTopColor: '#e0e0e0',
         }}
-        activeColor="#4A90E2"
-        inactiveColor="#999"
+        activeColor='#4A90E2'
+        inactiveColor='#999'
         labeled={true}
       />
     </SafeAreaView>
@@ -64,6 +56,6 @@ export default function TabsLayout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: '#fff',
   },
 });
