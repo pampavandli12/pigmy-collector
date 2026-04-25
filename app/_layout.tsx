@@ -10,6 +10,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { SQLiteProvider } from 'expo-sqlite';
 import { useEffect } from 'react';
 import { MD3LightTheme, PaperProvider } from 'react-native-paper';
+import { AppSnackbar } from '../components/AppSnackbar';
 import { PrinterProvider } from '../contexts/PrinterContext';
 import { AuthProvider, useAuth } from './providers/AuthProvider';
 
@@ -134,6 +135,7 @@ export default function RootLayout() {
           </AuthProvider>
         </PrinterProvider>
       </SQLiteProvider>
+      <AppSnackbar />
     </PaperProvider>
   );
 }

@@ -2,6 +2,7 @@
 import { createTransaction, fetchCustomers } from '@/services/user';
 import { Status } from '@/types/sharedEnums';
 import { Customer, TransactionPayload } from '@/types/user';
+import { showSnackbar } from '@/utils/snackbar';
 import { saveTransactionLocally } from '@/utils/transactions';
 import { create } from 'zustand';
 
@@ -27,9 +28,14 @@ const useUser = create<State & Actions>((set) => ({
     try {
       const customers = await fetchCustomers(payload);
       set({ customers, loadCustomerStatus: Status.Success });
-    } catch (error) {
+    } catch (error: unknown) {
+      const err = error as { response?: { status?: number } };
+      if (err.response?.status === 403) {
+        showSnackbar('Session expired. Please log in again.');
+        return;
+      }
       set({ loadCustomerStatus: Status.Error });
-      throw error;
+      showSnackbar('Failed to load customers. Please try again.'); // Show error message to user
     }
   },
   createTransaction: async (payload: TransactionPayload) => {
@@ -37,11 +43,15 @@ const useUser = create<State & Actions>((set) => ({
     try {
       const response = await createTransaction(payload);
       await saveTransactionLocally(payload);
-      console.log('Transaction response', response);
       set({ createTransactionStatus: Status.Success });
-    } catch (error) {
+    } catch (error: unknown) {
+      const err = error as { response?: { status?: number } };
+      if (err.response?.status === 403) {
+        showSnackbar('Session expired. Please log in again.');
+        return;
+      }
       set({ createTransactionStatus: Status.Error });
-      throw error;
+      showSnackbar('Failed to create transaction. Please try again.'); // Show error message to user
     }
   },
 }));

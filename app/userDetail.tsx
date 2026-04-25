@@ -54,7 +54,6 @@ export default function UserDetail() {
     };
   }, []);
   const handleConfirm = async () => {
-    console.log('Confirm deposit', { customer, amount, scheme, date });
     const payload = {
       userId: parseInt(customer.id, 10),
       agentCode: customer.agentCode,

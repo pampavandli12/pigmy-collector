@@ -1,5 +1,9 @@
 import { LocalTransaction } from '@/types/user';
-import { fetchLocalTransactions } from '@/utils/transactions';
+import {
+  fetchLocalTransactions,
+  fetchTodaysTransactionAmount,
+  fetchYesterdaysTransactionAmount,
+} from '@/utils/transactions';
 import { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Avatar, Card, Icon, Text } from 'react-native-paper';
@@ -11,21 +15,25 @@ export default function Dashboard() {
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchTransactions().finally(() => setRefreshing(false));
+    loadDashboardData();
   }, []);
   useEffect(() => {
-    fetchTransactions();
+    loadDashboardData();
   }, []);
+  const loadDashboardData = async () => {
+    await fetchTransactions();
+    await getInsights();
+  };
   const fetchTransactions = async () => {
     const recentTransactions = await fetchLocalTransactions();
-    console.log('Fetched local transactions', recentTransactions);
     setTransactions(recentTransactions);
   };
-  // const getInsights = async () => {
-  //   const todaysTotal = await fetchTodaysTransactionAmount();
-  //   const yesterdaysTotal = await fetchYesterdaysTransactionAmount();
-  //   return { todaysTotal, yesterdaysTotal };
-  // };
+  const getInsights = async () => {
+    const todaysTotal = await fetchTodaysTransactionAmount();
+    const yesterdaysTotal = await fetchYesterdaysTransactionAmount();
+    return { todaysTotal, yesterdaysTotal };
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView
@@ -45,17 +53,8 @@ export default function Dashboard() {
               </Text>
             </View>
             <Text variant='displaySmall' style={styles.collectionAmount}>
-              $12,500
+              {getInsights().then(({ todaysTotal }) => todaysTotal.toFixed(2))}
             </Text>
-            <View style={styles.percentageBadge}>
-              <Icon source='trending-up' size={16} color='#fff' />
-              <Text variant='bodySmall' style={styles.percentageText}>
-                +12%
-              </Text>
-              <Text variant='bodySmall' style={styles.percentageSubtext}>
-                from yesterday
-              </Text>
-            </View>
           </Card.Content>
         </Card>
 
@@ -63,9 +62,6 @@ export default function Dashboard() {
         <View style={styles.transactionsHeader}>
           <Text variant='titleLarge' style={styles.transactionsTitle}>
             Recent Transactions
-          </Text>
-          <Text variant='bodyMedium' style={styles.viewAllLink}>
-            View All
           </Text>
         </View>
 
@@ -152,25 +148,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 12,
   },
-  percentageBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-  },
-  percentageText: {
-    color: '#fff',
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-  percentageSubtext: {
-    color: '#fff',
-    marginLeft: 8,
-    opacity: 0.9,
-  },
   statsRow: {
     flexDirection: 'row',
     gap: 12,
@@ -230,10 +207,6 @@ const styles = StyleSheet.create({
   transactionsTitle: {
     fontWeight: '700',
     color: '#000',
-  },
-  viewAllLink: {
-    color: '#4A90E2',
-    fontWeight: '600',
   },
   transactionsList: {
     gap: 12,

@@ -65,8 +65,6 @@ export const TransactionSuccess = ({
       return;
       // misfortune... there's no SMS available on this device
     }
-    // Implement SMS sending functionality here
-    console.log('Send SMS clicked');
   };
   const onPrintReceipt = () => {
     // Implement print receipt functionality here

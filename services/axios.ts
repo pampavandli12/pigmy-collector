@@ -25,7 +25,6 @@ api.interceptors.request.use(
     return config;
   },
   (error) => {
-    console.error('API Request Error:', error);
     return Promise.reject(error);
   },
 );
@@ -35,11 +34,9 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error.response && error.response.status === 403) {
-      console.warn('Unauthorized! Logging out.');
       await SecureStore.deleteItemAsync(SECURE_STORE_KEY);
       await notifyUnauthorized();
     }
-    console.error('API Error:', error);
     return Promise.reject(error);
   },
 );

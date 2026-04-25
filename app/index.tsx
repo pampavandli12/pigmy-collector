@@ -1,5 +1,6 @@
 import { useAuth } from '@/app/providers/AuthProvider';
 import { userLogin } from '@/services/login';
+import { showSnackbar } from '@/utils/snackbar';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -26,6 +27,7 @@ export default function SignIn() {
   const router = useRouter();
   const { login } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [isPasswordHidden, setIsPasswordHidden] = useState(true);
   const {
     control,
     handleSubmit,
@@ -45,7 +47,9 @@ export default function SignIn() {
       const user = await userLogin(values.phoneNumber, values.password);
       await login(user);
     } catch (error) {
-      console.error('Sign-in failed:', error);
+      showSnackbar(
+        'Login failed. Please check your credentials and try again.',
+      );
     } finally {
       setLoading(false);
     }
@@ -99,12 +103,17 @@ export default function SignIn() {
                   onBlur={onBlur}
                   onChangeText={onChange}
                   mode='flat'
-                  secureTextEntry
+                  secureTextEntry={isPasswordHidden}
                   style={styles.input}
                   left={<TextInput.Icon icon='lock-outline' />}
                   underlineStyle={{ height: 0 }}
                   contentStyle={styles.inputContent}
-                  right={<TextInput.Icon icon='eye' />}
+                  right={
+                    <TextInput.Icon
+                      icon={isPasswordHidden ? 'eye-off' : 'eye'}
+                      onPress={() => setIsPasswordHidden(!isPasswordHidden)}
+                    />
+                  }
                   error={Boolean(errors.password)}
                 />
               )}

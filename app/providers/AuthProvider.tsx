@@ -1,6 +1,7 @@
 import { setUnauthorizedHandler } from '@/services/authSession';
 import { AuthUser, authUserSchema } from '@/types/auth';
 import { SECURE_STORE_KEY } from '@/utils/constants';
+import { showSnackbar } from '@/utils/snackbar';
 import * as SecureStore from 'expo-secure-store';
 import React, {
   createContext,
@@ -51,7 +52,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
         await SecureStore.deleteItemAsync(SECURE_STORE_KEY);
       } catch (error) {
-        console.error('Failed to load auth state:', error);
+        showSnackbar(
+          'Failed to load authentication state. Please log in again.',
+        );
         await SecureStore.deleteItemAsync(SECURE_STORE_KEY);
       } finally {
         setIsLoading(false);

@@ -4,7 +4,9 @@ import { DB_NAME, TABLE_NAME } from './constants';
 
 export const fetchLocalTransactions = async (): Promise<LocalTransaction[]> => {
   const db = await SQLite.openDatabaseAsync(DB_NAME);
-  const result = await db.getAllAsync(`SELECT * FROM ${TABLE_NAME}`);
+  const result = await db.getAllAsync(
+    `SELECT * FROM ${TABLE_NAME} ORDER BY date DESC LIMIT 10`,
+  );
   return result as LocalTransaction[];
 };
 
