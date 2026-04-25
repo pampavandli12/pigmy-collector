@@ -2,7 +2,6 @@ import { LocalTransaction } from '@/types/user';
 import {
   fetchLocalTransactions,
   fetchTodaysTransactionAmount,
-  fetchYesterdaysTransactionAmount,
 } from '@/utils/transactions';
 import { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
@@ -12,27 +11,28 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function Dashboard() {
   const [transactions, setTransactions] = useState<LocalTransaction[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [todaysTotal, setTodaysTotal] = useState(0);
+
+  const loadDashboardData = useCallback(async () => {
+    try {
+      const recentTransactions = await fetchLocalTransactions();
+      setTransactions(recentTransactions);
+
+      const today = await fetchTodaysTransactionAmount();
+      setTodaysTotal(today);
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     loadDashboardData();
-  }, []);
+  }, [loadDashboardData]);
+
   useEffect(() => {
     loadDashboardData();
-  }, []);
-  const loadDashboardData = async () => {
-    await fetchTransactions();
-    await getInsights();
-  };
-  const fetchTransactions = async () => {
-    const recentTransactions = await fetchLocalTransactions();
-    setTransactions(recentTransactions);
-  };
-  const getInsights = async () => {
-    const todaysTotal = await fetchTodaysTransactionAmount();
-    const yesterdaysTotal = await fetchYesterdaysTransactionAmount();
-    return { todaysTotal, yesterdaysTotal };
-  };
+  }, [loadDashboardData]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -53,7 +53,7 @@ export default function Dashboard() {
               </Text>
             </View>
             <Text variant='displaySmall' style={styles.collectionAmount}>
-              {getInsights().then(({ todaysTotal }) => todaysTotal.toFixed(2))}
+              ₹{todaysTotal.toFixed(2)}
             </Text>
           </Card.Content>
         </Card>

@@ -29,12 +29,12 @@ const useUser = create<State & Actions>((set) => ({
       const customers = await fetchCustomers(payload);
       set({ customers, loadCustomerStatus: Status.Success });
     } catch (error: unknown) {
+      set({ loadCustomerStatus: Status.Error });
       const err = error as { response?: { status?: number } };
       if (err.response?.status === 403) {
         showSnackbar('Session expired. Please log in again.');
         return;
       }
-      set({ loadCustomerStatus: Status.Error });
       showSnackbar('Failed to load customers. Please try again.'); // Show error message to user
     }
   },
@@ -46,11 +46,11 @@ const useUser = create<State & Actions>((set) => ({
       set({ createTransactionStatus: Status.Success });
     } catch (error: unknown) {
       const err = error as { response?: { status?: number } };
+      set({ createTransactionStatus: Status.Error });
       if (err.response?.status === 403) {
         showSnackbar('Session expired. Please log in again.');
         return;
       }
-      set({ createTransactionStatus: Status.Error });
       showSnackbar('Failed to create transaction. Please try again.'); // Show error message to user
     }
   },
