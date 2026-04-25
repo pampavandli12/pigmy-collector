@@ -1,22 +1,10 @@
+import { TransactionForm } from '@/components/TransactionForm';
+import { TransactionSuccess } from '@/components/TransactionSuccess';
 import { Status } from '@/types/sharedEnums';
-import { Picker } from '@react-native-picker/picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
-import {
-  Avatar,
-  Button,
-  Card,
-  IconButton,
-  Text,
-  TextInput,
-} from 'react-native-paper';
+import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
+import { IconButton, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import useUser from './store/userStore';
 
@@ -42,7 +30,6 @@ export default function UserDetail() {
   const [amount, setAmount] = useState('');
   const [scheme, setScheme] = useState('');
   const [date, setDate] = useState('');
-  const schemeOptions = ['Pigmy Deposit', 'Daily Deposit'];
 
   useEffect(() => {
     setDate(
@@ -53,6 +40,19 @@ export default function UserDetail() {
       }),
     );
   }, [setDate]);
+  useEffect(() => {
+    return () => {
+      // Reset transaction status when leaving the screen
+      // This ensures that if the user comes back to this screen, it will show the form instead of the success message
+      if (
+        createTransactionStatus === Status.Success ||
+        createTransactionStatus === Status.Error
+      ) {
+        // Reset to idle so that form is shown when user comes back
+        useUser.setState({ createTransactionStatus: Status.Idle });
+      }
+    };
+  }, []);
   const handleConfirm = async () => {
     console.log('Confirm deposit', { customer, amount, scheme, date });
     const payload = {
@@ -67,7 +67,7 @@ export default function UserDetail() {
     };
     await createTransaction(payload);
     // Handle deposit confirmation
-    router.back();
+    //router.back();
   };
   const isTransactionLoading = createTransactionStatus === Status.Loading;
 
@@ -91,97 +91,28 @@ export default function UserDetail() {
           </Text>
           <View style={styles.headerSpacer} />
         </View>
-
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Customer Info Card */}
-          <Card style={styles.customerCard}>
-            <Card.Content style={styles.customerContent}>
-              <Avatar.Text
-                size={45}
-                label={customer.name.charAt(0).toUpperCase()}
-                style={styles.avatar}
-              />
-              <View style={styles.customerInfo}>
-                <Text variant='titleLarge' style={styles.customerName}>
-                  {customer.name}
-                </Text>
-                <Text variant='bodyMedium' style={styles.customerId}>
-                  ID: {customer.id}
-                </Text>
-              </View>
-            </Card.Content>
-          </Card>
-
-          {/* Deposit Details Section */}
-          <View style={styles.detailsSection}>
-            <Text variant='titleLarge' style={styles.sectionTitle}>
-              Deposit Details
-            </Text>
-
-            {/* Amount Field */}
-            <View style={styles.fieldContainer}>
-              <Text variant='bodyMedium' style={styles.fieldLabel}>
-                Amount
-              </Text>
-              <TextInput
-                mode='flat'
-                value={amount}
-                onChangeText={setAmount}
-                keyboardType='decimal-pad'
-                style={styles.amountInput}
-                contentStyle={styles.amountInputContent}
-                underlineStyle={{ height: 0 }}
-                activeUnderlineColor='transparent'
-              />
-            </View>
-
-            {/* Scheme Field */}
-            <View style={styles.fieldContainer}>
-              <Text variant='bodyMedium' style={styles.fieldLabel}>
-                Scheme
-              </Text>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={scheme}
-                  onValueChange={(itemValue) => setScheme(itemValue)}
-                  style={styles.picker}
-                >
-                  <Picker.Item label='Select scheme' value='' />
-                  {schemeOptions.map((option) => (
-                    <Picker.Item key={option} label={option} value={option} />
-                  ))}
-                </Picker>
-              </View>
-            </View>
-
-            {/* Date Field */}
-            <View style={styles.fieldContainer}>
-              <Text variant='titleMedium' style={styles.fieldLabel}>
-                Date
-              </Text>
-              <View style={styles.dateContainer}>
-                <Text variant='titleMedium' style={styles.dateValue}>
-                  {date}
-                </Text>
-              </View>
-            </View>
-          </View>
-        </ScrollView>
-
-        {/* Bottom Button */}
-        <View style={styles.bottomContainer}>
-          <Button
-            mode='contained'
-            onPress={handleConfirm}
-            disabled={!amount || !scheme}
-            style={styles.confirmButton}
-            loading={isTransactionLoading}
-            labelStyle={styles.confirmButtonText}
-            contentStyle={styles.confirmButtonContent}
-          >
-            Confirm + Save
-          </Button>
-        </View>
+        {/* Transaction Form */}
+        {createTransactionStatus === Status.Success ? (
+          <TransactionSuccess
+            customerName={customer.name}
+            customerId={customer.id}
+            amount={`₹${amount}`}
+            scheme={scheme}
+            date={date}
+            onDone={() => router.back()}
+          />
+        ) : (
+          <TransactionForm
+            customer={customer}
+            amount={amount}
+            setAmount={setAmount}
+            scheme={scheme}
+            setScheme={setScheme}
+            date={date}
+            handleConfirm={handleConfirm}
+            isTransactionLoading={isTransactionLoading}
+          />
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -218,98 +149,5 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 16,
-  },
-  customerCard: {
-    marginTop: 16,
-    marginBottom: 24,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    elevation: 1,
-  },
-  customerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    marginRight: 16,
-  },
-  customerInfo: {
-    flex: 1,
-  },
-  customerName: {
-    fontWeight: '700',
-    color: '#000',
-    marginBottom: 4,
-  },
-  customerId: {
-    color: '#999',
-  },
-  chevron: {
-    margin: 0,
-  },
-  detailsSection: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontWeight: '700',
-    color: '#000',
-    marginBottom: 24,
-  },
-  fieldContainer: {
-    marginBottom: 32,
-  },
-  fieldLabel: {
-    color: '#999',
-    marginBottom: 8,
-    fontSize: 14,
-  },
-  amountInput: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    paddingHorizontal: 0,
-    height: 60,
-  },
-  amountInputContent: {
-    paddingLeft: 16,
-    paddingTop: 8,
-  },
-  dateContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-  },
-  dateValue: {
-    color: '#000',
-    fontSize: 16,
-  },
-  bottomContainer: {
-    padding: 16,
-    backgroundColor: '#F5F5F5',
-  },
-  pickerContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    height: 60,
-    justifyContent: 'center',
-  },
-  picker: {
-    height: 60,
-    color: '#000',
-  },
-  confirmButton: {
-    borderRadius: 12,
-    backgroundColor: '#4A90E2',
-  },
-  confirmButtonContent: {
-    paddingVertical: 12,
-  },
-  confirmButtonText: {
-    fontSize: 18,
-    fontWeight: '600',
   },
 });

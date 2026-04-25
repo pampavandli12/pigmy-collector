@@ -1,7 +1,7 @@
+import { setUnauthorizedHandler } from '@/services/authSession';
 import { AuthUser, authUserSchema } from '@/types/auth';
 import { SECURE_STORE_KEY } from '@/utils/constants';
 import * as SecureStore from 'expo-secure-store';
-import { setUnauthorizedHandler } from '@/services/authSession';
 import React, {
   createContext,
   useCallback,
