@@ -1,3 +1,4 @@
+import { DB_NAME, TABLE_NAME } from '@/utils/constants';
 import {
   Roboto_400Regular,
   Roboto_500Medium,
@@ -6,10 +7,29 @@ import {
 } from '@expo-google-fonts/roboto';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { SQLiteProvider } from 'expo-sqlite';
 import { useEffect } from 'react';
 import { MD3LightTheme, PaperProvider } from 'react-native-paper';
 import { PrinterProvider } from '../contexts/PrinterContext';
 import { AuthProvider, useAuth } from './providers/AuthProvider';
+
+async function initDb(db: any) {
+  await db.execAsync(`
+             PRAGMA journal_mode = WAL;
+             CREATE TABLE IF NOT EXISTS ${TABLE_NAME} (
+             id INTEGER PRIMARY KEY AUTOINCREMENT,
+             userId TEXT NOT NULL,
+             collectedAmount REAL NOT NULL,
+             accountNumber TEXT NOT NULL,
+             agentCode INTEGER NOT NULL,
+             bankCode TEXT NOT NULL,
+             customerName TEXT NOT NULL,
+             date TEXT NOT NULL,
+             collectiontype TEXT NOT NULL,
+             schemename TEXT NOT NULL
+             );
+         `);
+}
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -107,11 +127,13 @@ export default function RootLayout() {
 
   return (
     <PaperProvider theme={theme}>
-      <PrinterProvider>
-        <AuthProvider>
-          <InitialLayout />
-        </AuthProvider>
-      </PrinterProvider>
+      <SQLiteProvider databaseName={DB_NAME} onInit={initDb}>
+        <PrinterProvider>
+          <AuthProvider>
+            <InitialLayout />
+          </AuthProvider>
+        </PrinterProvider>
+      </SQLiteProvider>
     </PaperProvider>
   );
 }

@@ -11,3 +11,5 @@ export const API_ENDPOINTS = {
   ADD_TRANSACTION: '/pigmyMobile/v2/transaction',
 } as const;
 export const SECURE_STORE_KEY = 'userInfo';
+export const DB_NAME = 'pigmy_collector.db';
+export const TABLE_NAME = 'transactions';

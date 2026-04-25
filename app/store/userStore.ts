@@ -2,6 +2,7 @@
 import { createTransaction, fetchCustomers } from '@/services/user';
 import { Status } from '@/types/sharedEnums';
 import { Customer, TransactionPayload } from '@/types/user';
+import { saveTransactionLocally } from '@/utils/transactions';
 import { create } from 'zustand';
 
 type State = {
@@ -34,7 +35,9 @@ const useUser = create<State & Actions>((set) => ({
   createTransaction: async (payload: TransactionPayload) => {
     set({ createTransactionStatus: Status.Loading });
     try {
-      await createTransaction(payload);
+      const response = await createTransaction(payload);
+      await saveTransactionLocally(payload);
+      console.log('Transaction response', response);
       set({ createTransactionStatus: Status.Success });
     } catch (error) {
       set({ createTransactionStatus: Status.Error });

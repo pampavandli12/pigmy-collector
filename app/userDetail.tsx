@@ -60,7 +60,7 @@ export default function UserDetail() {
       agentCode: customer.agentCode,
       bankCode: customer.bankCode,
       collectedAmount: parseFloat(amount),
-      schemename: `#sym:${scheme}`,
+      schemename: scheme,
       collectiontype: 'cash',
       customerName: customer.name,
       accountNumber: parseInt(customer.account, 10),

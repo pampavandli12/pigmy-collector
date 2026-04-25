@@ -1,185 +1,108 @@
-import { useState } from "react";
-import { Image, ScrollView, StyleSheet, View } from "react-native";
-import { Button, Card, Icon, Text } from "react-native-paper";
-import { SafeAreaView } from "react-native-safe-area-context";
-
-interface Transaction {
-  id: string;
-  name: string;
-  date: string;
-  time: string;
-  amount: number;
-  status: string;
-  avatar: string;
-}
+import { LocalTransaction } from '@/types/user';
+import { fetchLocalTransactions } from '@/utils/transactions';
+import { useCallback, useEffect, useState } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Avatar, Card, Icon, Text } from 'react-native-paper';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function Dashboard() {
-  const [transactions] = useState<Transaction[]>([
-    {
-      id: "1",
-      name: "Ethan Carter",
-      date: "05/15/24",
-      time: "10:42 AM",
-      amount: 500.0,
-      status: "Success",
-      avatar: "https://i.pravatar.cc/150?img=12",
-    },
-    {
-      id: "2",
-      name: "Olivia Bennett",
-      date: "05/14/24",
-      time: "04:15 PM",
-      amount: 1200.0,
-      status: "Success",
-      avatar: "https://i.pravatar.cc/150?img=5",
-    },
-    {
-      id: "3",
-      name: "Noah Thompson",
-      date: "05/13/24",
-      time: "09:30 AM",
-      amount: 800.0,
-      status: "Success",
-      avatar: "https://i.pravatar.cc/150?img=13",
-    },
-    {
-      id: "4",
-      name: "Ava Martinez",
-      date: "05/12/24",
-      time: "02:20 PM",
-      amount: 2000.0,
-      status: "Success",
-      avatar: "https://i.pravatar.cc/150?img=1",
-    },
-    {
-      id: "5",
-      name: "Liam Harris",
-      date: "05/11/24",
-      time: "11:15 AM",
-      amount: 1500.0,
-      status: "Success",
-      avatar: "https://i.pravatar.cc/150?img=15",
-    },
-  ]);
+  const [transactions, setTransactions] = useState<LocalTransaction[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
 
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchTransactions().finally(() => setRefreshing(false));
+  }, []);
+  useEffect(() => {
+    fetchTransactions();
+  }, []);
+  const fetchTransactions = async () => {
+    const recentTransactions = await fetchLocalTransactions();
+    console.log('Fetched local transactions', recentTransactions);
+    setTransactions(recentTransactions);
+  };
+  // const getInsights = async () => {
+  //   const todaysTotal = await fetchTodaysTransactionAmount();
+  //   const yesterdaysTotal = await fetchYesterdaysTransactionAmount();
+  //   return { todaysTotal, yesterdaysTotal };
+  // };
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         {/* Today's Collection Card */}
         <Card style={styles.collectionCard}>
           <Card.Content>
             <View style={styles.collectionHeader}>
-              <Icon source="wallet" size={24} color="#fff" />
-              <Text variant="titleMedium" style={styles.collectionLabel}>
+              <Icon source='wallet' size={24} color='#fff' />
+              <Text variant='titleMedium' style={styles.collectionLabel}>
                 Today's Collection
               </Text>
             </View>
-            <Text variant="displaySmall" style={styles.collectionAmount}>
+            <Text variant='displaySmall' style={styles.collectionAmount}>
               $12,500
             </Text>
             <View style={styles.percentageBadge}>
-              <Icon source="trending-up" size={16} color="#fff" />
-              <Text variant="bodySmall" style={styles.percentageText}>
+              <Icon source='trending-up' size={16} color='#fff' />
+              <Text variant='bodySmall' style={styles.percentageText}>
                 +12%
               </Text>
-              <Text variant="bodySmall" style={styles.percentageSubtext}>
+              <Text variant='bodySmall' style={styles.percentageSubtext}>
                 from yesterday
               </Text>
             </View>
           </Card.Content>
         </Card>
 
-        {/* Stats Row */}
-        <View style={styles.statsRow}>
-          <Card style={styles.statCard}>
-            <Card.Content>
-              <View style={styles.statIconContainer}>
-                <Icon source="calendar-clock" size={28} color="#FF9800" />
-              </View>
-              <Text variant="headlineMedium" style={styles.statValue}>
-                $4,200
-              </Text>
-              <Text variant="bodyMedium" style={styles.statLabel}>
-                Total Due Payments
-              </Text>
-            </Card.Content>
-          </Card>
-
-          <Card style={styles.statCard}>
-            <Card.Content>
-              <View style={styles.statIconContainerGreen}>
-                <Icon source="check-circle" size={28} color="#4CAF50" />
-              </View>
-              <Text variant="headlineMedium" style={styles.statValue}>
-                142
-              </Text>
-              <Text variant="bodyMedium" style={styles.statLabel}>
-                Completed Trans.
-              </Text>
-            </Card.Content>
-          </Card>
-        </View>
-
-        {/* Action Buttons */}
-        <View style={styles.actionButtonsRow}>
-          <Button
-            mode="text"
-            icon="plus-circle"
-            textColor="#4A90E2"
-            labelStyle={styles.actionButtonLabel}
-            contentStyle={styles.actionButtonContent}
-            onPress={() => console.log("Add Deposit")}
-          >
-            Add Deposit
-          </Button>
-          <Button
-            mode="text"
-            icon="account-plus"
-            textColor="#4A90E2"
-            labelStyle={styles.actionButtonLabel}
-            contentStyle={styles.actionButtonContent}
-            onPress={() => console.log("Add Customer")}
-          >
-            Add Customer
-          </Button>
-        </View>
-
         {/* Recent Transactions */}
         <View style={styles.transactionsHeader}>
-          <Text variant="titleLarge" style={styles.transactionsTitle}>
+          <Text variant='titleLarge' style={styles.transactionsTitle}>
             Recent Transactions
           </Text>
-          <Text variant="bodyMedium" style={styles.viewAllLink}>
+          <Text variant='bodyMedium' style={styles.viewAllLink}>
             View All
           </Text>
         </View>
 
         {/* Transaction List */}
         <View style={styles.transactionsList}>
-          {transactions.map((transaction) => (
-            <View key={transaction.id} style={styles.transactionItem}>
-              <Image
-                source={{ uri: transaction.avatar }}
+          {transactions.map((transaction, index) => (
+            <View key={index} style={styles.transactionItem}>
+              <Avatar.Text
+                size={48}
+                label={transaction.customerName.charAt(0).toUpperCase()}
                 style={styles.transactionAvatar}
               />
               <View style={styles.transactionInfo}>
-                <Text variant="titleMedium" style={styles.transactionName}>
-                  {transaction.name}
+                <Text variant='titleMedium' style={styles.transactionName}>
+                  {transaction.customerName}
                 </Text>
-                <Text variant="bodySmall" style={styles.transactionDate}>
-                  {transaction.date} • {transaction.time}
+                <Text variant='bodySmall' style={styles.transactionDate}>
+                  {new Date(transaction.date).toLocaleDateString()}
                 </Text>
               </View>
               <View style={styles.transactionRight}>
-                <Text variant="titleMedium" style={styles.transactionAmount}>
-                  +${transaction.amount.toFixed(2)}
+                <Text variant='titleMedium' style={styles.transactionAmount}>
+                  +{transaction.collectedAmount.toFixed(2)}
                 </Text>
-                <Text variant="bodySmall" style={styles.transactionStatus}>
-                  {transaction.status}
+                <Text variant='bodySmall' style={styles.transactionStatus}>
+                  {transaction.collectiontype}
                 </Text>
               </View>
             </View>
           ))}
+          {transactions.length === 0 && (
+            <View style={{ alignItems: 'center', marginTop: 32 }}>
+              <Text variant='bodyMedium' style={{ color: '#666' }}>
+                No transactions yet
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -189,73 +112,73 @@ export default function Dashboard() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: '#F5F5F5',
   },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: '#F5F5F5',
   },
   headerTitle: {
-    fontWeight: "700",
-    color: "#000",
+    fontWeight: '700',
+    color: '#000',
   },
   content: {
     flex: 1,
     paddingHorizontal: 16,
   },
   collectionCard: {
-    backgroundColor: "#4A90E2",
+    backgroundColor: '#4A90E2',
     borderRadius: 16,
     marginTop: 16,
     marginBottom: 16,
     elevation: 2,
   },
   collectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 8,
   },
   collectionLabel: {
-    color: "#fff",
+    color: '#fff',
     marginLeft: 8,
-    fontWeight: "500",
+    fontWeight: '500',
   },
   collectionAmount: {
-    color: "#fff",
-    fontWeight: "700",
+    color: '#fff',
+    fontWeight: '700',
     marginBottom: 12,
   },
   percentageBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    alignSelf: "flex-start",
+    alignSelf: 'flex-start',
   },
   percentageText: {
-    color: "#fff",
-    fontWeight: "600",
+    color: '#fff',
+    fontWeight: '600',
     marginLeft: 4,
   },
   percentageSubtext: {
-    color: "#fff",
+    color: '#fff',
     marginLeft: 8,
     opacity: 0.9,
   },
   statsRow: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: 12,
     marginBottom: 16,
   },
   statCard: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: '#fff',
     borderRadius: 12,
     elevation: 1,
   },
@@ -263,63 +186,63 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: "#FFF3E0",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: '#FFF3E0',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 12,
   },
   statIconContainerGreen: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: "#E8F5E9",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: '#E8F5E9',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 12,
   },
   statValue: {
-    fontWeight: "700",
-    color: "#000",
+    fontWeight: '700',
+    color: '#000',
     marginBottom: 4,
   },
   statLabel: {
-    color: "#666",
+    color: '#666',
     fontSize: 14,
   },
   actionButtonsRow: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: 16,
     marginBottom: 24,
   },
   actionButtonContent: {
-    flexDirection: "row-reverse",
+    flexDirection: 'row-reverse',
   },
   actionButtonLabel: {
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   transactionsHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 16,
   },
   transactionsTitle: {
-    fontWeight: "700",
-    color: "#000",
+    fontWeight: '700',
+    color: '#000',
   },
   viewAllLink: {
-    color: "#4A90E2",
-    fontWeight: "600",
+    color: '#4A90E2',
+    fontWeight: '600',
   },
   transactionsList: {
     gap: 12,
     marginBottom: 24,
   },
   transactionItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
     padding: 16,
     borderRadius: 12,
     elevation: 1,
@@ -334,23 +257,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   transactionName: {
-    fontWeight: "600",
-    color: "#000",
+    fontWeight: '600',
+    color: '#000',
     marginBottom: 4,
   },
   transactionDate: {
-    color: "#666",
+    color: '#666',
   },
   transactionRight: {
-    alignItems: "flex-end",
+    alignItems: 'flex-end',
   },
   transactionAmount: {
-    fontWeight: "700",
-    color: "#4A90E2",
+    fontWeight: '700',
+    color: '#4A90E2',
     marginBottom: 4,
   },
   transactionStatus: {
-    color: "#4CAF50",
-    fontWeight: "500",
+    color: '#4CAF50',
+    fontWeight: '500',
   },
 });

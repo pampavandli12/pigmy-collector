@@ -19,3 +19,6 @@ export interface TransactionPayload {
   customerName: string;
   accountNumber: number;
 }
+export interface LocalTransaction extends TransactionPayload {
+  date: string;
+}
