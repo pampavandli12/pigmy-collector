@@ -1,4 +1,5 @@
 // store/useCounter.ts
+import { notifyUnauthorized } from '@/services/authSession';
 import { createTransaction, fetchCustomers } from '@/services/user';
 import { Status } from '@/types/sharedEnums';
 import { Customer, TransactionPayload } from '@/types/user';
@@ -33,6 +34,7 @@ const useUser = create<State & Actions>((set) => ({
       const err = error as { response?: { status?: number } };
       if (err.response?.status === 403) {
         showSnackbar('Session expired. Please log in again.');
+        await notifyUnauthorized();
         return;
       }
       showSnackbar('Failed to load customers. Please try again.'); // Show error message to user
@@ -49,6 +51,7 @@ const useUser = create<State & Actions>((set) => ({
       set({ createTransactionStatus: Status.Error });
       if (err.response?.status === 403) {
         showSnackbar('Session expired. Please log in again.');
+        await notifyUnauthorized();
         return;
       }
       showSnackbar('Failed to create transaction. Please try again.'); // Show error message to user
