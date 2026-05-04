@@ -11,6 +11,7 @@ interface TransactionSuccessProps {
   amount?: string;
   scheme?: string;
   date?: string;
+  mobilenumber?: string;
   onPrintReceipt?: () => void;
   onDone?: () => void;
 }
@@ -20,6 +21,7 @@ export const TransactionSuccess = ({
   customerId = '60001',
   amount = '255',
   scheme = 'Pigmy Deposit',
+  mobilenumber = '',
   date = new Date().toLocaleDateString('en-US', {
     month: 'long',
     day: 'numeric',
@@ -54,7 +56,7 @@ export const TransactionSuccess = ({
     if (isAvailable) {
       // do your SMS stuff here
       const { result } = await SMS.sendSMSAsync(
-        ['1234567890'], // Replace with the recipient's phone number
+        [mobilenumber], // Replace with the recipient's phone number
         `Dear ${customerName}, ₹${amount} has been collected successfully towards ${scheme} on ${date}. Account No: ${customerId}. Thank you for banking with us.`,
       );
     } else {

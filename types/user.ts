@@ -6,6 +6,7 @@ export interface Customer {
   customerName: string;
   lastDepositDate: string;
   schemeId: string;
+  mobilenumber: string;
   userId: number;
 }
 

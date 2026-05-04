@@ -64,6 +64,7 @@ export default function Users() {
         name: customer.customerName.trim(),
         balance: customer.currentBalance.toString(),
         account: customer.accountNumber.toString(),
+        mobilenumber: customer.mobilenumber,
       },
     });
   };

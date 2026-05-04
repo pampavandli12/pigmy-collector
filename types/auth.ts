@@ -5,6 +5,7 @@ export const authUserSchema = z
     agentCode: z.number().int(),
     agentName: z.string().min(1),
     bankCode: z.string().min(1),
+    bankName: z.string().min(4),
     token: z.string().min(1),
   })
   .strict();

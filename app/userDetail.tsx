@@ -25,6 +25,7 @@ export default function UserDetail() {
     balance: parseFloat(params.balance as string),
     account: params.account as string,
     image: params.image as string,
+    mobilenumber: params.mobilenumber as string,
   };
 
   const [amount, setAmount] = useState('');
@@ -98,6 +99,7 @@ export default function UserDetail() {
             amount={`₹${amount}`}
             scheme={scheme}
             date={date}
+            mobilenumber={customer.mobilenumber}
             onDone={() => router.back()}
           />
         ) : (
