@@ -1,12 +1,14 @@
-import { TransactionForm } from '@/components/TransactionForm';
-import { TransactionSuccess } from '@/components/TransactionSuccess';
-import { Status } from '@/types/sharedEnums';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
-import { IconButton, Text } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import useUser from './store/userStore';
+import { TransactionForm } from "@/components/TransactionForm";
+import { TransactionSuccess } from "@/components/TransactionSuccess";
+import { actions } from "@/store/actions";
+import { Status } from "@/types/sharedEnums";
+import { TransactionPayload } from "@/types/user";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useState } from "react";
+import { KeyboardAvoidingView, Platform, StyleSheet, View } from "react-native";
+import { IconButton, Text } from "react-native-paper";
+import { SafeAreaView } from "react-native-safe-area-context";
+import useUser from "./store/userStore";
 
 export default function UserDetail() {
   const router = useRouter();
@@ -14,85 +16,77 @@ export default function UserDetail() {
   const createTransactionStatus = useUser(
     (state) => state.createTransactionStatus,
   );
-  const createTransaction = useUser((state) => state.createTransaction);
 
+  const [transactionSuccess, setTransactionSuccess] = useState(false);
   // Parse customer data from params
   const customer = {
     id: params.id as string,
     name: params.name as string,
-    agentCode: parseInt(params.agentCode as string, 10),
+    agentCode: Array.isArray(params.agentCode)
+      ? params.agentCode[0]
+      : params.agentCode,
     bankCode: params.bankCode as string,
-    balance: parseFloat(params.balance as string),
+    balance: params.balance,
     account: params.account as string,
     image: params.image as string,
     mobilenumber: params.mobilenumber as string,
   };
 
-  const [amount, setAmount] = useState('');
-  const [scheme, setScheme] = useState('');
-  const [date, setDate] = useState('');
+  const [amount, setAmount] = useState("");
+  const [scheme, setScheme] = useState("");
+  const [date, setDate] = useState("");
 
   useEffect(() => {
     setDate(
-      new Date().toLocaleDateString('en-US', {
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric',
+      new Date().toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
       }),
     );
   }, [setDate]);
-  useEffect(() => {
-    return () => {
-      // Reset transaction status when leaving the screen
-      // This ensures that if the user comes back to this screen, it will show the form instead of the success message
-      if (
-        createTransactionStatus === Status.Success ||
-        createTransactionStatus === Status.Error
-      ) {
-        // Reset to idle so that form is shown when user comes back
-        useUser.setState({ createTransactionStatus: Status.Idle });
-      }
-    };
-  }, []);
+
   const handleConfirm = async () => {
-    const payload = {
-      userId: parseInt(customer.id, 10),
-      agentCode: customer.agentCode,
+    const payload: TransactionPayload = {
+      userId: Number(customer.id),
+      agentCode: Number(customer.agentCode),
       bankCode: customer.bankCode,
-      collectedAmount: parseFloat(amount),
+      collectedAmount: Number(amount),
       schemename: scheme,
-      collectiontype: 'cash',
+      collectiontype: "cash",
       customerName: customer.name,
-      accountNumber: parseInt(customer.account, 10),
+      accountNumber: Number(customer.account),
+      transactionId: `tx-${Date.now()}`,
     };
-    await createTransaction(payload);
+    actions.addTransaction(payload);
+    setTransactionSuccess(true);
     // Handle deposit confirmation
     //router.back();
   };
   const isTransactionLoading = createTransactionStatus === Status.Loading;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         {/* Header */}
         <View style={styles.header}>
           <IconButton
-            icon='arrow-left'
+            icon="arrow-left"
             size={24}
-            iconColor='#000'
+            iconColor="#000"
             onPress={() => router.back()}
             style={styles.backButton}
           />
-          <Text variant='headlineSmall' style={styles.headerTitle}>
+          <Text variant="headlineSmall" style={styles.headerTitle}>
             New Deposit
           </Text>
           <View style={styles.headerSpacer} />
         </View>
         {/* Transaction Form */}
-        {createTransactionStatus === Status.Success ? (
+        {transactionSuccess ? (
           <TransactionSuccess
             customerName={customer.name}
             customerId={customer.id}
@@ -122,27 +116,27 @@ export default function UserDetail() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: "#F5F5F5",
   },
   keyboardView: {
     flex: 1,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 8,
     paddingVertical: 8,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: "#F5F5F5",
   },
   backButton: {
     margin: 0,
   },
   headerTitle: {
-    fontWeight: '700',
-    color: '#000',
+    fontWeight: "700",
+    color: "#000",
     flex: 1,
-    textAlign: 'center',
+    textAlign: "center",
   },
   headerSpacer: {
     width: 48,
