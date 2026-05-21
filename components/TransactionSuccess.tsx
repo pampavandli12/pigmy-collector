@@ -1,7 +1,4 @@
-import useUser from '@/app/store/userStore';
-import { Status } from '@/types/sharedEnums';
 import * as SMS from 'expo-sms';
-import { useEffect } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import { Avatar, Button, Card, Icon, Text } from 'react-native-paper';
 
@@ -35,22 +32,6 @@ export const TransactionSuccess = ({
     .join('')
     .slice(0, 2)
     .toUpperCase();
-  const createTransactionStatus = useUser(
-    (state) => state.createTransactionStatus,
-  );
-  useEffect(() => {
-    return () => {
-      // Reset transaction status when leaving the screen
-      // This ensures that if the user comes back to this screen, it will show the form instead of the success message
-      if (
-        createTransactionStatus === Status.Success ||
-        createTransactionStatus === Status.Error
-      ) {
-        // Reset to idle so that form is shown when user comes back
-        useUser.setState({ createTransactionStatus: Status.Idle });
-      }
-    };
-  }, []);
   const onSendSms = async () => {
     const isAvailable = await SMS.isAvailableAsync();
     if (isAvailable) {

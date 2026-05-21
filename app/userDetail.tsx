@@ -1,21 +1,16 @@
-import { TransactionForm } from "@/components/TransactionForm";
-import { TransactionSuccess } from "@/components/TransactionSuccess";
-import { actions } from "@/store/actions";
-import { Status } from "@/types/sharedEnums";
-import { TransactionPayload } from "@/types/user";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
-import { KeyboardAvoidingView, Platform, StyleSheet, View } from "react-native";
-import { IconButton, Text } from "react-native-paper";
-import { SafeAreaView } from "react-native-safe-area-context";
-import useUser from "./store/userStore";
+import { TransactionForm } from '@/components/TransactionForm';
+import { TransactionSuccess } from '@/components/TransactionSuccess';
+import { actions } from '@/store/actions';
+import { TransactionPayload } from '@/types/user';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
+import { IconButton, Text } from 'react-native-paper';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function UserDetail() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const createTransactionStatus = useUser(
-    (state) => state.createTransactionStatus,
-  );
 
   const [transactionSuccess, setTransactionSuccess] = useState(false);
   // Parse customer data from params
@@ -32,16 +27,16 @@ export default function UserDetail() {
     mobilenumber: params.mobilenumber as string,
   };
 
-  const [amount, setAmount] = useState("");
-  const [scheme, setScheme] = useState("");
-  const [date, setDate] = useState("");
+  const [amount, setAmount] = useState('');
+  const [scheme, setScheme] = useState('');
+  const [date, setDate] = useState('');
 
   useEffect(() => {
     setDate(
-      new Date().toLocaleDateString("en-US", {
-        month: "long",
-        day: "numeric",
-        year: "numeric",
+      new Date().toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
       }),
     );
   }, [setDate]);
@@ -53,7 +48,7 @@ export default function UserDetail() {
       bankCode: customer.bankCode,
       collectedAmount: Number(amount),
       schemename: scheme,
-      collectiontype: "cash",
+      collectiontype: 'cash',
       customerName: customer.name,
       accountNumber: Number(customer.account),
       transactionId: `tx-${Date.now()}`,
@@ -63,24 +58,23 @@ export default function UserDetail() {
     // Handle deposit confirmation
     //router.back();
   };
-  const isTransactionLoading = createTransactionStatus === Status.Loading;
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         {/* Header */}
         <View style={styles.header}>
           <IconButton
-            icon="arrow-left"
+            icon='arrow-left'
             size={24}
-            iconColor="#000"
+            iconColor='#000'
             onPress={() => router.back()}
             style={styles.backButton}
           />
-          <Text variant="headlineSmall" style={styles.headerTitle}>
+          <Text variant='headlineSmall' style={styles.headerTitle}>
             New Deposit
           </Text>
           <View style={styles.headerSpacer} />
@@ -105,7 +99,7 @@ export default function UserDetail() {
             setScheme={setScheme}
             date={date}
             handleConfirm={handleConfirm}
-            isTransactionLoading={isTransactionLoading}
+            isTransactionLoading={false}
           />
         )}
       </KeyboardAvoidingView>
@@ -116,27 +110,27 @@ export default function UserDetail() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: '#F5F5F5',
   },
   keyboardView: {
     flex: 1,
   },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 8,
     paddingVertical: 8,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: '#F5F5F5',
   },
   backButton: {
     margin: 0,
   },
   headerTitle: {
-    fontWeight: "700",
-    color: "#000",
+    fontWeight: '700',
+    color: '#000',
     flex: 1,
-    textAlign: "center",
+    textAlign: 'center',
   },
   headerSpacer: {
     width: 48,

@@ -1,8 +1,8 @@
-import { observable } from "@legendapp/state";
+import { observable } from '@legendapp/state';
 
-import { mmkv } from "./persistence";
+import { mmkv } from './persistence';
 
-import { Customer, OutboxItem } from "@/types/user";
+import { Customer, OutboxItem } from '@/types/user';
 
 interface AppState {
   customers: Record<number, Customer>;
@@ -27,11 +27,11 @@ function loadStorage<T>(key: string, fallback: T): T {
 }
 
 export const store$ = observable<AppState>({
-  customers: loadStorage("customers", {}),
+  customers: loadStorage('customers', {}),
 
-  outbox: loadStorage("outbox", {}),
+  outbox: loadStorage('outbox', {}),
 
-  searchQuery: "",
+  searchQuery: '',
 
   isRefreshingCustomers: false,
 
@@ -39,9 +39,9 @@ export const store$ = observable<AppState>({
 });
 
 store$.customers.onChange(({ value }) => {
-  mmkv.set("customers", JSON.stringify(value));
+  mmkv.set('customers', JSON.stringify(value));
 });
 
 store$.outbox.onChange(({ value }) => {
-  mmkv.set("outbox", JSON.stringify(value));
+  mmkv.set('outbox', JSON.stringify(value));
 });

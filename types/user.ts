@@ -27,7 +27,7 @@ export interface TransactionPayload {
   accountNumber: number;
 }
 
-export type SyncStatus = "pending" | "syncing" | "failed";
+export type SyncStatus = 'pending' | 'syncing' | 'failed' | 'synced';
 
 export interface OutboxItem {
   payload: TransactionPayload;

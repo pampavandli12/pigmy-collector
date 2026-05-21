@@ -1,6 +1,9 @@
-import { useState } from 'react';
-import { SafeAreaView, StyleSheet } from 'react-native';
+import { processOutbox } from '@/store/syncEngine';
+import NetInfo from '@react-native-community/netinfo';
+import { useEffect, useState } from 'react';
+import { StyleSheet } from 'react-native';
 import { BottomNavigation } from 'react-native-paper';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Dashboard from './dashboard';
 import Support from './support';
 import Users from './users';
@@ -27,6 +30,19 @@ export default function TabsLayout() {
       unfocusedIcon: 'help-circle-outline',
     },
   ]);
+
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      if (state.isConnected) {
+        console.log('Internet restored');
+
+        // Retry only existing queue
+        processOutbox();
+      }
+    });
+
+    return unsubscribe;
+  }, []);
 
   const renderScene = BottomNavigation.SceneMap({
     dashboard: Dashboard,

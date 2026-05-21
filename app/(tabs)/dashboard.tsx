@@ -1,38 +1,35 @@
-import { LocalTransaction } from '@/types/user';
 import {
-  fetchLocalTransactions,
-  fetchTodaysTransactionAmount,
-} from '@/utils/transactions';
-import { useCallback, useEffect, useState } from 'react';
+  todaysCollectionAmount$,
+  todaysTransactionCount$,
+  todaysTransactions$,
+} from '@/store/selectors';
+import { useCallback, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Avatar, Card, Icon, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function Dashboard() {
-  const [transactions, setTransactions] = useState<LocalTransaction[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [todaysTotal, setTodaysTotal] = useState(0);
 
-  const loadDashboardData = useCallback(async () => {
-    try {
-      const recentTransactions = await fetchLocalTransactions();
-      setTransactions(recentTransactions);
+  const todaysTransactions = todaysTransactions$.get();
 
-      const today = await fetchTodaysTransactionAmount();
-      setTodaysTotal(today);
-    } finally {
-      setRefreshing(false);
-    }
-  }, []);
+  const transactions = useMemo(
+    () => todaysTransactions.map((trx) => trx.payload),
+    [todaysTransactions],
+  );
+  console.log('Dashboard - Transactions for Today:', transactions);
+  const totalAmount = todaysCollectionAmount$.get();
+
+  const totalCount = todaysTransactionCount$.get();
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    loadDashboardData();
-  }, [loadDashboardData]);
-
-  useEffect(() => {
-    loadDashboardData();
-  }, [loadDashboardData]);
+    // Simulate a network request or data refresh
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1000);
+  }, []);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -53,7 +50,7 @@ export default function Dashboard() {
               </Text>
             </View>
             <Text variant='displaySmall' style={styles.collectionAmount}>
-              ₹{todaysTotal.toFixed(2)}
+              ₹{totalAmount}
             </Text>
           </Card.Content>
         </Card>
