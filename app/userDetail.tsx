@@ -2,6 +2,7 @@ import { TransactionForm } from '@/components/TransactionForm';
 import { TransactionSuccess } from '@/components/TransactionSuccess';
 import { actions } from '@/store/actions';
 import { TransactionPayload } from '@/types/user';
+import * as Crypto from 'expo-crypto';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
@@ -51,8 +52,9 @@ export default function UserDetail() {
       collectiontype: 'cash',
       customerName: customer.name,
       accountNumber: Number(customer.account),
-      transactionId: `tx-${Date.now()}`,
+      transactionId: Crypto.randomUUID(),
     };
+    console.log('Confirming transaction with payload:', payload);
     actions.addTransaction(payload);
     setTransactionSuccess(true);
     // Handle deposit confirmation

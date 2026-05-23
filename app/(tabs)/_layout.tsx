@@ -1,4 +1,4 @@
-import { processOutbox } from '@/store/syncEngine';
+import { cleanupOutbox, processOutbox } from '@/store/syncEngine';
 import NetInfo from '@react-native-community/netinfo';
 import { useEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
@@ -38,6 +38,7 @@ export default function TabsLayout() {
 
         // Retry only existing queue
         processOutbox();
+        cleanupOutbox();
       }
     });
 
@@ -51,7 +52,7 @@ export default function TabsLayout() {
   });
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <BottomNavigation
         navigationState={{ index, routes }}
         onIndexChange={setIndex}

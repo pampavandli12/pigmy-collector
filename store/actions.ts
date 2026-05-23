@@ -2,7 +2,7 @@ import { fetchCustomers } from '@/services/user';
 import { store$ } from './store';
 
 import { Customer, OutboxItem, TransactionPayload } from '@/types/user';
-import { processOutbox } from './syncEngine';
+import { cleanupOutbox, processOutbox } from './syncEngine';
 
 export const actions = {
   async syncCustomers(agentCode: number, bankCode: string) {
@@ -56,6 +56,8 @@ export const actions = {
 
     // Trigger immediate sync attempt
     processOutbox();
+    // Delete yesterday's transactions to prevent indefinite growth
+    cleanupOutbox();
   },
 
   retryFailedTransactions() {

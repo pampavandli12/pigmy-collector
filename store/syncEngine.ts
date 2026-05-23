@@ -67,3 +67,16 @@ export async function processOutbox() {
     syncing = false;
   }
 }
+
+// Delete yesterday's transactions from outbox to prevent indefinite growth
+export function cleanupOutbox() {
+  const outbox = store$.outbox.peek();
+
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+
+  Object.entries(outbox).forEach(([txId, item]) => {
+    if (item?.createdAt < cutoff) {
+      store$.outbox[txId].set(undefined);
+    }
+  });
+}

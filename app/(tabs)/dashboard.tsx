@@ -2,26 +2,22 @@ import {
   todaysCollectionAmount$,
   todaysTransactionCount$,
   todaysTransactions$,
+  totalCustomerCount$,
 } from '@/store/selectors';
-import { useCallback, useMemo, useState } from 'react';
+import { useSelector } from '@legendapp/state/react';
+import { useCallback, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Avatar, Card, Icon, Text } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false);
-  const [todaysTotal, setTodaysTotal] = useState(0);
 
-  const todaysTransactions = todaysTransactions$.get();
+  const transactions = useSelector(todaysTransactions$);
 
-  const transactions = useMemo(
-    () => todaysTransactions.map((trx) => trx.payload),
-    [todaysTransactions],
-  );
-  console.log('Dashboard - Transactions for Today:', transactions);
-  const totalAmount = todaysCollectionAmount$.get();
+  const totalAmount = useSelector(todaysCollectionAmount$);
 
-  const totalCount = todaysTransactionCount$.get();
+  const totalCount = useSelector(todaysTransactionCount$);
+  const totalCustomerCount = useSelector(totalCustomerCount$);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -32,7 +28,7 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
@@ -54,6 +50,31 @@ export default function Dashboard() {
             </Text>
           </Card.Content>
         </Card>
+
+        {/* Transaction count / customer count */}
+        <View style={styles.statsRow}>
+          <Card style={styles.statCard}>
+            <Card.Content style={styles.statContent}>
+              <View style={styles.transactionContent}>
+                <Text variant='titleLarge' style={styles.statValue}>
+                  {totalCount}
+                </Text>
+                <Text variant='bodySmall' style={styles.statLabel}>
+                  Today's Transactions
+                </Text>
+              </View>
+
+              <View style={styles.customerContent}>
+                <Text variant='titleLarge' style={styles.statValue}>
+                  {totalCustomerCount}
+                </Text>
+                <Text variant='bodySmall' style={styles.statLabel}>
+                  Total Customers
+                </Text>
+              </View>
+            </Card.Content>
+          </Card>
+        </View>
 
         {/* Recent Transactions */}
         <View style={styles.transactionsHeader}>
@@ -98,7 +119,7 @@ export default function Dashboard() {
           )}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -155,6 +176,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 12,
     elevation: 1,
+  },
+  statContent: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    display: 'flex',
+    flexDirection: 'row',
+    gap: 8,
   },
   statIconContainer: {
     width: 48,
@@ -245,5 +273,17 @@ const styles = StyleSheet.create({
   transactionStatus: {
     color: '#4CAF50',
     fontWeight: '500',
+  },
+  transactionContent: {
+    flex: 1,
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+  },
+  customerContent: {
+    flex: 1,
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
   },
 });

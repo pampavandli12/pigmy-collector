@@ -38,17 +38,20 @@ export const todaysTransactions$ = computed(() => {
 
   return Object.values(outbox)
     .filter((item) => isToday(item.createdAt))
-    .sort((a, b) => b.createdAt - a.createdAt);
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .map((item) => item.payload);
 });
-
 /**
  * Today's Total Collection
+ */
+/**
+ * Today's Collection Amount
  */
 export const todaysCollectionAmount$ = computed(() => {
   const transactions = todaysTransactions$.get();
 
   return transactions.reduce((total, item) => {
-    return total + Number(item.payload.collectedAmount || 0);
+    return total + Number(item.collectedAmount || 0);
   }, 0);
 });
 
@@ -57,4 +60,9 @@ export const todaysCollectionAmount$ = computed(() => {
  */
 export const todaysTransactionCount$ = computed(() => {
   return todaysTransactions$.get().length;
+});
+
+// Total customer count
+export const totalCustomerCount$ = computed(() => {
+  return Object.keys(store$.customers.get()).length;
 });

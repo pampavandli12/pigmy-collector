@@ -1,8 +1,8 @@
+import { useSelector } from '@legendapp/state/react';
 import { useRouter } from 'expo-router';
 import { useCallback } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Avatar, Card, IconButton, Searchbar, Text } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../providers/AuthProvider';
 
 import { store$ } from '@/store/store';
@@ -13,18 +13,14 @@ import { actions } from '@/store/actions';
 import { Customer } from '@/types/user';
 
 export default function Users() {
-  const customers = filteredCustomers$.get();
-  const searchQuery = store$.searchQuery.get();
+  const customers = useSelector(filteredCustomers$);
+  const searchQuery = useSelector(store$.searchQuery);
 
-  const syncing = store$.isRefreshingCustomers.get();
+  const syncing = useSelector(store$.isRefreshingCustomers);
 
   const router = useRouter();
 
   const { user } = useAuth();
-
-  const onRefresh = useCallback(() => {
-    loadCustomers();
-  }, []);
 
   const loadCustomers = useCallback(() => {
     if (!user) {
@@ -49,7 +45,7 @@ export default function Users() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <View style={styles.header}>
         <Searchbar
           placeholder='Search customers'
@@ -66,7 +62,7 @@ export default function Users() {
         style={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={syncing} onRefresh={onRefresh} />
+          <RefreshControl refreshing={syncing} onRefresh={loadCustomers} />
         }
       >
         {customers?.map((customer) => (
@@ -115,22 +111,15 @@ export default function Users() {
           </Card>
         ))}
 
-        {customers.length === 0 && !isCustomerLoading && (
+        {customers.length === 0 && (
           <View style={styles.emptyState}>
             <Text variant='bodyLarge' style={styles.emptyText}>
               No customers found
             </Text>
           </View>
         )}
-        {/* {isCustomerLoading && (
-          <View style={styles.emptyState}>
-            <Text variant="bodyLarge" style={styles.emptyText}>
-              Loading customers...
-            </Text>
-          </View>
-        )} */}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
