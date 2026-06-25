@@ -2,7 +2,7 @@ import { usePrinter } from '@/contexts/PrinterContext';
 import { ReceiptData, ReceiptPrinter } from '@/utils/ReceiptPrinter';
 import { useRouter } from 'expo-router';
 import * as SMS from 'expo-sms';
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import { Avatar, Button, Card, Icon, Text } from 'react-native-paper';
 
@@ -39,14 +39,14 @@ export const TransactionSuccess = ({
 
   const { isConnected } = usePrinter();
   const [isPrinting, setIsPrinting] = useState(false);
+  const [shouldPrintOnConnect, setShouldPrintOnConnect] = useState(false);
   const router = useRouter();
 
   const onSendSms = async () => {
     const isAvailable = await SMS.isAvailableAsync();
     if (isAvailable) {
-      // do your SMS stuff here
-      const { result } = await SMS.sendSMSAsync(
-        [mobilenumber], // Replace with the recipient's phone number
+      await SMS.sendSMSAsync(
+        [mobilenumber],
         `Dear ${customerName}, ₹${amount} has been collected successfully towards ${scheme} on ${date}. Account No: ${customerId}. Thank you for banking with us.`,
       );
     } else {
@@ -54,54 +54,42 @@ export const TransactionSuccess = ({
         'SMS Not Available',
         'Sorry, SMS functionality is not available on this device.',
       );
-      return;
-      // misfortune... there's no SMS available on this device
     }
   };
-  const onPrintReceipt = async () => {
-    // Implement print receipt functionality here
+
+  const onPrintReceipt = useCallback(async () => {
     if (!isConnected) {
-      Alert.alert('Not Connected', 'Please connect to a printer first');
-      // naviagete to printer connection screen
-      router.push('/printer');
+      setShouldPrintOnConnect(true);
+      router.push({
+        pathname: '/printer',
+        params: { redirectBack: 'true' },
+      });
       return;
     }
+
     setIsPrinting(true);
-    const sampleReceipt: ReceiptData = {
-      storeName: 'Pigmy Collector Store',
-      storeAddress: '123 Main Street, City',
-      phone: '+1 234-567-8900',
-      receiptNumber: `RC${Date.now()}`,
-      date: new Date().toLocaleString(),
+    const numericAmount = Number(amount.replace(/[^0-9.]/g, '')) || 0;
+    const receiptData: ReceiptData = {
+      storeName: 'PIGMY COLLECTOR',
+      storeAddress: 'Daily Collection System',
+      phone: mobilenumber || undefined,
+      receiptNumber: `TX-${customerId}-${Date.now().toString().slice(-6)}`,
+      date: date || new Date().toLocaleString(),
       items: [
         {
-          name: 'Product A',
-          quantity: 2,
-          price: 25.0,
-          total: 50.0,
-        },
-        {
-          name: 'Product B',
+          name: `Deposit: ${scheme}`,
           quantity: 1,
-          price: 15.5,
-          total: 15.5,
-        },
-        {
-          name: 'Product C',
-          quantity: 3,
-          price: 10.0,
-          total: 30.0,
+          price: numericAmount,
+          total: numericAmount,
         },
       ],
-      subtotal: 95.5,
-      tax: 9.55,
-      discount: 5.0,
-      total: 100.05,
+      subtotal: numericAmount,
+      total: numericAmount,
       paymentMethod: 'Cash',
-      footer: 'Visit us again!',
+      footer: `Customer: ${customerName}`,
     };
-    const success = await ReceiptPrinter.printReceipt(sampleReceipt);
-    console.log('Print Receipt clicked');
+
+    const success = await ReceiptPrinter.printReceipt(receiptData);
     setIsPrinting(false);
 
     if (success) {
@@ -109,7 +97,14 @@ export const TransactionSuccess = ({
     } else {
       Alert.alert('Error', 'Failed to print receipt');
     }
-  };
+  }, [isConnected, amount, mobilenumber, customerId, date, scheme, customerName, router]);
+
+  useEffect(() => {
+    if (isConnected && shouldPrintOnConnect) {
+      setShouldPrintOnConnect(false);
+      onPrintReceipt();
+    }
+  }, [isConnected, shouldPrintOnConnect, onPrintReceipt]);
   return (
     <View style={styles.container}>
       <View style={styles.content}>
@@ -190,6 +185,8 @@ export const TransactionSuccess = ({
             labelStyle={styles.actionLabel}
             contentStyle={styles.actionContent}
             icon='printer'
+            loading={isPrinting}
+            disabled={isPrinting}
           >
             Print Receipt
           </Button>

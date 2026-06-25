@@ -12,7 +12,11 @@ import {
 import { usePrinter } from "../contexts/PrinterContext";
 import { ReceiptData, ReceiptPrinter } from "../utils/ReceiptPrinter";
 
-export default function PrinterManager() {
+interface PrinterManagerProps {
+  onConnectSuccess?: () => void;
+}
+
+export default function PrinterManager({ onConnectSuccess }: PrinterManagerProps) {
   const {
     isConnected,
     connectedDevice,
@@ -28,7 +32,7 @@ export default function PrinterManager() {
 
   useEffect(() => {
     requestPermissions();
-  }, []);
+  }, [requestPermissions]);
 
   const handleScan = async () => {
     await scanForDevices();
@@ -37,7 +41,14 @@ export default function PrinterManager() {
   const handleConnect = async (address: string) => {
     const success = await connectToPrinter(address);
     if (success) {
-      Alert.alert("Success", "Connected to printer successfully!");
+      Alert.alert("Success", "Connected to printer successfully!", [
+        {
+          text: "OK",
+          onPress: () => {
+            onConnectSuccess?.();
+          },
+        },
+      ]);
     } else {
       Alert.alert("Error", "Failed to connect to printer");
     }
