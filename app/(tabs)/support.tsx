@@ -1,7 +1,7 @@
+import { useAuth } from '@/providers/AuthProvider';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Card, IconButton, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAuth } from '../providers/AuthProvider';
 
 interface SupportOption {
   id: string;

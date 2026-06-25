@@ -1,58 +1,33 @@
-import { Status } from '@/types/sharedEnums';
-import { Customer } from '@/types/user';
+import { useSelector } from '@legendapp/state/react';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import {
-  Avatar,
-  Card,
-  IconButton,
-  Searchbar,
-  Text,
-  useTheme,
-} from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAuth } from '../providers/AuthProvider';
-import useUser from '../store/userStore';
+import { Avatar, Card, IconButton, Searchbar, Text } from 'react-native-paper';
+
+import { store$ } from '@/store/store';
+
+import { filteredCustomers$ } from '@/store/selectors';
+
+import { useAuth } from '@/providers/AuthProvider';
+import { actions } from '@/store/actions';
+import { Customer } from '@/types/user';
 
 export default function Users() {
+  const customers = useSelector(filteredCustomers$);
+  const searchQuery = useSelector(store$.searchQuery);
+
+  const syncing = useSelector(store$.isRefreshingCustomers);
+
   const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filter, setFilter] = useState<'all' | 'active'>('all');
-  const customerLoading = useUser((state) => state.loadCustomerStatus);
-  const fetchCustomers = useUser((state) => state.loadCustomers);
-  const customers = useUser((state) => state.customers);
+
   const { user } = useAuth();
-  const theme = useTheme();
-  const [refreshing, setRefreshing] = useState(false);
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    loadCustomers().finally(() => setRefreshing(false));
-  }, []);
-
-  const loadCustomers = useCallback(async () => {
+  const loadCustomers = useCallback(() => {
     if (!user) {
       return;
     }
-
-    await fetchCustomers({
-      agentCode: user.agentCode,
-      bankCode: user.bankCode,
-    });
+    actions.syncCustomers(user.agentCode, user.bankCode);
   }, [user]);
-
-  useEffect(() => {
-    loadCustomers();
-  }, [loadCustomers]);
-
-  const filteredCustomers = customers.filter((customer) => {
-    const matchesSearch = customer.customerName
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
-    const matchesFilter = filter === 'all' || filter === 'active';
-    return matchesSearch && matchesFilter;
-  });
 
   const handleCustomerPress = (customer: Customer) => {
     router.push({
@@ -68,16 +43,13 @@ export default function Users() {
       },
     });
   };
-  const isCustomerLoading = useMemo(() => {
-    return customerLoading === Status.Loading;
-  }, [customerLoading]);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <View style={styles.header}>
         <Searchbar
           placeholder='Search customers'
-          onChangeText={setSearchQuery}
+          onChangeText={(text) => store$.searchQuery.set(text)}
           value={searchQuery}
           style={styles.searchbar}
           icon='magnify'
@@ -90,62 +62,64 @@ export default function Users() {
         style={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl refreshing={syncing} onRefresh={loadCustomers} />
         }
       >
-        {filteredCustomers &&
-          filteredCustomers.map((customer) => (
-            <Card
-              key={customer.userId}
-              style={styles.customerCard}
-              onPress={() => handleCustomerPress(customer)}
-            >
-              <Card.Content style={styles.cardContent}>
-                <View style={styles.customerInfo}>
-                  <Avatar.Text
-                    size={45}
-                    label={customer.customerName.charAt(0).toUpperCase()}
-                    style={styles.avatar}
-                  />
-
-                  <View style={styles.customerDetails}>
-                    <Text variant='titleMedium' style={styles.customerName}>
-                      {customer.customerName.trim()}
-                    </Text>
-                    <Text variant='bodyMedium' style={styles.balance}>
-                      Balance: ₹{customer.currentBalance.toFixed(2)}
-                    </Text>
-                    <Text variant='bodyMedium' style={styles.account}>
-                      Acct: {customer.accountNumber}
-                    </Text>
-                  </View>
-                </View>
-                <IconButton
-                  icon='chevron-right'
-                  size={24}
-                  iconColor='#4A90E2'
-                  style={styles.chevron}
+        {customers?.map((customer) => (
+          <Card
+            key={customer.accountNumber.toString()}
+            style={styles.customerCard}
+            onPress={() => handleCustomerPress(customer)}
+          >
+            <Card.Content style={styles.cardContent}>
+              <View style={styles.customerInfo}>
+                <Avatar.Text
+                  size={45}
+                  label={
+                    customer.customerName?.trim()?.charAt(0)?.toUpperCase() ||
+                    'U'
+                  }
+                  style={styles.avatar}
                 />
-              </Card.Content>
-            </Card>
-          ))}
 
-        {filteredCustomers.length === 0 && !isCustomerLoading && (
+                <View style={styles.customerDetails}>
+                  <Text
+                    variant='titleMedium'
+                    style={styles.customerName}
+                    numberOfLines={1}
+                  >
+                    {customer.customerName?.trim() || 'Unknown Customer'}
+                  </Text>
+
+                  <Text variant='bodyMedium' style={styles.balance}>
+                    Balance: ₹{Number(customer.currentBalance || 0).toFixed(2)}
+                  </Text>
+
+                  <Text variant='bodyMedium' style={styles.account}>
+                    Acct: {customer.accountNumber}
+                  </Text>
+                </View>
+              </View>
+
+              <IconButton
+                icon='chevron-right'
+                size={24}
+                iconColor='#4A90E2'
+                style={styles.chevron}
+              />
+            </Card.Content>
+          </Card>
+        ))}
+
+        {customers.length === 0 && (
           <View style={styles.emptyState}>
             <Text variant='bodyLarge' style={styles.emptyText}>
               No customers found
             </Text>
           </View>
         )}
-        {isCustomerLoading && (
-          <View style={styles.emptyState}>
-            <Text variant='bodyLarge' style={styles.emptyText}>
-              Loading customers...
-            </Text>
-          </View>
-        )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 

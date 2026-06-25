@@ -1,7 +1,8 @@
-import useUser from '@/app/store/userStore';
-import { Status } from '@/types/sharedEnums';
+import { usePrinter } from '@/contexts/PrinterContext';
+import { ReceiptData, ReceiptPrinter } from '@/utils/ReceiptPrinter';
+import { useRouter } from 'expo-router';
 import * as SMS from 'expo-sms';
-import { useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import { Avatar, Button, Card, Icon, Text } from 'react-native-paper';
 
@@ -35,28 +36,17 @@ export const TransactionSuccess = ({
     .join('')
     .slice(0, 2)
     .toUpperCase();
-  const createTransactionStatus = useUser(
-    (state) => state.createTransactionStatus,
-  );
-  useEffect(() => {
-    return () => {
-      // Reset transaction status when leaving the screen
-      // This ensures that if the user comes back to this screen, it will show the form instead of the success message
-      if (
-        createTransactionStatus === Status.Success ||
-        createTransactionStatus === Status.Error
-      ) {
-        // Reset to idle so that form is shown when user comes back
-        useUser.setState({ createTransactionStatus: Status.Idle });
-      }
-    };
-  }, []);
+
+  const { isConnected } = usePrinter();
+  const [isPrinting, setIsPrinting] = useState(false);
+  const [shouldPrintOnConnect, setShouldPrintOnConnect] = useState(false);
+  const router = useRouter();
+
   const onSendSms = async () => {
     const isAvailable = await SMS.isAvailableAsync();
     if (isAvailable) {
-      // do your SMS stuff here
-      const { result } = await SMS.sendSMSAsync(
-        [mobilenumber], // Replace with the recipient's phone number
+      await SMS.sendSMSAsync(
+        [mobilenumber],
         `Dear ${customerName}, ₹${amount} has been collected successfully towards ${scheme} on ${date}. Account No: ${customerId}. Thank you for banking with us.`,
       );
     } else {
@@ -64,14 +54,57 @@ export const TransactionSuccess = ({
         'SMS Not Available',
         'Sorry, SMS functionality is not available on this device.',
       );
-      return;
-      // misfortune... there's no SMS available on this device
     }
   };
-  const onPrintReceipt = () => {
-    // Implement print receipt functionality here
-    console.log('Print Receipt clicked');
-  };
+
+  const onPrintReceipt = useCallback(async () => {
+    if (!isConnected) {
+      setShouldPrintOnConnect(true);
+      router.push({
+        pathname: '/printer',
+        params: { redirectBack: 'true' },
+      });
+      return;
+    }
+
+    setIsPrinting(true);
+    const numericAmount = Number(amount.replace(/[^0-9.]/g, '')) || 0;
+    const receiptData: ReceiptData = {
+      storeName: 'PIGMY COLLECTOR',
+      storeAddress: 'Daily Collection System',
+      phone: mobilenumber || undefined,
+      receiptNumber: `TX-${customerId}-${Date.now().toString().slice(-6)}`,
+      date: date || new Date().toLocaleString(),
+      items: [
+        {
+          name: `Deposit: ${scheme}`,
+          quantity: 1,
+          price: numericAmount,
+          total: numericAmount,
+        },
+      ],
+      subtotal: numericAmount,
+      total: numericAmount,
+      paymentMethod: 'Cash',
+      footer: `Customer: ${customerName}`,
+    };
+
+    const success = await ReceiptPrinter.printReceipt(receiptData);
+    setIsPrinting(false);
+
+    if (success) {
+      Alert.alert('Success', 'Receipt printed successfully!');
+    } else {
+      Alert.alert('Error', 'Failed to print receipt');
+    }
+  }, [isConnected, amount, mobilenumber, customerId, date, scheme, customerName, router]);
+
+  useEffect(() => {
+    if (isConnected && shouldPrintOnConnect) {
+      setShouldPrintOnConnect(false);
+      onPrintReceipt();
+    }
+  }, [isConnected, shouldPrintOnConnect, onPrintReceipt]);
   return (
     <View style={styles.container}>
       <View style={styles.content}>
@@ -152,6 +185,8 @@ export const TransactionSuccess = ({
             labelStyle={styles.actionLabel}
             contentStyle={styles.actionContent}
             icon='printer'
+            loading={isPrinting}
+            disabled={isPrinting}
           >
             Print Receipt
           </Button>

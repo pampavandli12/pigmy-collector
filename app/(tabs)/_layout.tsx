@@ -1,6 +1,9 @@
-import { useState } from 'react';
-import { SafeAreaView, StyleSheet } from 'react-native';
+import { cleanupOutbox, processOutbox } from '@/store/syncEngine';
+import NetInfo from '@react-native-community/netinfo';
+import { useEffect, useState } from 'react';
+import { StyleSheet } from 'react-native';
 import { BottomNavigation } from 'react-native-paper';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Dashboard from './dashboard';
 import Support from './support';
 import Users from './users';
@@ -28,6 +31,20 @@ export default function TabsLayout() {
     },
   ]);
 
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      if (state.isConnected) {
+        console.log('Internet restored');
+
+        // Retry only existing queue
+        processOutbox();
+        cleanupOutbox();
+      }
+    });
+
+    return unsubscribe;
+  }, []);
+
   const renderScene = BottomNavigation.SceneMap({
     dashboard: Dashboard,
     users: Users,
@@ -35,7 +52,7 @@ export default function TabsLayout() {
   });
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <BottomNavigation
         navigationState={{ index, routes }}
         onIndexChange={setIndex}

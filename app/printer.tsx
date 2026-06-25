@@ -1,14 +1,25 @@
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import PrinterManager from "../components/PrinterManager";
 
 export default function PrinterScreen() {
+  const router = useRouter();
+  const params = useLocalSearchParams();
+  const redirectBack = params.redirectBack === "true";
+
+  const handleConnectSuccess = () => {
+    if (redirectBack) {
+      router.back();
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Bluetooth Printer</Text>
       </View>
-      <PrinterManager />
+      <PrinterManager onConnectSuccess={handleConnectSuccess} />
     </View>
   );
 }

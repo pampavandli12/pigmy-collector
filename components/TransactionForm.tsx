@@ -1,6 +1,14 @@
 import { Picker } from '@react-native-picker/picker';
+import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { Avatar, Button, Card, Text, TextInput } from 'react-native-paper';
+import {
+  Avatar,
+  Button,
+  Card,
+  HelperText,
+  Text,
+  TextInput,
+} from 'react-native-paper';
 
 interface TransactionFormProps {
   customer: {
@@ -30,7 +38,15 @@ export const TransactionForm = ({
   handleConfirm,
   isTransactionLoading,
 }: TransactionFormProps) => {
+  const [reconfirmAmount, setReconfirmAmount] = useState('');
   const schemeOptions = ['Pigmy Deposit', 'Daily Deposit'];
+
+  const amountMismatch = useMemo(() => {
+    return amount !== reconfirmAmount;
+  }, [amount, reconfirmAmount]);
+  const disableConfirm = useMemo(() => {
+    return !amount || !reconfirmAmount || !scheme || amount !== reconfirmAmount;
+  }, [amount, reconfirmAmount, scheme]);
   return (
     <View style={styles.keyboardView}>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -47,7 +63,11 @@ export const TransactionForm = ({
                 {customer.name}
               </Text>
               <Text variant='bodyMedium' style={styles.customerId}>
-                ID: {customer.id}
+                Account No: {customer.account}
+              </Text>
+
+              <Text variant='bodyMedium' style={styles.customerId}>
+                Current Balance: ₹{customer.balance}
               </Text>
             </View>
           </Card.Content>
@@ -74,8 +94,30 @@ export const TransactionForm = ({
               underlineStyle={{ height: 0 }}
               activeUnderlineColor='transparent'
             />
+            <HelperText type='error' visible={amountMismatch}>
+              Amount mismatch, Please reconfirm the amount
+            </HelperText>
           </View>
 
+          {/* Reconfirm amount field */}
+          <View style={styles.fieldContainer}>
+            <Text variant='bodyMedium' style={styles.fieldLabel}>
+              Reconfirm Amount
+            </Text>
+            <TextInput
+              mode='flat'
+              value={reconfirmAmount}
+              onChangeText={setReconfirmAmount}
+              keyboardType='decimal-pad'
+              style={styles.amountInput}
+              contentStyle={styles.amountInputContent}
+              underlineStyle={{ height: 0 }}
+              activeUnderlineColor='transparent'
+            />
+            <HelperText type='error' visible={amountMismatch}>
+              Amount mismatch, Please reconfirm the amount
+            </HelperText>
+          </View>
           {/* Scheme Field */}
           <View style={styles.fieldContainer}>
             <Text variant='bodyMedium' style={styles.fieldLabel}>
@@ -114,7 +156,7 @@ export const TransactionForm = ({
         <Button
           mode='contained'
           onPress={handleConfirm}
-          disabled={!amount || !scheme}
+          disabled={disableConfirm}
           style={styles.confirmButton}
           loading={isTransactionLoading}
           labelStyle={styles.confirmButtonText}

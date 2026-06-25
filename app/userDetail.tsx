@@ -1,28 +1,28 @@
 import { TransactionForm } from '@/components/TransactionForm';
 import { TransactionSuccess } from '@/components/TransactionSuccess';
-import { Status } from '@/types/sharedEnums';
+import { actions } from '@/store/actions';
+import { TransactionPayload } from '@/types/user';
+import * as Crypto from 'expo-crypto';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { IconButton, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import useUser from './store/userStore';
 
 export default function UserDetail() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const createTransactionStatus = useUser(
-    (state) => state.createTransactionStatus,
-  );
-  const createTransaction = useUser((state) => state.createTransaction);
 
+  const [transactionSuccess, setTransactionSuccess] = useState(false);
   // Parse customer data from params
   const customer = {
     id: params.id as string,
     name: params.name as string,
-    agentCode: parseInt(params.agentCode as string, 10),
+    agentCode: Array.isArray(params.agentCode)
+      ? params.agentCode[0]
+      : params.agentCode,
     bankCode: params.bankCode as string,
-    balance: parseFloat(params.balance as string),
+    balance: params.balance,
     account: params.account as string,
     image: params.image as string,
     mobilenumber: params.mobilenumber as string,
@@ -41,35 +41,25 @@ export default function UserDetail() {
       }),
     );
   }, [setDate]);
-  useEffect(() => {
-    return () => {
-      // Reset transaction status when leaving the screen
-      // This ensures that if the user comes back to this screen, it will show the form instead of the success message
-      if (
-        createTransactionStatus === Status.Success ||
-        createTransactionStatus === Status.Error
-      ) {
-        // Reset to idle so that form is shown when user comes back
-        useUser.setState({ createTransactionStatus: Status.Idle });
-      }
-    };
-  }, []);
+
   const handleConfirm = async () => {
-    const payload = {
-      userId: parseInt(customer.id, 10),
-      agentCode: customer.agentCode,
+    const payload: TransactionPayload = {
+      userId: Number(customer.id),
+      agentCode: Number(customer.agentCode),
       bankCode: customer.bankCode,
-      collectedAmount: parseFloat(amount),
+      collectedAmount: Number(amount),
       schemename: scheme,
       collectiontype: 'cash',
       customerName: customer.name,
-      accountNumber: parseInt(customer.account, 10),
+      accountNumber: Number(customer.account),
+      transactionId: Crypto.randomUUID(),
     };
-    await createTransaction(payload);
+    console.log('Confirming transaction with payload:', payload);
+    actions.addTransaction(payload);
+    setTransactionSuccess(true);
     // Handle deposit confirmation
     //router.back();
   };
-  const isTransactionLoading = createTransactionStatus === Status.Loading;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -92,7 +82,7 @@ export default function UserDetail() {
           <View style={styles.headerSpacer} />
         </View>
         {/* Transaction Form */}
-        {createTransactionStatus === Status.Success ? (
+        {transactionSuccess ? (
           <TransactionSuccess
             customerName={customer.name}
             customerId={customer.id}
@@ -111,7 +101,7 @@ export default function UserDetail() {
             setScheme={setScheme}
             date={date}
             handleConfirm={handleConfirm}
-            isTransactionLoading={isTransactionLoading}
+            isTransactionLoading={false}
           />
         )}
       </KeyboardAvoidingView>

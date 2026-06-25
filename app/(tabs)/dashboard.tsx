@@ -1,41 +1,34 @@
-import { LocalTransaction } from '@/types/user';
 import {
-  fetchLocalTransactions,
-  fetchTodaysTransactionAmount,
-} from '@/utils/transactions';
-import { useCallback, useEffect, useState } from 'react';
+  todaysCollectionAmount$,
+  todaysTransactionCount$,
+  todaysTransactions$,
+  totalCustomerCount$,
+} from '@/store/selectors';
+import { useSelector } from '@legendapp/state/react';
+import { useCallback, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Avatar, Card, Icon, Text } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function Dashboard() {
-  const [transactions, setTransactions] = useState<LocalTransaction[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  const [todaysTotal, setTodaysTotal] = useState(0);
 
-  const loadDashboardData = useCallback(async () => {
-    try {
-      const recentTransactions = await fetchLocalTransactions();
-      setTransactions(recentTransactions);
+  const transactions = useSelector(todaysTransactions$);
 
-      const today = await fetchTodaysTransactionAmount();
-      setTodaysTotal(today);
-    } finally {
-      setRefreshing(false);
-    }
-  }, []);
+  const totalAmount = useSelector(todaysCollectionAmount$);
+
+  const totalCount = useSelector(todaysTransactionCount$);
+  const totalCustomerCount = useSelector(totalCustomerCount$);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    loadDashboardData();
-  }, [loadDashboardData]);
-
-  useEffect(() => {
-    loadDashboardData();
-  }, [loadDashboardData]);
+    // Simulate a network request or data refresh
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1000);
+  }, []);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
@@ -53,10 +46,35 @@ export default function Dashboard() {
               </Text>
             </View>
             <Text variant='displaySmall' style={styles.collectionAmount}>
-              ₹{todaysTotal.toFixed(2)}
+              ₹{totalAmount}
             </Text>
           </Card.Content>
         </Card>
+
+        {/* Transaction count / customer count */}
+        <View style={styles.statsRow}>
+          <Card style={styles.statCard}>
+            <Card.Content style={styles.statContent}>
+              <View style={styles.transactionContent}>
+                <Text variant='titleLarge' style={styles.statValue}>
+                  {totalCount}
+                </Text>
+                <Text variant='bodySmall' style={styles.statLabel}>
+                  Today's Transactions
+                </Text>
+              </View>
+
+              <View style={styles.customerContent}>
+                <Text variant='titleLarge' style={styles.statValue}>
+                  {totalCustomerCount}
+                </Text>
+                <Text variant='bodySmall' style={styles.statLabel}>
+                  Total Customers
+                </Text>
+              </View>
+            </Card.Content>
+          </Card>
+        </View>
 
         {/* Recent Transactions */}
         <View style={styles.transactionsHeader}>
@@ -101,7 +119,7 @@ export default function Dashboard() {
           )}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -158,6 +176,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 12,
     elevation: 1,
+  },
+  statContent: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    display: 'flex',
+    flexDirection: 'row',
+    gap: 8,
   },
   statIconContainer: {
     width: 48,
@@ -248,5 +273,17 @@ const styles = StyleSheet.create({
   transactionStatus: {
     color: '#4CAF50',
     fontWeight: '500',
+  },
+  transactionContent: {
+    flex: 1,
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+  },
+  customerContent: {
+    flex: 1,
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
   },
 });

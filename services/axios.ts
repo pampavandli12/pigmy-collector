@@ -19,7 +19,11 @@ api.interceptors.request.use(
       ? authUserSchema.safeParse(JSON.parse(storedUser))
       : null;
     const token = parsedUser?.success ? parsedUser.data.token : null;
-
+    // Display the whole API url
+    console.log(
+      'API Request:',
+      `${config.method?.toUpperCase()} ${config.baseURL}${config.url}`,
+    );
     config.headers['Content-Type'] = 'application/json';
     config.headers['Authorization'] = token || '';
     return config;

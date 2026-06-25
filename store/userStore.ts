@@ -4,7 +4,6 @@ import { createTransaction, fetchCustomers } from '@/services/user';
 import { Status } from '@/types/sharedEnums';
 import { Customer, TransactionPayload } from '@/types/user';
 import { showSnackbar } from '@/utils/snackbar';
-import { saveTransactionLocally } from '@/utils/transactions';
 import { create } from 'zustand';
 
 type State = {
@@ -44,7 +43,6 @@ const useUser = create<State & Actions>((set) => ({
     set({ createTransactionStatus: Status.Loading });
     try {
       const response = await createTransaction(payload);
-      await saveTransactionLocally(payload);
       set({ createTransactionStatus: Status.Success });
     } catch (error: unknown) {
       const err = error as { response?: { status?: number } };
