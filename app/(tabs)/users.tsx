@@ -3,12 +3,12 @@ import { useRouter } from 'expo-router';
 import { useCallback } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Avatar, Card, IconButton, Searchbar, Text } from 'react-native-paper';
-import { useAuth } from '../providers/AuthProvider';
 
 import { store$ } from '@/store/store';
 
 import { filteredCustomers$ } from '@/store/selectors';
 
+import { useAuth } from '@/providers/AuthProvider';
 import { actions } from '@/store/actions';
 import { Customer } from '@/types/user';
 

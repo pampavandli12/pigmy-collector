@@ -1,4 +1,4 @@
-import { useAuth } from '@/app/providers/AuthProvider';
+import { useAuth } from '@/providers/AuthProvider';
 import { userLogin } from '@/services/login';
 import { showSnackbar } from '@/utils/snackbar';
 import { zodResolver } from '@hookform/resolvers/zod';

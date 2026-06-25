@@ -28,7 +28,10 @@ export async function processOutbox() {
 
     const pending = Object.entries(outbox)
       .filter(([_, item]) => {
-        return item.status === 'pending' || item.status === 'failed';
+        return (
+          (item && item.status === 'pending') ||
+          (item && item.status === 'failed')
+        );
       })
       .sort((a, b) => a[1].createdAt - b[1].createdAt);
 
@@ -76,7 +79,11 @@ export function cleanupOutbox() {
 
   Object.entries(outbox).forEach(([txId, item]) => {
     if (item?.createdAt < cutoff) {
-      store$.outbox[txId].set(undefined);
+      // Remove the entry by creating a shallow copy without the key
+      const outboxCopy = { ...store$.outbox.peek() } as Record<string, unknown>;
+      delete outboxCopy[txId];
+      store$.outbox.set(outboxCopy as any);
+      console.log('Deleted old transaction from outbox:', txId);
     }
   });
 }

@@ -1,3 +1,4 @@
+import { AuthProvider, useAuth } from '@/providers/AuthProvider';
 import {
   Roboto_400Regular,
   Roboto_500Medium,
@@ -10,7 +11,6 @@ import { useEffect } from 'react';
 import { MD3LightTheme, PaperProvider } from 'react-native-paper';
 import { AppSnackbar } from '../components/AppSnackbar';
 import { PrinterProvider } from '../contexts/PrinterContext';
-import { AuthProvider, useAuth } from './providers/AuthProvider';
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();

@@ -1,4 +1,8 @@
+import { usePrinter } from '@/contexts/PrinterContext';
+import { ReceiptData, ReceiptPrinter } from '@/utils/ReceiptPrinter';
+import { useRouter } from 'expo-router';
 import * as SMS from 'expo-sms';
+import { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import { Avatar, Button, Card, Icon, Text } from 'react-native-paper';
 
@@ -32,6 +36,11 @@ export const TransactionSuccess = ({
     .join('')
     .slice(0, 2)
     .toUpperCase();
+
+  const { isConnected } = usePrinter();
+  const [isPrinting, setIsPrinting] = useState(false);
+  const router = useRouter();
+
   const onSendSms = async () => {
     const isAvailable = await SMS.isAvailableAsync();
     if (isAvailable) {
@@ -49,9 +58,57 @@ export const TransactionSuccess = ({
       // misfortune... there's no SMS available on this device
     }
   };
-  const onPrintReceipt = () => {
+  const onPrintReceipt = async () => {
     // Implement print receipt functionality here
+    if (!isConnected) {
+      Alert.alert('Not Connected', 'Please connect to a printer first');
+      // naviagete to printer connection screen
+      router.push('/printer');
+      return;
+    }
+    setIsPrinting(true);
+    const sampleReceipt: ReceiptData = {
+      storeName: 'Pigmy Collector Store',
+      storeAddress: '123 Main Street, City',
+      phone: '+1 234-567-8900',
+      receiptNumber: `RC${Date.now()}`,
+      date: new Date().toLocaleString(),
+      items: [
+        {
+          name: 'Product A',
+          quantity: 2,
+          price: 25.0,
+          total: 50.0,
+        },
+        {
+          name: 'Product B',
+          quantity: 1,
+          price: 15.5,
+          total: 15.5,
+        },
+        {
+          name: 'Product C',
+          quantity: 3,
+          price: 10.0,
+          total: 30.0,
+        },
+      ],
+      subtotal: 95.5,
+      tax: 9.55,
+      discount: 5.0,
+      total: 100.05,
+      paymentMethod: 'Cash',
+      footer: 'Visit us again!',
+    };
+    const success = await ReceiptPrinter.printReceipt(sampleReceipt);
     console.log('Print Receipt clicked');
+    setIsPrinting(false);
+
+    if (success) {
+      Alert.alert('Success', 'Receipt printed successfully!');
+    } else {
+      Alert.alert('Error', 'Failed to print receipt');
+    }
   };
   return (
     <View style={styles.container}>
