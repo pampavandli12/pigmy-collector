@@ -84,6 +84,8 @@ const InitialLayout = () => {
       </Stack.Protected>
       <Stack.Protected guard={isAuthenticated}>
         <Stack.Screen name='(tabs)' options={{ headerShown: false }} />
+        <Stack.Screen name='userDetail' options={{ headerShown: false }} />
+        <Stack.Screen name='printer' options={{ headerShown: false }} />
       </Stack.Protected>
     </Stack>
   );
