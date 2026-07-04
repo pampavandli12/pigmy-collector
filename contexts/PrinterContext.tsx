@@ -1,4 +1,11 @@
-import React, { createContext, useCallback, useContext, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
+import ExpoThermalPrinter from "../modules/expo-thermal-printer/src/ExpoThermalPrinterModule";
 import BluetoothPrinterService, {
   PrinterDevice,
 } from "../services/BluetoothPrinterService";
@@ -9,6 +16,7 @@ interface PrinterContextType {
   availableDevices: PrinterDevice[];
   isScanning: boolean;
   scanForDevices: () => Promise<void>;
+  pairPrinter: (address: string) => Promise<boolean>;
   connectToPrinter: (address: string) => Promise<boolean>;
   disconnectPrinter: () => Promise<void>;
   requestPermissions: () => Promise<boolean>;
@@ -33,6 +41,66 @@ export const PrinterProvider: React.FC<{ children: React.ReactNode }> = ({
   );
   const [availableDevices, setAvailableDevices] = useState<PrinterDevice[]>([]);
   const [isScanning, setIsScanning] = useState(false);
+
+  const upsertDevice = useCallback((device: PrinterDevice) => {
+    setAvailableDevices((current) => {
+      const index = current.findIndex((item) => item.address === device.address);
+      if (index === -1) return [...current, device];
+
+      const next = [...current];
+      next[index] = { ...next[index], ...device };
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    const deviceFound = ExpoThermalPrinter.addListener("deviceFound", upsertDevice);
+    const scanStarted = ExpoThermalPrinter.addListener("scanStarted", () => {
+      setIsScanning(true);
+    });
+    const scanFinished = ExpoThermalPrinter.addListener("scanFinished", (payload) => {
+      if (payload.devices?.length) {
+        setAvailableDevices(payload.devices);
+      }
+      setIsScanning(false);
+    });
+    const paired = ExpoThermalPrinter.addListener("paired", upsertDevice);
+    const connected = ExpoThermalPrinter.addListener("connected", (device) => {
+      setIsConnected(true);
+      setConnectedDevice(device);
+      upsertDevice({ ...device, connected: true });
+    });
+    const disconnected = ExpoThermalPrinter.addListener("disconnected", () => {
+      setIsConnected(false);
+      setConnectedDevice(null);
+      setAvailableDevices((current) =>
+        current.map((device) => ({ ...device, connected: false }))
+      );
+    });
+    const connectionLost = ExpoThermalPrinter.addListener("connectionLost", () => {
+      setIsConnected(false);
+      setConnectedDevice(null);
+      setAvailableDevices((current) =>
+        current.map((device) => ({ ...device, connected: false }))
+      );
+    });
+
+    return () => {
+      deviceFound.remove();
+      scanStarted.remove();
+      scanFinished.remove();
+      paired.remove();
+      connected.remove();
+      disconnected.remove();
+      connectionLost.remove();
+    };
+  }, [upsertDevice]);
+
+  useEffect(() => {
+    BluetoothPrinterService.isConnected()
+      .then(setIsConnected)
+      .catch(() => setIsConnected(false));
+  }, []);
 
   const requestPermissions = useCallback(async (): Promise<boolean> => {
     try {
@@ -61,15 +129,23 @@ export const PrinterProvider: React.FC<{ children: React.ReactNode }> = ({
         return;
       }
 
-      const devices = await BluetoothPrinterService.scanPairedDevices();
-      setAvailableDevices(devices);
+      const pairedDevices = await BluetoothPrinterService.scanPairedDevices();
+      setAvailableDevices(pairedDevices);
+      await BluetoothPrinterService.startScan();
     } catch (error) {
       console.error("Scan error:", error);
-      setAvailableDevices([]);
-    } finally {
       setIsScanning(false);
     }
   }, [requestPermissions]);
+
+  const pairPrinter = useCallback(async (address: string): Promise<boolean> => {
+    try {
+      return await BluetoothPrinterService.pairPrinter(address);
+    } catch (error) {
+      console.error("Pairing error:", error);
+      return false;
+    }
+  }, []);
 
   const connectToPrinter = useCallback(
     async (address: string): Promise<boolean> => {
@@ -78,7 +154,9 @@ export const PrinterProvider: React.FC<{ children: React.ReactNode }> = ({
         if (success) {
           const device = availableDevices.find((d) => d.address === address);
           setIsConnected(true);
-          setConnectedDevice(device || { name: "Unknown", address });
+          setConnectedDevice(
+            device || { name: "Unknown", address, paired: true, connected: true }
+          );
         }
         return success;
       } catch (error) {
@@ -105,6 +183,7 @@ export const PrinterProvider: React.FC<{ children: React.ReactNode }> = ({
     availableDevices,
     isScanning,
     scanForDevices,
+    pairPrinter,
     connectToPrinter,
     disconnectPrinter,
     requestPermissions,

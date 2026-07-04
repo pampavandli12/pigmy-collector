@@ -18,11 +18,11 @@ export default function UserDetail() {
   const customer = {
     id: params.id as string,
     name: params.name as string,
-    agentCode: Array.isArray(params.agentCode)
-      ? params.agentCode[0]
-      : params.agentCode,
+    agentCode: Number(
+      Array.isArray(params.agentCode) ? params.agentCode[0] : params.agentCode
+    ),
     bankCode: params.bankCode as string,
-    balance: params.balance,
+    balance: Number(Array.isArray(params.balance) ? params.balance[0] : params.balance),
     account: params.account as string,
     image: params.image as string,
     mobilenumber: params.mobilenumber as string,
@@ -45,7 +45,7 @@ export default function UserDetail() {
   const handleConfirm = async () => {
     const payload: TransactionPayload = {
       userId: Number(customer.id),
-      agentCode: Number(customer.agentCode),
+      agentCode: customer.agentCode,
       bankCode: customer.bankCode,
       collectedAmount: Number(amount),
       schemename: scheme,

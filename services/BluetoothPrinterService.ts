@@ -1,366 +1,137 @@
-import { PermissionsAndroid, Platform } from "react-native";
+import ExpoThermalPrinter, {
+  PrinterDevice,
+  Receipt,
+} from "../modules/expo-thermal-printer/src/ExpoThermalPrinterModule";
 
-// Safely import Bluetooth modules with error handling
-let BluetoothEscposPrinter: any = null;
-let BluetoothManager: any = null;
+export type { PrinterDevice };
 
-try {
-  const BluetoothModule = require("react-native-bluetooth-escpos-printer");
-  BluetoothEscposPrinter = BluetoothModule.BluetoothEscposPrinter;
-  BluetoothManager = BluetoothModule.BluetoothManager;
-} catch (error) {
-  console.warn("Bluetooth printer module not available:", error);
-}
-
-export interface PrinterDevice {
-  name: string;
-  address: string;
-}
+type PrintTextOptions = {
+  fontType?: number;
+  fontSize?: number;
+  align?: number;
+};
 
 class BluetoothPrinterService {
-  private isConnected: boolean = false;
   private connectedDevice: PrinterDevice | null = null;
 
-  /**
-   * Check if Bluetooth module is available
-   */
-  private isModuleAvailable(): boolean {
-    if (!BluetoothManager || !BluetoothEscposPrinter) {
-      console.error("Bluetooth printer module not loaded");
-      return false;
-    }
-    return true;
-  }
-
-  /**
-   * Request Bluetooth permissions (Android 12+)
-   */
   async requestBluetoothPermissions(): Promise<boolean> {
-    if (Platform.OS !== "android") {
-      return true;
-    }
-
-    try {
-      const apiLevel = Platform.Version;
-
-      if (apiLevel >= 31) {
-        // Android 12+ requires new permissions
-        const granted = await PermissionsAndroid.requestMultiple([
-          PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
-          PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        ]);
-
-        return (
-          granted["android.permission.BLUETOOTH_SCAN"] === "granted" &&
-          granted["android.permission.BLUETOOTH_CONNECT"] === "granted" &&
-          granted["android.permission.ACCESS_FINE_LOCATION"] === "granted"
-        );
-      } else {
-        // Android 11 and below
-        const granted = await PermissionsAndroid.requestMultiple([
-          PermissionsAndroid.PERMISSIONS.BLUETOOTH,
-          PermissionsAndroid.PERMISSIONS.BLUETOOTH_ADMIN,
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        ]);
-
-        return (
-          granted["android.permission.BLUETOOTH"] === "granted" &&
-          granted["android.permission.BLUETOOTH_ADMIN"] === "granted" &&
-          granted["android.permission.ACCESS_FINE_LOCATION"] === "granted"
-        );
-      }
-    } catch (error) {
-      console.error("Permission request error:", error);
-      return false;
-    }
+    return ExpoThermalPrinter.requestPermissions();
   }
 
-  /**
-   * Enable Bluetooth
-   */
   async enableBluetooth(): Promise<boolean> {
-    if (!this.isModuleAvailable()) return false;
-
-    try {
-      await BluetoothManager.enableBluetooth();
-      return true;
-    } catch (error) {
-      console.error("Error enabling Bluetooth:", error);
-      return false;
-    }
+    return ExpoThermalPrinter.enableBluetooth();
   }
 
-  /**
-   * Check if Bluetooth is enabled
-   */
   async isBluetoothEnabled(): Promise<boolean> {
-    if (!this.isModuleAvailable()) return false;
-
-    try {
-      const enabled = await BluetoothManager.isBluetoothEnabled();
-      return enabled;
-    } catch (error) {
-      console.error("Error checking Bluetooth status:", error);
-      return false;
-    }
+    return ExpoThermalPrinter.isBluetoothEnabled();
   }
 
-  /**
-   * Scan for paired Bluetooth devices
-   */
   async scanPairedDevices(): Promise<PrinterDevice[]> {
-    if (!this.isModuleAvailable()) return [];
-
-    try {
-      // Enable Bluetooth and get paired devices in one call
-      const devicesString = await BluetoothManager.enableBluetooth();
-
-      // Parse the JSON string returned by enableBluetooth
-      let pairedDevicesArray: any[] = [];
-
-      if (devicesString && typeof devicesString === "string") {
-        // Remove any trailing commas and fix JSON format
-        const cleanedString = devicesString
-          .replace(/,\s*]/g, "]")
-          .replace(/,\s*}/g, "}");
-        try {
-          pairedDevicesArray = JSON.parse(cleanedString);
-        } catch (parseError) {
-          console.error("JSON parse error:", parseError);
-          console.log("Received string:", devicesString);
-          // Try alternative: it might already be an array
-          if (Array.isArray(devicesString)) {
-            pairedDevicesArray = devicesString;
-          }
-        }
-      } else if (Array.isArray(devicesString)) {
-        pairedDevicesArray = devicesString;
-      }
-
-      // Log the raw devices to see their structure
-      console.log(
-        "Paired devices raw data:",
-        JSON.stringify(pairedDevicesArray, null, 2)
-      );
-
-      return pairedDevicesArray.map((device: any) => {
-        let deviceObj = device;
-
-        // If device is a string, parse it as JSON
-        if (typeof device === "string") {
-          try {
-            deviceObj = JSON.parse(device);
-          } catch (e) {
-            console.error("Failed to parse device string:", device);
-            return { name: "Unknown Device", address: "" };
-          }
-        }
-
-        return {
-          name: deviceObj.name || deviceObj.address || "Unknown Device",
-          address: deviceObj.address || "",
-        };
-      });
-    } catch (error) {
-      console.error("Error scanning devices:", error);
-      return [];
-    }
+    return ExpoThermalPrinter.getPairedPrinters();
   }
 
-  /**
-   * Connect to a Bluetooth printer
-   */
+  async startScan(): Promise<void> {
+    await ExpoThermalPrinter.startScan();
+  }
+
+  async stopScan(): Promise<void> {
+    await ExpoThermalPrinter.stopScan();
+  }
+
+  async pairPrinter(address: string): Promise<boolean> {
+    return ExpoThermalPrinter.pairPrinter(address);
+  }
+
   async connect(address: string): Promise<boolean> {
-    if (!this.isModuleAvailable()) return false;
-
-    try {
-      await BluetoothManager.connect(address);
-      this.isConnected = true;
-      this.connectedDevice = { name: "", address };
-      return true;
-    } catch (error) {
-      console.error("Connection error:", error);
-      this.isConnected = false;
-      return false;
+    const connected = await ExpoThermalPrinter.connect(address);
+    if (connected) {
+      this.connectedDevice = { name: "Printer", address, paired: true, connected: true };
     }
+    return connected;
   }
 
-  /**
-   * Disconnect from the printer
-   */
   async disconnect(): Promise<void> {
-    if (!this.isModuleAvailable()) return;
-
-    try {
-      await BluetoothManager.disconnect();
-      this.isConnected = false;
-      this.connectedDevice = null;
-    } catch (error) {
-      console.error("Disconnect error:", error);
-    }
+    await ExpoThermalPrinter.disconnect();
+    this.connectedDevice = null;
   }
 
-  /**
-   * Get connection status
-   */
-  getConnectionStatus(): boolean {
-    return this.isConnected;
+  async isConnected(): Promise<boolean> {
+    return ExpoThermalPrinter.isConnected();
   }
 
-  /**
-   * Get connected device
-   */
   getConnectedDevice(): PrinterDevice | null {
     return this.connectedDevice;
   }
 
-  /**
-   * Print text
-   */
-  async printText(
-    text: string,
-    options?: {
-      fontType?: number;
-      fontSize?: number;
-      align?: number;
-    }
-  ): Promise<boolean> {
-    if (!this.isModuleAvailable()) return false;
-
-    try {
-      const { fontType = 0, fontSize = 0, align = 0 } = options || {};
-
-      await BluetoothEscposPrinter.printText(text, {
-        fonttype: fontType,
-        widthtimes: fontSize,
-        heigthtimes: fontSize,
-        encoding: "UTF-8",
-      });
-
-      return true;
-    } catch (error) {
-      console.error("Print error:", error);
-      return false;
-    }
+  async printText(text: string, _options?: PrintTextOptions): Promise<boolean> {
+    await ExpoThermalPrinter.printText(text);
+    return true;
   }
 
-  /**
-   * Print line with text
-   */
   async printLine(text: string): Promise<void> {
-    if (!this.isModuleAvailable()) return;
-
-    await BluetoothEscposPrinter.printText(`${text}\n`, {});
+    await ExpoThermalPrinter.printText(`${text}\n`);
   }
 
-  /**
-   * Print multiple columns
-   */
   async printColumns(
     columns: string[],
     widths: number[],
     align: number[]
   ): Promise<void> {
-    if (!this.isModuleAvailable()) return;
-
-    await BluetoothEscposPrinter.printColumn(widths, align, columns, {});
+    const line = columns
+      .map((column, index) => {
+        const width = widths[index] ?? column.length;
+        const alignment = align[index] ?? 0;
+        if (alignment === 2) return column.padStart(width).slice(-width);
+        if (alignment === 1) {
+          const padding = Math.max(width - column.length, 0);
+          const left = Math.floor(padding / 2);
+          const right = padding - left;
+          return `${" ".repeat(left)}${column}${" ".repeat(right)}`.slice(0, width);
+        }
+        return column.padEnd(width).slice(0, width);
+      })
+      .join("");
+    await this.printLine(line);
   }
 
-  /**
-   * Print image from base64
-   */
-  async printImage(base64: string, width: number = 300): Promise<void> {
-    if (!this.isModuleAvailable()) return;
-
-    await BluetoothEscposPrinter.printPic(base64, { width });
+  async printImage(base64: string): Promise<void> {
+    await ExpoThermalPrinter.printImage(base64);
   }
 
-  /**
-   * Print QR code
-   */
   async printQRCode(
     content: string,
-    size: number = 5,
-    errorCorrectionLevel: number = 0
+    _size?: number,
+    _errorCorrectionLevel?: number
   ): Promise<void> {
-    if (!this.isModuleAvailable()) return;
-
-    await BluetoothEscposPrinter.printQRCode(
-      content,
-      size,
-      errorCorrectionLevel
-    );
+    await ExpoThermalPrinter.printQr(content);
   }
 
-  /**
-   * Print barcode
-   */
-  async printBarcode(
-    content: string,
-    type: number = 73,
-    width: number = 2,
-    height: number = 50,
-    textPosition: number = 2
-  ): Promise<void> {
-    if (!this.isModuleAvailable()) return;
-
-    await BluetoothEscposPrinter.printBarCode(
-      content,
-      type,
-      width,
-      height,
-      textPosition,
-      2
-    );
+  async printBarcode(content: string): Promise<void> {
+    await ExpoThermalPrinter.printText(content);
   }
 
-  /**
-   * Set print alignment
-   */
-  async setAlignment(align: "left" | "center" | "right"): Promise<void> {
-    if (!this.isModuleAvailable()) return;
-
-    const alignMap = { left: 0, center: 1, right: 2 };
-    await BluetoothEscposPrinter.printerAlign(alignMap[align]);
+  async setAlignment(_align: "left" | "center" | "right"): Promise<void> {
+    // Native receipt rendering owns ESC/POS alignment. This remains for legacy helpers.
   }
 
-  /**
-   * Print divider line
-   */
   async printDivider(): Promise<void> {
     await this.printLine("--------------------------------");
   }
 
-  /**
-   * Feed paper
-   */
   async feedPaper(lines: number = 3): Promise<void> {
-    for (let i = 0; i < lines; i++) {
-      await this.printLine("");
-    }
+    await ExpoThermalPrinter.printText("\n".repeat(lines));
   }
 
-  /**
-   * Cut paper (if supported)
-   */
   async cutPaper(): Promise<void> {
-    if (!this.isModuleAvailable()) return;
-
-    try {
-      await BluetoothEscposPrinter.cutOnePoint();
-    } catch (error) {
-      console.log("Paper cut not supported");
-    }
+    // Cutting is performed by native receipt rendering when supported.
   }
 
-  /**
-   * Initialize printer
-   */
   async initialize(): Promise<void> {
-    if (!this.isModuleAvailable()) return;
+    // Native print methods initialize the printer before writing.
+  }
 
-    await BluetoothEscposPrinter.printerInit();
+  async printReceipt(data: Receipt): Promise<void> {
+    await ExpoThermalPrinter.printReceipt(data);
   }
 }
 

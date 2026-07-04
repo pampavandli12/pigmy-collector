@@ -23,6 +23,7 @@ export default function PrinterManager({ onConnectSuccess }: PrinterManagerProps
     availableDevices,
     isScanning,
     scanForDevices,
+    pairPrinter,
     connectToPrinter,
     disconnectPrinter,
     requestPermissions,
@@ -51,6 +52,15 @@ export default function PrinterManager({ onConnectSuccess }: PrinterManagerProps
       ]);
     } else {
       Alert.alert("Error", "Failed to connect to printer");
+    }
+  };
+
+  const handlePair = async (address: string) => {
+    const success = await pairPrinter(address);
+    if (success) {
+      Alert.alert("Success", "Printer paired successfully");
+    } else {
+      Alert.alert("Error", "Failed to pair printer");
     }
   };
 
@@ -131,18 +141,42 @@ export default function PrinterManager({ onConnectSuccess }: PrinterManagerProps
   const renderDeviceItem = ({
     item,
   }: {
-    item: { name: string; address: string };
+    item: { name: string; address: string; paired: boolean; connected: boolean };
   }) => (
-    <TouchableOpacity
-      style={styles.deviceItem}
-      onPress={() => handleConnect(item.address)}
-    >
-      <View>
+    <View style={styles.deviceItem}>
+      <View style={styles.deviceDetails}>
         <Text style={styles.deviceName}>{item.name}</Text>
         <Text style={styles.deviceAddress}>{item.address}</Text>
+        <View style={styles.deviceBadges}>
+          <Text style={[styles.deviceBadge, item.paired && styles.deviceBadgePaired]}>
+            {item.paired ? "Paired" : "New"}
+          </Text>
+          {item.connected && (
+            <Text style={[styles.deviceBadge, styles.deviceBadgeConnected]}>
+              Connected
+            </Text>
+          )}
+        </View>
       </View>
-      <Text style={styles.connectText}>Connect</Text>
-    </TouchableOpacity>
+      {item.paired ? (
+        <TouchableOpacity
+          style={styles.deviceAction}
+          onPress={() => handleConnect(item.address)}
+          disabled={item.connected}
+        >
+          <Text style={styles.connectText}>
+            {item.connected ? "Connected" : "Connect"}
+          </Text>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          style={styles.deviceAction}
+          onPress={() => handlePair(item.address)}
+        >
+          <Text style={styles.connectText}>Pair</Text>
+        </TouchableOpacity>
+      )}
+    </View>
   );
 
   return (
@@ -202,8 +236,7 @@ export default function PrinterManager({ onConnectSuccess }: PrinterManagerProps
           />
         ) : (
           <Text style={styles.emptyText}>
-            No devices found. Make sure your printer is paired in Bluetooth
-            settings.
+            No printers found. Turn on the printer and scan again.
           </Text>
         )}
       </View>
@@ -240,18 +273,9 @@ export default function PrinterManager({ onConnectSuccess }: PrinterManagerProps
       )}
 
       <View style={styles.infoSection}>
-        <Text style={styles.infoTitle}>📝 Instructions:</Text>
-        <Text style={styles.infoText}>
-          1. Pair your Bluetooth printer in your device's Bluetooth settings
-          first
-        </Text>
-        <Text style={styles.infoText}>
-          2. Click "Scan for Devices" to find paired printers
-        </Text>
-        <Text style={styles.infoText}>3. Select your printer to connect</Text>
-        <Text style={styles.infoText}>
-          4. Once connected, you can print test pages or receipts
-        </Text>
+        <Text style={styles.infoTitle}>Printer setup</Text>
+        <Text style={styles.infoText}>Scan, pair new printers, then connect.</Text>
+        <Text style={styles.infoText}>Connected printers can print test pages and receipts.</Text>
       </View>
     </ScrollView>
   );
@@ -362,6 +386,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#e0e0e0",
   },
+  deviceDetails: {
+    flex: 1,
+    paddingRight: 12,
+  },
   deviceName: {
     fontSize: 16,
     fontWeight: "600",
@@ -370,6 +398,34 @@ const styles = StyleSheet.create({
   deviceAddress: {
     fontSize: 12,
     color: "#666",
+  },
+  deviceBadges: {
+    flexDirection: "row",
+    gap: 6,
+    marginTop: 8,
+  },
+  deviceBadge: {
+    backgroundColor: "#F2F2F7",
+    borderRadius: 10,
+    color: "#666",
+    fontSize: 11,
+    fontWeight: "600",
+    overflow: "hidden",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  deviceBadgePaired: {
+    backgroundColor: "#E8F5E9",
+    color: "#1B7F3A",
+  },
+  deviceBadgeConnected: {
+    backgroundColor: "#E7F0FF",
+    color: "#0066CC",
+  },
+  deviceAction: {
+    minWidth: 78,
+    alignItems: "flex-end",
+    paddingVertical: 8,
   },
   connectText: {
     color: "#007AFF",

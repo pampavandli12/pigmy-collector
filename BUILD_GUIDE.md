@@ -10,7 +10,7 @@
 
 2. **Fixed Bluetooth Printer Library**
 
-   - Patched `react-native-bluetooth-escpos-printer` to work with modern Gradle
+   - Uses the local `modules/expo-thermal-printer` Expo module for Bluetooth printing
    - Removed deprecated jcenter repositories
    - Updated to secure HTTPS URLs
    - Created automatic patch script
@@ -71,7 +71,7 @@ echo "sdk.dir=$HOME/Library/Android/sdk" > android/local.properties
 Run:
 
 ```bash
-npm run patch-printer
+npm run android
 ```
 
 ### Permission Errors
@@ -108,7 +108,7 @@ Should show your device. If not:
 ## 📦 Important Files
 
 - `android/local.properties` - SDK location (gitignored)
-- `scripts/patch-bluetooth-printer.sh` - Automatic patch for Bluetooth library
+- `modules/expo-thermal-printer` - Local Bluetooth Classic thermal printer module
 - `~/.zshrc` - Contains ANDROID_HOME environment variable
 
 ## 🔄 After Clean Install
@@ -116,7 +116,7 @@ Should show your device. If not:
 If you run `npm install` or `npm ci`:
 
 1. The `postinstall` script will automatically patch the library
-2. Or run `npm run patch-printer` manually
+2. Or run `npm run android` to rebuild the native app
 
 ## 📝 Notes
 
@@ -136,7 +136,7 @@ npm run android
 npm start
 
 # Apply printer library patch
-npm run patch-printer
+npm run android
 
 # Check connected devices
 adb devices

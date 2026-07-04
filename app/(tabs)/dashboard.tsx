@@ -26,7 +26,6 @@ export default function Dashboard() {
       setRefreshing(false);
     }, 1000);
   }, []);
-
   return (
     <View style={styles.container}>
       <ScrollView
@@ -42,7 +41,7 @@ export default function Dashboard() {
             <View style={styles.collectionHeader}>
               <Icon source='wallet' size={24} color='#fff' />
               <Text variant='titleMedium' style={styles.collectionLabel}>
-                Today's Collection
+                Today&apos;s Collection
               </Text>
             </View>
             <Text variant='displaySmall' style={styles.collectionAmount}>
@@ -60,7 +59,7 @@ export default function Dashboard() {
                   {totalCount}
                 </Text>
                 <Text variant='bodySmall' style={styles.statLabel}>
-                  Today's Transactions
+                  Today&apos;s Transactions
                 </Text>
               </View>
 
@@ -97,7 +96,7 @@ export default function Dashboard() {
                   {transaction.customerName}
                 </Text>
                 <Text variant='bodySmall' style={styles.transactionDate}>
-                  {new Date(transaction.date).toLocaleDateString()}
+                  {new Date(transaction.createdAt).toLocaleDateString()}
                 </Text>
               </View>
               <View style={styles.transactionRight}>
