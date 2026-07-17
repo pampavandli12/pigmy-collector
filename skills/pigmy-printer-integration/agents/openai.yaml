@@ -1,0 +1,4 @@
+interface:
+  display_name: "Pigmy Printer Integration"
+  short_description: "Work with Bluetooth printer connection and receipt printing."
+  default_prompt: "Help me modify Bluetooth printer behavior safely."

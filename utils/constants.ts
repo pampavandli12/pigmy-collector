@@ -1,5 +1,5 @@
-const LOCAL_API_BASE_URL = 'http://192.168.1.5:1010';
-//const LOCAL_API_BASE_URL = 'https://pigmymobile-api.onrender.com';
+//const LOCAL_API_BASE_URL = 'http://192.168.1.5:1010';
+const LOCAL_API_BASE_URL = 'https://pigmymobile-api.onrender.com';
 //const PRODUCTION_API_BASE_URL = 'https://pigmymobile-api.onrender.com';
 
 // export const API_BASE_URL = __DEV__

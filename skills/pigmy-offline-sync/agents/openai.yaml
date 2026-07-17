@@ -1,0 +1,4 @@
+interface:
+  display_name: "Pigmy Offline Sync"
+  short_description: "Work with the local-first transaction outbox."
+  default_prompt: "Help me change the offline transaction sync flow safely."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Pigmy Navigation Screens"
+  short_description: "Work with Expo Router screens and navigation boundaries."
+  default_prompt: "Help me add or change a screen in Pigmy Collector."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Pigmy API Auth"
+  short_description: "Work with API services and auth/session behavior."
+  default_prompt: "Help me modify API or authentication behavior safely."
