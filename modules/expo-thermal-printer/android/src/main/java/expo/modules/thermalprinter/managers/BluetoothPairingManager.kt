@@ -7,6 +7,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import androidx.core.content.ContextCompat
 import expo.modules.kotlin.Promise
 import expo.modules.thermalprinter.utils.BluetoothUtils
@@ -18,6 +20,16 @@ class BluetoothPairingManager(
   private var pendingAddress: String? = null
   private var pendingPromise: Promise? = null
   private var receiverRegistered = false
+  private val timeoutHandler = Handler(Looper.getMainLooper())
+  private val timeoutRunnable = Runnable {
+    val address = pendingAddress ?: return@Runnable
+    pendingPromise?.reject(
+      "E_PAIRING_TIMEOUT",
+      "Timed out pairing with printer $address",
+      null
+    )
+    clear()
+  }
 
   private val receiver = object : BroadcastReceiver() {
     override fun onReceive(receiverContext: Context?, intent: Intent?) {
@@ -45,6 +57,13 @@ class BluetoothPairingManager(
 
   @SuppressLint("MissingPermission")
   fun pairPrinter(address: String, promise: Promise) {
+    try {
+      BluetoothUtils.requireValidAddress(address)
+    } catch (error: IllegalArgumentException) {
+      promise.reject("E_INVALID_BLUETOOTH_ADDRESS", error.message, error)
+      return
+    }
+
     val adapter = BluetoothUtils.adapter(context)
     if (adapter == null) {
       promise.reject("E_BLUETOOTH_UNAVAILABLE", "Bluetooth is not available", null)
@@ -66,6 +85,7 @@ class BluetoothPairingManager(
     pendingAddress = address
     pendingPromise = promise
     registerReceiver()
+    timeoutHandler.postDelayed(timeoutRunnable, PAIRING_TIMEOUT_MS)
 
     val started = device.createBond()
     if (!started) {
@@ -86,6 +106,7 @@ class BluetoothPairingManager(
   }
 
   fun clear() {
+    timeoutHandler.removeCallbacks(timeoutRunnable)
     pendingAddress = null
     pendingPromise = null
     if (receiverRegistered) {
@@ -105,5 +126,9 @@ class BluetoothPairingManager(
     } else {
       intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
     }
+  }
+
+  companion object {
+    private const val PAIRING_TIMEOUT_MS = 30000L
   }
 }

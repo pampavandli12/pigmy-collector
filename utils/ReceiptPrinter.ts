@@ -1,4 +1,9 @@
 import BluetoothPrinterService from "../services/BluetoothPrinterService";
+import {
+  amountToWords,
+  BankReceiptData,
+  formatBankReceipt,
+} from "./receiptFormatter";
 
 export interface ReceiptItem {
   name: string;
@@ -20,6 +25,18 @@ export interface ReceiptData {
   total: number;
   paymentMethod?: string;
   footer?: string;
+  bankName?: string | null;
+  receiptTitle?: string | null;
+  time?: string | null;
+  customerName?: string | null;
+  accountNo?: string | number | null;
+  accountOpeningDate?: string | Date | null;
+  openingBalance?: number | string | null;
+  receivedAmount?: number | string | null;
+  totalBalance?: number | string | null;
+  amountInWords?: string | null;
+  collectorName?: string | null;
+  collectorPhone?: string | number | null;
 }
 
 export class ReceiptPrinter {
@@ -28,7 +45,8 @@ export class ReceiptPrinter {
    */
   static async printReceipt(data: ReceiptData): Promise<boolean> {
     try {
-      await BluetoothPrinterService.printReceipt(data);
+      const receiptText = formatBankReceipt(toBankReceiptData(data));
+      await BluetoothPrinterService.printText(receiptText);
       return true;
     } catch (error) {
       console.error("Print receipt error:", error);
@@ -45,26 +63,19 @@ export class ReceiptPrinter {
     total: string
   ): Promise<boolean> {
     try {
-      await BluetoothPrinterService.initialize();
+      const receiptText = [
+        title,
+        "",
+        "--------------------------------",
+        ...items,
+        "--------------------------------",
+        `TOTAL: ${total}`,
+        "",
+        "",
+        "",
+      ].join("\n");
 
-      await BluetoothPrinterService.setAlignment("center");
-      await BluetoothPrinterService.printText(title, { fontSize: 1 });
-      await BluetoothPrinterService.printLine("");
-      await BluetoothPrinterService.printDivider();
-
-      await BluetoothPrinterService.setAlignment("left");
-      for (const item of items) {
-        await BluetoothPrinterService.printLine(item);
-      }
-
-      await BluetoothPrinterService.printDivider();
-      await BluetoothPrinterService.setAlignment("right");
-      await BluetoothPrinterService.printText(`TOTAL: ${total}`, {
-        fontSize: 1,
-      });
-
-      await BluetoothPrinterService.feedPaper(3);
-      await BluetoothPrinterService.cutPaper();
+      await BluetoothPrinterService.printText(receiptText);
 
       return true;
     } catch (error) {
@@ -78,21 +89,19 @@ export class ReceiptPrinter {
    */
   static async printTest(): Promise<boolean> {
     try {
-      await BluetoothPrinterService.initialize();
+      const receiptText = [
+        "TEST PRINT",
+        "",
+        "--------------------------------",
+        "Printer is working correctly!",
+        `Date: ${new Date().toLocaleString()}`,
+        "--------------------------------",
+        "",
+        "",
+        "",
+      ].join("\n");
 
-      await BluetoothPrinterService.setAlignment("center");
-      await BluetoothPrinterService.printText("TEST PRINT", { fontSize: 1 });
-      await BluetoothPrinterService.printLine("");
-      await BluetoothPrinterService.printDivider();
-
-      await BluetoothPrinterService.setAlignment("left");
-      await BluetoothPrinterService.printLine("Printer is working correctly!");
-      await BluetoothPrinterService.printLine(
-        `Date: ${new Date().toLocaleString()}`
-      );
-
-      await BluetoothPrinterService.printDivider();
-      await BluetoothPrinterService.feedPaper(3);
+      await BluetoothPrinterService.printText(receiptText);
 
       return true;
     } catch (error) {
@@ -125,4 +134,26 @@ export class ReceiptPrinter {
       return false;
     }
   }
+}
+
+function toBankReceiptData(data: ReceiptData): BankReceiptData {
+  const firstItem = data.items[0];
+
+  return {
+    bankName: data.bankName ?? data.storeName,
+    receiptTitle: data.receiptTitle ?? "Receipt",
+    date: data.date,
+    time: data.time,
+    customerName: data.customerName ?? data.footer?.replace(/^Customer:\s*/i, ""),
+    accountNo: data.accountNo,
+    accountOpeningDate: data.accountOpeningDate,
+    openingBalance: data.openingBalance,
+    receivedAmount: data.receivedAmount ?? firstItem?.total ?? data.total,
+    totalBalance: data.totalBalance ?? data.total,
+    amountInWords:
+      data.amountInWords ??
+      amountToWords(data.receivedAmount ?? firstItem?.total ?? data.total),
+    collectorName: data.collectorName,
+    collectorPhone: data.collectorPhone ?? data.phone,
+  };
 }

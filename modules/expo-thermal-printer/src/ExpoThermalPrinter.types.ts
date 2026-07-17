@@ -44,4 +44,5 @@ export type ExpoThermalPrinterModuleEvents = {
   connected: (device: PrinterDevice) => void;
   disconnected: () => void;
   connectionLost: (payload: ConnectionLostPayload) => void;
+  reconnectFailed: (payload: ConnectionLostPayload) => void;
 };

@@ -48,13 +48,14 @@ class ExpoThermalPrinterModule : Module() {
             "paired",
             "connected",
             "disconnected",
-            "connectionLost"
+            "connectionLost",
+            "reconnectFailed"
         )
 
         OnDestroy {
             scanner.unregisterReceiver()
             pairingManager.clear()
-            connectionManager.disconnect()
+            connectionManager.shutdown()
         }
 
         OnActivityResult { _, payload ->

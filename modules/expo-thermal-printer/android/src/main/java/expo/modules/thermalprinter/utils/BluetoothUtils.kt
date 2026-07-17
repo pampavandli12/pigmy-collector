@@ -14,6 +14,7 @@ import java.util.UUID
 
 object BluetoothUtils {
   val SPP_UUID: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+  private val BLUETOOTH_ADDRESS_PATTERN = Regex("^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$")
 
   fun adapter(context: Context): BluetoothAdapter? {
     val manager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
@@ -39,6 +40,12 @@ object BluetoothUtils {
   fun hasPermissions(context: Context): Boolean {
     return requiredPermissions().all {
       ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+    }
+  }
+
+  fun requireValidAddress(address: String) {
+    if (!BLUETOOTH_ADDRESS_PATTERN.matches(address.trim())) {
+      throw IllegalArgumentException("Invalid Bluetooth address: $address")
     }
   }
 

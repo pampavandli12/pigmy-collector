@@ -6,12 +6,18 @@ import android.content.Context
 import expo.modules.thermalprinter.utils.BluetoothUtils
 import java.io.IOException
 import java.io.OutputStream
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import kotlin.concurrent.thread
+import kotlin.math.min
 
 class BluetoothConnectionManager(
   private val context: Context,
   private val emitEvent: (String, Map<String, Any?>) -> Unit
 ) {
+  private val connectExecutor = Executors.newSingleThreadExecutor()
   @Volatile private var socket: BluetoothSocket? = null
   @Volatile private var outputStream: OutputStream? = null
   @Volatile private var manualDisconnect = false
@@ -29,6 +35,7 @@ class BluetoothConnectionManager(
 
   @SuppressLint("MissingPermission")
   fun connect(address: String): Boolean {
+    BluetoothUtils.requireValidAddress(address)
     val adapter = BluetoothUtils.adapter(context) ?: throw IllegalStateException("Bluetooth is not available")
     if (!BluetoothUtils.hasPermissions(context)) {
       throw SecurityException("Bluetooth permissions are not granted")
@@ -42,15 +49,22 @@ class BluetoothConnectionManager(
 
     val device = adapter.getRemoteDevice(address)
     val nextSocket = device.createRfcommSocketToServiceRecord(BluetoothUtils.SPP_UUID)
-    nextSocket.connect()
+    try {
+      connectWithTimeout(nextSocket)
 
-    socket = nextSocket
-    outputStream = nextSocket.outputStream
-    lastConnectedAddress = address
-    manualDisconnect = false
-    emitEvent("connected", BluetoothUtils.toPrinterDevice(device, address).toMap())
-    monitorConnection(nextSocket, address)
-    return true
+      socket = nextSocket
+      outputStream = nextSocket.outputStream
+      lastConnectedAddress = address
+      manualDisconnect = false
+      emitEvent("connected", BluetoothUtils.toPrinterDevice(device, address).toMap())
+      monitorConnection(nextSocket, address)
+      return true
+    } catch (error: Exception) {
+      try {
+        nextSocket.close()
+      } catch (_: IOException) {}
+      throw error
+    }
   }
 
   fun disconnect() {
@@ -62,13 +76,65 @@ class BluetoothConnectionManager(
   @Synchronized
   @Throws(IOException::class)
   fun write(bytes: ByteArray) {
-    val stream = outputStream ?: throw IOException("Printer is not connected")
+    if (bytes.isEmpty()) return
+
     try {
-      stream.write(bytes)
+      var offset = 0
+      while (offset < bytes.size) {
+        val stream = outputStream ?: throw IOException("Printer is not connected")
+        if (socket?.isConnected != true) {
+          throw IOException("Printer connection is closed")
+        }
+
+        val length = min(WRITE_CHUNK_SIZE, bytes.size - offset)
+        stream.write(bytes, offset, length)
+        stream.flush()
+        offset += length
+
+        if (offset < bytes.size) {
+          Thread.sleep(INTER_CHUNK_DELAY_MS)
+        }
+      }
+
+      val stream = outputStream ?: throw IOException("Printer is not connected")
       stream.flush()
     } catch (error: IOException) {
       handleConnectionLost(error)
       throw error
+    } catch (error: InterruptedException) {
+      Thread.currentThread().interrupt()
+      val ioError = IOException("Printer write was interrupted", error)
+      handleConnectionLost(ioError)
+      throw ioError
+    }
+  }
+
+  fun shutdown() {
+    disconnect()
+    connectExecutor.shutdownNow()
+  }
+
+  private fun connectWithTimeout(nextSocket: BluetoothSocket) {
+    val future = connectExecutor.submit {
+      nextSocket.connect()
+    }
+
+    try {
+      future.get(CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+    } catch (error: TimeoutException) {
+      future.cancel(true)
+      try {
+        nextSocket.close()
+      } catch (_: IOException) {}
+      throw IOException("Timed out connecting to printer", error)
+    } catch (error: ExecutionException) {
+      val cause = error.cause
+      if (cause is IOException) throw cause
+      if (cause is RuntimeException) throw cause
+      throw IOException("Failed to connect to printer", cause)
+    } catch (error: InterruptedException) {
+      Thread.currentThread().interrupt()
+      throw IOException("Printer connection was interrupted", error)
     }
   }
 
@@ -121,6 +187,10 @@ class BluetoothConnectionManager(
         }
       }
       reconnecting = false
+      emitEvent(
+        "reconnectFailed",
+        mapOf("address" to address, "message" to "Failed to reconnect to printer")
+      )
     }
   }
 
@@ -133,5 +203,11 @@ class BluetoothConnectionManager(
     } catch (_: IOException) {}
     outputStream = null
     socket = null
+  }
+
+  companion object {
+    private const val CONNECT_TIMEOUT_MS = 10000L
+    private const val WRITE_CHUNK_SIZE = 256
+    private const val INTER_CHUNK_DELAY_MS = 20L
   }
 }

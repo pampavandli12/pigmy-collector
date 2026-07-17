@@ -11,7 +11,8 @@ public class ExpoThermalPrinterModule: Module {
       "paired",
       "connected",
       "disconnected",
-      "connectionLost"
+      "connectionLost",
+      "reconnectFailed"
     )
 
     AsyncFunction("requestPermissions") { false }
