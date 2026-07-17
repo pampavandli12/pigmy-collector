@@ -8,6 +8,7 @@ import { store$ } from '@/store/store';
 
 import { filteredCustomers$ } from '@/store/selectors';
 
+import { useCustomerVoiceSearch } from '@/hooks/useCustomerVoiceSearch';
 import { useAuth } from '@/providers/AuthProvider';
 import { actions } from '@/store/actions';
 import { Customer } from '@/types/user';
@@ -17,6 +18,7 @@ export default function Users() {
   const searchQuery = useSelector(store$.searchQuery);
 
   const syncing = useSelector(store$.isRefreshingCustomers);
+  const voiceSearch = useCustomerVoiceSearch();
 
   const router = useRouter();
 
@@ -49,12 +51,26 @@ export default function Users() {
       <View style={styles.header}>
         <Searchbar
           placeholder='Search customers'
-          onChangeText={(text) => store$.searchQuery.set(text)}
+          onChangeText={(text) => {
+            voiceSearch.cancel();
+            store$.searchQuery.set(text);
+          }}
           value={searchQuery}
           style={styles.searchbar}
           icon='magnify'
           iconColor='#4A90E2'
           inputStyle={styles.searchInput}
+          right={(props) => (
+            <IconButton
+              {...props}
+              icon={voiceSearch.isActive ? 'microphone-off' : 'microphone'}
+              iconColor={voiceSearch.isActive ? '#D32F2F' : '#4A90E2'}
+              onPress={voiceSearch.start}
+              accessibilityLabel={
+                voiceSearch.isActive ? 'Cancel voice search' : 'Start voice search'
+              }
+            />
+          )}
         />
       </View>
 
