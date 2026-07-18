@@ -5,6 +5,7 @@ import * as SMS from 'expo-sms';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import { Avatar, Button, Card, Icon, Text } from 'react-native-paper';
+import { showSnackbar } from '@/utils/snackbar';
 
 interface TransactionSuccessProps {
   customerName?: string;
@@ -43,17 +44,18 @@ export const TransactionSuccess = ({
   const router = useRouter();
 
   const onSendSms = async () => {
-    const isAvailable = await SMS.isAvailableAsync();
-    if (isAvailable) {
-      await SMS.sendSMSAsync(
-        [mobilenumber],
-        `Dear ${customerName}, ₹${amount} has been collected successfully towards ${scheme} on ${date}. Account No: ${customerId}. Thank you for banking with us.`,
-      );
-    } else {
-      Alert.alert(
-        'SMS Not Available',
-        'Sorry, SMS functionality is not available on this device.',
-      );
+    try {
+      const isAvailable = await SMS.isAvailableAsync();
+      if (isAvailable) {
+        await SMS.sendSMSAsync(
+          [mobilenumber],
+          `Dear ${customerName}, ₹${amount} has been collected successfully towards ${scheme} on ${date}. Account No: ${customerId}. Thank you for banking with us.`,
+        );
+      } else {
+        showSnackbar('SMS is not available on this device.', { type: 'error' });
+      }
+    } catch {
+      showSnackbar('Unable to open the SMS composer.', { type: 'error' });
     }
   };
 
@@ -95,7 +97,7 @@ export const TransactionSuccess = ({
     if (success) {
       Alert.alert('Success', 'Receipt printed successfully!');
     } else {
-      Alert.alert('Error', 'Failed to print receipt');
+      showSnackbar('Failed to print receipt.', { type: 'error' });
     }
   }, [isConnected, amount, mobilenumber, customerId, date, scheme, customerName, router]);
 

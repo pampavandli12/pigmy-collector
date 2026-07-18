@@ -6,9 +6,19 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"]
+    },
     "outDir": ".test-build",
     "rootDir": ".",
     "types": ["node"]
   },
-  "include": ["__tests__/**/*.ts", "utils/receiptFormatter.ts"]
+  "include": [
+    "__tests__/**/*.ts",
+    "store/outboxPolicy.ts",
+    "types/user.ts",
+    "utils/errors.ts",
+    "utils/receiptFormatter.ts"
+  ]
 }

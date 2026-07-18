@@ -1,8 +1,8 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
-import { authUserSchema } from '../types/auth';
 import { API_BASE_URL, SECURE_STORE_KEY } from '../utils/constants';
 import { notifyUnauthorized } from './authSession';
+import { getStoredToken } from './authStorage';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -14,18 +14,13 @@ export const api = axios.create({
 // Interceptor for adding auth token and logging requests/responses
 api.interceptors.request.use(
   async (config) => {
-    const storedUser = await SecureStore.getItemAsync(SECURE_STORE_KEY);
-    const parsedUser = storedUser
-      ? authUserSchema.safeParse(JSON.parse(storedUser))
-      : null;
-    const token = parsedUser?.success ? parsedUser.data.token : null;
-    // Display the whole API url
-    console.log(
-      'API Request:',
-      `${config.method?.toUpperCase()} ${config.baseURL}${config.url}`,
-    );
+    const token = await getStoredToken();
     config.headers['Content-Type'] = 'application/json';
-    config.headers['Authorization'] = token || '';
+    if (token) {
+      config.headers.Authorization = token;
+    } else {
+      delete config.headers.Authorization;
+    }
     return config;
   },
   (error) => {

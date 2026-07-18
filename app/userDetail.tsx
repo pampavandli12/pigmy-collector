@@ -50,7 +50,7 @@ export default function UserDetail() {
   const [scheme, setScheme] = useState('');
   const [date] = useState(getDisplayDate);
 
-  const handleConfirm = async () => {
+  const handleConfirm = () => {
     const payload: TransactionPayload = {
       userId: Number(customer.id),
       agentCode: customer.agentCode,
@@ -62,7 +62,6 @@ export default function UserDetail() {
       accountNumber: Number(customer.account),
       transactionId: Crypto.randomUUID(),
     };
-    console.log('Confirming transaction with payload:', payload);
     actions.addTransaction(payload);
     setTransactionSuccess(true);
     // Handle deposit confirmation

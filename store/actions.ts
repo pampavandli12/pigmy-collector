@@ -2,6 +2,7 @@ import { fetchCustomers } from '@/services/user';
 import { store$ } from './store';
 
 import { Customer, OutboxItem, TransactionPayload } from '@/types/user';
+import { showSnackbar } from '@/utils/snackbar';
 import { cleanupOutbox, processOutbox } from './syncEngine';
 
 function isToday(timestamp: number) {
@@ -95,16 +96,15 @@ export const actions = {
         agentCode,
         bankCode,
       });
-      console.log('Fetched customers:', customers);
-
       const mapped = mergeFetchedCustomersWithLocalBalances(customers);
 
       store$.customers.set(mapped);
 
       store$.lastCustomerSync.set(Date.now());
-    } catch (e) {
-      console.error('Failed to sync customers', e);
-      console.log('Offline mode active');
+    } catch {
+      showSnackbar('Unable to refresh customers. Showing offline data.', {
+        type: 'error',
+      });
     } finally {
       store$.isRefreshingCustomers.set(false);
     }
@@ -114,7 +114,6 @@ export const actions = {
     const existingTransaction = store$.outbox[payload.transactionId].peek();
 
     if (existingTransaction) {
-      console.log('Transaction already exists:', payload.transactionId);
       return;
     }
 
@@ -132,8 +131,6 @@ export const actions = {
 
     store$.outbox[payload.transactionId].set(transaction);
     updateCustomerBalanceForToday(payload, createdAt);
-
-    console.log('Transaction added:', payload.transactionId);
 
     // Trigger immediate sync attempt
     processOutbox();

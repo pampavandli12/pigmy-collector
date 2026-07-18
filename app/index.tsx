@@ -2,7 +2,6 @@ import { useAuth } from '@/providers/AuthProvider';
 import { userLogin } from '@/services/login';
 import { showSnackbar } from '@/utils/snackbar';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
@@ -24,7 +23,6 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function SignIn() {
-  const router = useRouter();
   const { login } = useAuth();
   const [loading, setLoading] = useState(false);
   const [isPasswordHidden, setIsPasswordHidden] = useState(true);
@@ -46,7 +44,7 @@ export default function SignIn() {
     try {
       const user = await userLogin(values.phoneNumber, values.password);
       await login(user);
-    } catch (error) {
+    } catch {
       showSnackbar(
         'Login failed. Please check your credentials and try again.',
       );

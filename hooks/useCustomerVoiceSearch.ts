@@ -116,9 +116,8 @@ export function useCustomerVoiceSearch() {
         continuous: false,
         maxAlternatives: 1,
       });
-    } catch (error) {
+    } catch {
       setIsStarting(false);
-      console.error('Failed to start speech recognition', error);
       showSnackbar('Unable to start voice search.', { type: 'error' });
     }
   };
