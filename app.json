@@ -27,11 +27,7 @@
         "BLUETOOTH_CONNECT",
         "BLUETOOTH_SCAN",
         "ACCESS_FINE_LOCATION",
-        "BLUETOOTH",
-        "BLUETOOTH_ADMIN",
-        "BLUETOOTH_CONNECT",
-        "BLUETOOTH_SCAN",
-        "ACCESS_FINE_LOCATION"
+        "RECORD_AUDIO"
       ],
       "package": "com.pampapathi.pigmycollector"
     },
@@ -55,7 +51,8 @@
       ],
       "expo-font",
       "expo-secure-store",
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-speech-recognition"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -21,7 +21,7 @@ A mobile application for managing daily collections and deposits with Bluetooth 
 - **UI Library**: React Native Paper (Material Design 3)
 - **Navigation**: Expo Router 6.0.19
 - **Fonts**: Google Roboto (Regular, Medium, Bold)
-- **Bluetooth**: react-native-bluetooth-escpos-printer
+- **Bluetooth**: Local Expo Bluetooth Classic thermal printer module
 - **Icons**: Material Design Icons (via react-native-vector-icons)
 
 ## Prerequisites
@@ -181,15 +181,9 @@ npx expo run:android
 
 ## Known Issues & Solutions
 
-### Bluetooth Module Warnings
+### Bluetooth Printer Module
 
-You may see warnings like:
-
-```
-WARN  Bluetooth printer module not available
-```
-
-This is expected and handled gracefully. The app has defensive checks and won't crash if Bluetooth is unavailable.
+Bluetooth printing is implemented in `modules/expo-thermal-printer` and only supports Android Bluetooth Classic thermal printers.
 
 ### Gradle Build Issues
 
@@ -243,4 +237,4 @@ For issues and questions:
 
 - Built with [Expo](https://expo.dev)
 - UI components from [React Native Paper](https://callstack.github.io/react-native-paper/)
-- Bluetooth printing via [react-native-bluetooth-escpos-printer](https://github.com/januslo/react-native-bluetooth-escpos-printer)
+- Bluetooth printing via the local Expo module in `modules/expo-thermal-printer`

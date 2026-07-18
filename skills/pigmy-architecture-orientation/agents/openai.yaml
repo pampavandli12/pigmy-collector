@@ -1,0 +1,4 @@
+interface:
+  display_name: "Pigmy Architecture Orientation"
+  short_description: "Orient to the Pigmy Collector app architecture."
+  default_prompt: "Orient me to the Pigmy Collector architecture before making changes."

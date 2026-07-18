@@ -1,4 +1,9 @@
 import BluetoothPrinterService from "../services/BluetoothPrinterService";
+import {
+  amountToWords,
+  BankReceiptData,
+  formatBankReceipt,
+} from "./receiptFormatter";
 
 export interface ReceiptItem {
   name: string;
@@ -20,6 +25,18 @@ export interface ReceiptData {
   total: number;
   paymentMethod?: string;
   footer?: string;
+  bankName?: string | null;
+  receiptTitle?: string | null;
+  time?: string | null;
+  customerName?: string | null;
+  accountNo?: string | number | null;
+  accountOpeningDate?: string | Date | null;
+  openingBalance?: number | string | null;
+  receivedAmount?: number | string | null;
+  totalBalance?: number | string | null;
+  amountInWords?: string | null;
+  collectorName?: string | null;
+  collectorPhone?: string | number | null;
 }
 
 export class ReceiptPrinter {
@@ -28,130 +45,8 @@ export class ReceiptPrinter {
    */
   static async printReceipt(data: ReceiptData): Promise<boolean> {
     try {
-      await BluetoothPrinterService.initialize();
-
-      // Header
-      if (data.storeName) {
-        await BluetoothPrinterService.setAlignment("center");
-        await BluetoothPrinterService.printText(data.storeName, {
-          fontSize: 1,
-          fontType: 1,
-        });
-        await BluetoothPrinterService.printLine("");
-      }
-
-      if (data.storeAddress) {
-        await BluetoothPrinterService.setAlignment("center");
-        await BluetoothPrinterService.printLine(data.storeAddress);
-      }
-
-      if (data.phone) {
-        await BluetoothPrinterService.setAlignment("center");
-        await BluetoothPrinterService.printLine(`Tel: ${data.phone}`);
-      }
-
-      await BluetoothPrinterService.printLine("");
-      await BluetoothPrinterService.printDivider();
-
-      // Receipt details
-      await BluetoothPrinterService.setAlignment("left");
-      await BluetoothPrinterService.printColumns(
-        ["Receipt #:", data.receiptNumber],
-        [16, 16],
-        [0, 2]
-      );
-      await BluetoothPrinterService.printColumns(
-        ["Date:", data.date],
-        [16, 16],
-        [0, 2]
-      );
-      await BluetoothPrinterService.printDivider();
-
-      // Items header
-      await BluetoothPrinterService.printColumns(
-        ["Item", "Qty", "Price", "Total"],
-        [14, 6, 6, 6],
-        [0, 1, 2, 2]
-      );
-      await BluetoothPrinterService.printDivider();
-
-      // Items
-      for (const item of data.items) {
-        // Item name
-        await BluetoothPrinterService.printLine(item.name);
-
-        // Quantity, price, and total
-        await BluetoothPrinterService.printColumns(
-          [
-            "",
-            `${item.quantity}`,
-            `$${item.price.toFixed(2)}`,
-            `$${item.total.toFixed(2)}`,
-          ],
-          [14, 6, 6, 6],
-          [0, 1, 2, 2]
-        );
-      }
-
-      await BluetoothPrinterService.printDivider();
-
-      // Totals
-      await BluetoothPrinterService.printColumns(
-        ["Subtotal:", `$${data.subtotal.toFixed(2)}`],
-        [20, 12],
-        [0, 2]
-      );
-
-      if (data.tax) {
-        await BluetoothPrinterService.printColumns(
-          ["Tax:", `$${data.tax.toFixed(2)}`],
-          [20, 12],
-          [0, 2]
-        );
-      }
-
-      if (data.discount) {
-        await BluetoothPrinterService.printColumns(
-          ["Discount:", `-$${data.discount.toFixed(2)}`],
-          [20, 12],
-          [0, 2]
-        );
-      }
-
-      await BluetoothPrinterService.printDivider();
-      await BluetoothPrinterService.printColumns(
-        ["TOTAL:", `$${data.total.toFixed(2)}`],
-        [20, 12],
-        [0, 2]
-      );
-
-      if (data.paymentMethod) {
-        await BluetoothPrinterService.printLine("");
-        await BluetoothPrinterService.printColumns(
-          ["Payment:", data.paymentMethod],
-          [16, 16],
-          [0, 2]
-        );
-      }
-
-      await BluetoothPrinterService.printDivider();
-
-      // Footer
-      if (data.footer) {
-        await BluetoothPrinterService.printLine("");
-        await BluetoothPrinterService.setAlignment("center");
-        await BluetoothPrinterService.printLine(data.footer);
-      }
-
-      await BluetoothPrinterService.setAlignment("center");
-      await BluetoothPrinterService.printLine("");
-      await BluetoothPrinterService.printLine("Thank you!");
-      await BluetoothPrinterService.printLine("");
-
-      // Feed and cut
-      await BluetoothPrinterService.feedPaper(3);
-      await BluetoothPrinterService.cutPaper();
-
+      const receiptText = formatBankReceipt(toBankReceiptData(data));
+      await BluetoothPrinterService.printText(receiptText);
       return true;
     } catch (error) {
       console.error("Print receipt error:", error);
@@ -168,26 +63,19 @@ export class ReceiptPrinter {
     total: string
   ): Promise<boolean> {
     try {
-      await BluetoothPrinterService.initialize();
+      const receiptText = [
+        title,
+        "",
+        "--------------------------------",
+        ...items,
+        "--------------------------------",
+        `TOTAL: ${total}`,
+        "",
+        "",
+        "",
+      ].join("\n");
 
-      await BluetoothPrinterService.setAlignment("center");
-      await BluetoothPrinterService.printText(title, { fontSize: 1 });
-      await BluetoothPrinterService.printLine("");
-      await BluetoothPrinterService.printDivider();
-
-      await BluetoothPrinterService.setAlignment("left");
-      for (const item of items) {
-        await BluetoothPrinterService.printLine(item);
-      }
-
-      await BluetoothPrinterService.printDivider();
-      await BluetoothPrinterService.setAlignment("right");
-      await BluetoothPrinterService.printText(`TOTAL: ${total}`, {
-        fontSize: 1,
-      });
-
-      await BluetoothPrinterService.feedPaper(3);
-      await BluetoothPrinterService.cutPaper();
+      await BluetoothPrinterService.printText(receiptText);
 
       return true;
     } catch (error) {
@@ -201,21 +89,19 @@ export class ReceiptPrinter {
    */
   static async printTest(): Promise<boolean> {
     try {
-      await BluetoothPrinterService.initialize();
+      const receiptText = [
+        "TEST PRINT",
+        "",
+        "--------------------------------",
+        "Printer is working correctly!",
+        `Date: ${new Date().toLocaleString()}`,
+        "--------------------------------",
+        "",
+        "",
+        "",
+      ].join("\n");
 
-      await BluetoothPrinterService.setAlignment("center");
-      await BluetoothPrinterService.printText("TEST PRINT", { fontSize: 1 });
-      await BluetoothPrinterService.printLine("");
-      await BluetoothPrinterService.printDivider();
-
-      await BluetoothPrinterService.setAlignment("left");
-      await BluetoothPrinterService.printLine("Printer is working correctly!");
-      await BluetoothPrinterService.printLine(
-        `Date: ${new Date().toLocaleString()}`
-      );
-
-      await BluetoothPrinterService.printDivider();
-      await BluetoothPrinterService.feedPaper(3);
+      await BluetoothPrinterService.printText(receiptText);
 
       return true;
     } catch (error) {
@@ -248,4 +134,26 @@ export class ReceiptPrinter {
       return false;
     }
   }
+}
+
+function toBankReceiptData(data: ReceiptData): BankReceiptData {
+  const firstItem = data.items[0];
+
+  return {
+    bankName: data.bankName ?? data.storeName,
+    receiptTitle: data.receiptTitle ?? "Receipt",
+    date: data.date,
+    time: data.time,
+    customerName: data.customerName ?? data.footer?.replace(/^Customer:\s*/i, ""),
+    accountNo: data.accountNo,
+    accountOpeningDate: data.accountOpeningDate,
+    openingBalance: data.openingBalance,
+    receivedAmount: data.receivedAmount ?? firstItem?.total ?? data.total,
+    totalBalance: data.totalBalance ?? data.total,
+    amountInWords:
+      data.amountInWords ??
+      amountToWords(data.receivedAmount ?? firstItem?.total ?? data.total),
+    collectorName: data.collectorName,
+    collectorPhone: data.collectorPhone ?? data.phone,
+  };
 }

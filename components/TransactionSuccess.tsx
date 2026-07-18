@@ -2,7 +2,7 @@ import { usePrinter } from '@/contexts/PrinterContext';
 import { ReceiptData, ReceiptPrinter } from '@/utils/ReceiptPrinter';
 import { useRouter } from 'expo-router';
 import * as SMS from 'expo-sms';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import { Avatar, Button, Card, Icon, Text } from 'react-native-paper';
 
@@ -39,7 +39,7 @@ export const TransactionSuccess = ({
 
   const { isConnected } = usePrinter();
   const [isPrinting, setIsPrinting] = useState(false);
-  const [shouldPrintOnConnect, setShouldPrintOnConnect] = useState(false);
+  const shouldPrintOnConnect = useRef(false);
   const router = useRouter();
 
   const onSendSms = async () => {
@@ -59,7 +59,7 @@ export const TransactionSuccess = ({
 
   const onPrintReceipt = useCallback(async () => {
     if (!isConnected) {
-      setShouldPrintOnConnect(true);
+      shouldPrintOnConnect.current = true;
       router.push({
         pathname: '/printer',
         params: { redirectBack: 'true' },
@@ -100,11 +100,11 @@ export const TransactionSuccess = ({
   }, [isConnected, amount, mobilenumber, customerId, date, scheme, customerName, router]);
 
   useEffect(() => {
-    if (isConnected && shouldPrintOnConnect) {
-      setShouldPrintOnConnect(false);
+    if (isConnected && shouldPrintOnConnect.current) {
+      shouldPrintOnConnect.current = false;
       onPrintReceipt();
     }
-  }, [isConnected, shouldPrintOnConnect, onPrintReceipt]);
+  }, [isConnected, onPrintReceipt]);
   return (
     <View style={styles.container}>
       <View style={styles.content}>

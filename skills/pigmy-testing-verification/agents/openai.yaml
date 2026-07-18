@@ -1,0 +1,4 @@
+interface:
+  display_name: "Pigmy Testing Verification"
+  short_description: "Verify Pigmy Collector changes without automated tests."
+  default_prompt: "Help me verify a Pigmy Collector change before handoff."

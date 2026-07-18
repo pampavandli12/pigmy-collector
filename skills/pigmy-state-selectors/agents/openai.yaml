@@ -1,0 +1,4 @@
+interface:
+  display_name: "Pigmy State Selectors"
+  short_description: "Work with Legend State selectors and read models."
+  default_prompt: "Help me add or change derived state in Pigmy Collector."

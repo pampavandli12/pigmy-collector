@@ -1,51 +1,59 @@
 import { TransactionForm } from '@/components/TransactionForm';
 import { TransactionSuccess } from '@/components/TransactionSuccess';
 import { actions } from '@/store/actions';
+import { store$ } from '@/store/store';
 import { TransactionPayload } from '@/types/user';
+import { useSelector } from '@legendapp/state/react';
 import * as Crypto from 'expo-crypto';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { IconButton, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+function getDisplayDate() {
+  return new Date().toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
 
 export default function UserDetail() {
   const router = useRouter();
   const params = useLocalSearchParams();
 
   const [transactionSuccess, setTransactionSuccess] = useState(false);
+  const account = Array.isArray(params.account)
+    ? params.account[0]
+    : params.account;
+  const accountNumber = Number(account);
+  const storedCustomer = useSelector(store$.customers[accountNumber]);
+
   // Parse customer data from params
   const customer = {
     id: params.id as string,
     name: params.name as string,
-    agentCode: Array.isArray(params.agentCode)
-      ? params.agentCode[0]
-      : params.agentCode,
+    agentCode: Number(
+      Array.isArray(params.agentCode) ? params.agentCode[0] : params.agentCode
+    ),
     bankCode: params.bankCode as string,
-    balance: params.balance,
-    account: params.account as string,
+    balance:
+      storedCustomer?.currentBalance ??
+      Number(Array.isArray(params.balance) ? params.balance[0] : params.balance),
+    account: account as string,
     image: params.image as string,
     mobilenumber: params.mobilenumber as string,
   };
 
   const [amount, setAmount] = useState('');
   const [scheme, setScheme] = useState('');
-  const [date, setDate] = useState('');
-
-  useEffect(() => {
-    setDate(
-      new Date().toLocaleDateString('en-US', {
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric',
-      }),
-    );
-  }, [setDate]);
+  const [date] = useState(getDisplayDate);
 
   const handleConfirm = async () => {
     const payload: TransactionPayload = {
       userId: Number(customer.id),
-      agentCode: Number(customer.agentCode),
+      agentCode: customer.agentCode,
       bankCode: customer.bankCode,
       collectedAmount: Number(amount),
       schemename: scheme,

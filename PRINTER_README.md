@@ -1,6 +1,6 @@
 # Bluetooth Printer Integration
 
-This project now includes Bluetooth receipt printing functionality.
+This project includes Bluetooth Classic thermal receipt printing through the local Expo module at `modules/expo-thermal-printer`.
 
 ## Features
 
@@ -13,31 +13,20 @@ This project now includes Bluetooth receipt printing functionality.
 
 ## Setup
 
-### 1. Install Dependencies
-
-The required dependencies are already installed:
-
-```bash
-npm install react-native-bluetooth-escpos-printer
-```
-
-### 2. Build with Expo Development Build
+### 1. Build with Expo Development Build
 
 Since this uses native modules, you need to create a development build:
 
 ```bash
 # For Android
 npx expo run:android
-
-# For iOS
-npx expo run:ios
 ```
 
-**Note:** This will NOT work with Expo Go. You must use a development build.
+**Note:** This will NOT work with Expo Go. The printer module is Android-only.
 
-### 3. Permissions
+### 2. Permissions
 
-Bluetooth permissions are configured in `app.json` for Android. Make sure your printer is paired in your device's Bluetooth settings before using the app.
+Bluetooth permissions are configured in `app.json` and the local module manifest.
 
 ## Usage
 
@@ -45,8 +34,9 @@ Bluetooth permissions are configured in `app.json` for Android. Make sure your p
 
 1. Navigate to the Printer screen
 2. Click "Scan for Devices"
-3. Select your paired Bluetooth printer
-4. Test the connection with "Print Test Page"
+3. Pair a new printer if needed
+4. Connect to the printer
+5. Test the connection with "Print Test Page"
 
 ### Printing a Receipt
 
@@ -100,6 +90,8 @@ function MyComponent() {
 │   └── PrinterContext.tsx   # Printer state management
 ├── services/
 │   └── BluetoothPrinterService.ts  # Bluetooth printer service
+├── modules/
+│   └── expo-thermal-printer # Native Expo Bluetooth Classic module
 └── utils/
     └── ReceiptPrinter.ts    # Receipt formatting and printing
 ```
@@ -110,6 +102,8 @@ function MyComponent() {
 
 - `requestBluetoothPermissions()` - Request Bluetooth permissions
 - `scanPairedDevices()` - Get list of paired devices
+- `startScan()` - Discover paired and nearby Bluetooth Classic printers
+- `pairPrinter(address)` - Pair a discovered printer in-app
 - `connect(address)` - Connect to a printer
 - `disconnect()` - Disconnect from printer
 - `printText(text, options)` - Print text
@@ -136,8 +130,8 @@ This works with ESC/POS compatible thermal printers, including:
 ### App crashes or printer not found
 
 - Make sure you're using a development build, not Expo Go
-- Pair your printer in device Bluetooth settings first
 - Grant all required Bluetooth permissions
+- Keep the printer powered on and discoverable while scanning
 
 ### Print quality issues
 

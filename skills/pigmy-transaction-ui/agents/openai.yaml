@@ -1,0 +1,4 @@
+interface:
+  display_name: "Pigmy Transaction UI"
+  short_description: "Work with deposit entry and transaction success flows."
+  default_prompt: "Help me change the deposit or transaction success UI."
