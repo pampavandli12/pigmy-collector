@@ -1,11 +1,12 @@
 import { usePrinter } from '@/contexts/PrinterContext';
+import { useAuth } from '@/providers/AuthProvider';
 import { ReceiptData, ReceiptPrinter } from '@/utils/ReceiptPrinter';
+import { showSnackbar } from '@/utils/snackbar';
 import { useRouter } from 'expo-router';
 import * as SMS from 'expo-sms';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import { Avatar, Button, Card, Icon, Text } from 'react-native-paper';
-import { showSnackbar } from '@/utils/snackbar';
 
 interface TransactionSuccessProps {
   customerName?: string;
@@ -42,14 +43,14 @@ export const TransactionSuccess = ({
   const [isPrinting, setIsPrinting] = useState(false);
   const shouldPrintOnConnect = useRef(false);
   const router = useRouter();
-
+  const { user: agentInfo } = useAuth();
   const onSendSms = async () => {
     try {
       const isAvailable = await SMS.isAvailableAsync();
       if (isAvailable) {
         await SMS.sendSMSAsync(
           [mobilenumber],
-          `Dear ${customerName}, ₹${amount} has been collected successfully towards ${scheme} on ${date}. Account No: ${customerId}. Thank you for banking with us.`,
+          `Dear ${customerName}, ${amount} has been collected successfully towards ${scheme} on ${date}. Account No: ${customerId}. Thank you for banking with us.`,
         );
       } else {
         showSnackbar('SMS is not available on this device.', { type: 'error' });
@@ -74,7 +75,7 @@ export const TransactionSuccess = ({
     const receiptData: ReceiptData = {
       storeName: 'PIGMY COLLECTOR',
       storeAddress: 'Daily Collection System',
-      phone: mobilenumber || undefined,
+      phone: agentInfo?.phoneNumber || undefined,
       receiptNumber: `TX-${customerId}-${Date.now().toString().slice(-6)}`,
       date: date || new Date().toLocaleString(),
       items: [
@@ -99,7 +100,16 @@ export const TransactionSuccess = ({
     } else {
       showSnackbar('Failed to print receipt.', { type: 'error' });
     }
-  }, [isConnected, amount, mobilenumber, customerId, date, scheme, customerName, router]);
+  }, [
+    isConnected,
+    amount,
+    mobilenumber,
+    customerId,
+    date,
+    scheme,
+    customerName,
+    router,
+  ]);
 
   useEffect(() => {
     if (isConnected && shouldPrintOnConnect.current) {

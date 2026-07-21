@@ -6,6 +6,7 @@ beforeEach(() => jest.clearAllMocks());
 test('returns a validated stored token', async () => {
   (SecureStore.getItemAsync as jest.Mock).mockResolvedValue(JSON.stringify({
     agentCode: 1, agentName: 'Agent', bankCode: 'B', bankName: 'Bank Name', token: 'secret',
+    phoneNumber: '9876543210',
   }));
   await expect(getStoredToken()).resolves.toBe('secret');
 });

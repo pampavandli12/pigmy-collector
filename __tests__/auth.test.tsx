@@ -10,6 +10,7 @@ const user = {
   bankCode: 'BANK',
   bankName: 'Pigmy Bank',
   token: 'token',
+  phoneNumber: '9876543210',
 };
 
 beforeEach(() => jest.clearAllMocks());

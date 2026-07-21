@@ -7,6 +7,7 @@ export const authUserSchema = z
     bankCode: z.string().min(1),
     bankName: z.string().min(4),
     token: z.string().min(1),
+    phoneNumber: z.string().min(1),
   })
   .strict();
 

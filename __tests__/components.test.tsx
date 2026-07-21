@@ -18,6 +18,18 @@ jest.mock('expo-sms', () => ({
 jest.mock('../utils/ReceiptPrinter', () => ({
   ReceiptPrinter: { printReceipt: jest.fn().mockResolvedValue(true) },
 }));
+jest.mock('../providers/AuthProvider', () => ({
+  useAuth: () => ({
+    user: {
+      agentCode: 1,
+      agentName: 'Agent',
+      bankCode: 'BANK',
+      bankName: 'Pigmy Bank',
+      token: 'token',
+      phoneNumber: '9876543210',
+    },
+  }),
+}));
 
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { PaperProvider } from 'react-native-paper';
