@@ -27,6 +27,7 @@ const useUser = create<State & Actions>((set) => ({
     set({ loadCustomerStatus: Status.Loading, customers: [] });
     try {
       const customers = await fetchCustomers(payload);
+      console.log(customers);
       set({ customers, loadCustomerStatus: Status.Success });
     } catch (error: unknown) {
       set({ loadCustomerStatus: Status.Error });

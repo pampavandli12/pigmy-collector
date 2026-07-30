@@ -32,11 +32,13 @@ jest.mock('../providers/AuthProvider', () => ({
 }));
 
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import * as SMS from 'expo-sms';
 import { PaperProvider } from 'react-native-paper';
 import { AppSnackbar } from '../components/AppSnackbar';
 import PrinterManager from '../components/PrinterManager';
 import { TransactionForm } from '../components/TransactionForm';
 import { TransactionSuccess } from '../components/TransactionSuccess';
+import { ReceiptPrinter } from '../utils/ReceiptPrinter';
 import { showSnackbar } from '../utils/snackbar';
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -70,9 +72,125 @@ test('keeps transaction confirmation disabled until values match', () => {
 });
 
 test('shows an SMS error through the snackbar', async () => {
-  const screen = render(<TransactionSuccess customerName='Customer' />, { wrapper });
+  const screen = render(
+    <>
+      <TransactionSuccess
+        customerName='Customer'
+        openingBalance={100}
+        totalBalance={200}
+      />
+      <AppSnackbar />
+    </>,
+    { wrapper },
+  );
   fireEvent.press(screen.getByText('Send SMS'));
-  await waitFor(() => expect(screen.queryByText('Transaction Successful')).toBeTruthy());
+  await waitFor(() =>
+    expect(
+      screen.getByText('SMS is not available on this device.'),
+    ).toBeTruthy(),
+  );
+});
+
+test('opens SMS composer with bank name and post-transaction balance', async () => {
+  const isAvailableAsync = SMS.isAvailableAsync as jest.Mock;
+  const sendSMSAsync = SMS.sendSMSAsync as jest.Mock;
+  sendSMSAsync.mockClear();
+  isAvailableAsync.mockResolvedValueOnce(true);
+
+  const screen = render(
+    <TransactionSuccess
+      customerName='Customer'
+      customerId='2053'
+      accountNumber='60001'
+      amount='₹100'
+      openingBalance={900}
+      totalBalance={1000}
+      scheme='Pigmy Deposit'
+      date='July 24, 2026'
+      mobilenumber='9123456780'
+    />,
+    { wrapper },
+  );
+
+  fireEvent.press(screen.getByText('Send SMS'));
+
+  await waitFor(() => expect(sendSMSAsync).toHaveBeenCalledTimes(1));
+  expect(sendSMSAsync).toHaveBeenCalledWith(
+    ['9123456780'],
+    expect.stringContaining('Pigmy Bank'),
+  );
+  const smsBody = sendSMSAsync.mock.calls[0][1];
+  expect(smsBody).toContain('₹100');
+  expect(smsBody).toContain('Total Balance: ₹1,000.00');
+  expect(smsBody).toContain('Account No: 60001');
+});
+
+test('prints bank and agent details without the customer phone number', async () => {
+  const printReceipt = ReceiptPrinter.printReceipt as jest.Mock;
+  printReceipt.mockClear();
+  printReceipt.mockResolvedValueOnce(true);
+
+  const screen = render(
+    <TransactionSuccess
+      customerName='Customer'
+      customerId='2053'
+      accountNumber='60001'
+      amount='₹100'
+      openingBalance={900}
+      totalBalance={1000}
+      mobilenumber='9123456780'
+    />,
+    { wrapper },
+  );
+
+  fireEvent.press(screen.getByText('Print Receipt'));
+
+  await waitFor(() => expect(printReceipt).toHaveBeenCalledTimes(1));
+  const receiptData = printReceipt.mock.calls[0][0];
+  expect(receiptData).toEqual(
+    expect.objectContaining({
+      bankName: 'Pigmy Bank',
+      collectorName: 'Agent',
+      collectorPhone: '9876543210',
+      customerName: 'Customer',
+      accountNo: '60001',
+      openingBalance: 900,
+      receivedAmount: 100,
+      totalBalance: 1000,
+    }),
+  );
+  expect(JSON.stringify(receiptData)).not.toContain('9123456780');
+});
+
+test('shows a snackbar when receipt printing fails', async () => {
+  const printReceipt = ReceiptPrinter.printReceipt as jest.Mock;
+  printReceipt.mockClear();
+  printReceipt.mockResolvedValueOnce(false);
+
+  const screen = render(
+    <>
+      <TransactionSuccess openingBalance={100} totalBalance={200} />
+      <AppSnackbar />
+    </>,
+    { wrapper },
+  );
+
+  fireEvent.press(screen.getByText('Print Receipt'));
+
+  await waitFor(() =>
+    expect(screen.getByText('Failed to print receipt.')).toBeTruthy(),
+  );
+});
+
+test('keeps success actions and Done available in the responsive layout', () => {
+  const screen = render(
+    <TransactionSuccess openingBalance={100} totalBalance={200} />,
+    { wrapper },
+  );
+
+  expect(screen.getByText('Send SMS')).toBeTruthy();
+  expect(screen.getByText('Print Receipt')).toBeTruthy();
+  expect(screen.getByText('Done')).toBeTruthy();
 });
 
 test('renders printer connection state and actions', () => {

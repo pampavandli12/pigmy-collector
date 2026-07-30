@@ -11,6 +11,12 @@ import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { IconButton, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+interface TransactionSuccessSnapshot {
+  amount: number;
+  openingBalance: number;
+  totalBalance: number;
+}
+
 function getDisplayDate() {
   return new Date().toLocaleDateString('en-US', {
     month: 'long',
@@ -22,8 +28,8 @@ function getDisplayDate() {
 export default function UserDetail() {
   const router = useRouter();
   const params = useLocalSearchParams();
-
-  const [transactionSuccess, setTransactionSuccess] = useState(false);
+  const [transactionSuccess, setTransactionSuccess] =
+    useState<TransactionSuccessSnapshot | null>(null);
   const account = Array.isArray(params.account)
     ? params.account[0]
     : params.account;
@@ -35,12 +41,14 @@ export default function UserDetail() {
     id: params.id as string,
     name: params.name as string,
     agentCode: Number(
-      Array.isArray(params.agentCode) ? params.agentCode[0] : params.agentCode
+      Array.isArray(params.agentCode) ? params.agentCode[0] : params.agentCode,
     ),
     bankCode: params.bankCode as string,
     balance:
       storedCustomer?.currentBalance ??
-      Number(Array.isArray(params.balance) ? params.balance[0] : params.balance),
+      Number(
+        Array.isArray(params.balance) ? params.balance[0] : params.balance,
+      ),
     account: account as string,
     image: params.image as string,
     mobilenumber: params.mobilenumber as string,
@@ -51,11 +59,13 @@ export default function UserDetail() {
   const [date] = useState(getDisplayDate);
 
   const handleConfirm = () => {
+    const numericAmount = Number(amount);
+    const openingBalance = Number(customer.balance || 0);
     const payload: TransactionPayload = {
       userId: Number(customer.id),
       agentCode: customer.agentCode,
       bankCode: customer.bankCode,
-      collectedAmount: Number(amount),
+      collectedAmount: numericAmount,
       schemename: scheme,
       collectiontype: 'cash',
       customerName: customer.name,
@@ -63,9 +73,11 @@ export default function UserDetail() {
       transactionId: Crypto.randomUUID(),
     };
     actions.addTransaction(payload);
-    setTransactionSuccess(true);
-    // Handle deposit confirmation
-    //router.back();
+    setTransactionSuccess({
+      amount: numericAmount,
+      openingBalance,
+      totalBalance: openingBalance + numericAmount,
+    });
   };
 
   return (
@@ -93,7 +105,10 @@ export default function UserDetail() {
           <TransactionSuccess
             customerName={customer.name}
             customerId={customer.id}
-            amount={`₹${amount}`}
+            accountNumber={customer.account}
+            amount={`₹${transactionSuccess.amount}`}
+            openingBalance={transactionSuccess.openingBalance}
+            totalBalance={transactionSuccess.totalBalance}
             scheme={scheme}
             date={date}
             mobilenumber={customer.mobilenumber}

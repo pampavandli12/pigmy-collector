@@ -32,7 +32,8 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response && error.response.status === 403) {
+    const status = error.response?.status;
+    if (status === 401 || status === 403) {
       await SecureStore.deleteItemAsync(SECURE_STORE_KEY);
       await notifyUnauthorized();
     }

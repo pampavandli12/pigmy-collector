@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
-import { shouldRemoveOutboxItem } from '../store/outboxPolicy';
+import {
+  isValidOutboxItem,
+  shouldRemoveOutboxItem,
+} from '../store/outboxPolicy';
 import { OutboxItem } from '../types/user';
 
 const now = new Date(2026, 6, 18, 12).getTime();
@@ -39,4 +42,15 @@ test('keeps transactions created at local midnight or later today', () => {
     shouldRemoveOutboxItem(item('pending', startOfToday), now),
     false,
   );
+});
+
+test('removes malformed persisted entries that cannot be synchronized', () => {
+  const malformed = {
+    status: 'failed',
+    retryCount: 4,
+    error: 'Network Error',
+  };
+
+  assert.equal(isValidOutboxItem(malformed), false);
+  assert.equal(shouldRemoveOutboxItem(malformed, now), true);
 });

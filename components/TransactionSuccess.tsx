@@ -5,24 +5,43 @@ import { showSnackbar } from '@/utils/snackbar';
 import { useRouter } from 'expo-router';
 import * as SMS from 'expo-sms';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import {
+  Alert,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { Avatar, Button, Card, Icon, Text } from 'react-native-paper';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface TransactionSuccessProps {
   customerName?: string;
   customerId?: string;
+  accountNumber?: string;
   amount?: string;
+  openingBalance: number;
+  totalBalance: number;
   scheme?: string;
   date?: string;
   mobilenumber?: string;
-  onPrintReceipt?: () => void;
   onDone?: () => void;
+}
+
+function formatIndianCurrency(value: number) {
+  return `₹${value.toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 export const TransactionSuccess = ({
   customerName = 'SRIRAM.S',
   customerId = '60001',
+  accountNumber = customerId,
   amount = '255',
+  openingBalance,
+  totalBalance,
   scheme = 'Pigmy Deposit',
   mobilenumber = '',
   date = new Date().toLocaleDateString('en-US', {
@@ -44,13 +63,17 @@ export const TransactionSuccess = ({
   const shouldPrintOnConnect = useRef(false);
   const router = useRouter();
   const { user: agentInfo } = useAuth();
+  const insets = useSafeAreaInsets();
+  const { width, fontScale } = useWindowDimensions();
+  const stackActions = width < 380 || fontScale > 1.2;
+
   const onSendSms = async () => {
     try {
       const isAvailable = await SMS.isAvailableAsync();
       if (isAvailable) {
         await SMS.sendSMSAsync(
           [mobilenumber],
-          `Dear ${customerName}, ${amount} has been collected successfully towards ${scheme} on ${date}. Account No: ${customerId}. Thank you for banking with us.`,
+          `Dear ${customerName}, ${amount} has been collected successfully towards ${scheme} on ${date}. Account No: ${accountNumber}. Total Balance: ${formatIndianCurrency(totalBalance)}. Thank you for banking with ${agentInfo?.bankName ?? 'us'}.`,
         );
       } else {
         showSnackbar('SMS is not available on this device.', { type: 'error' });
@@ -73,9 +96,7 @@ export const TransactionSuccess = ({
     setIsPrinting(true);
     const numericAmount = Number(amount.replace(/[^0-9.]/g, '')) || 0;
     const receiptData: ReceiptData = {
-      storeName: 'PIGMY COLLECTOR',
-      storeAddress: 'Daily Collection System',
-      phone: agentInfo?.phoneNumber || undefined,
+      bankName: agentInfo?.bankName,
       receiptNumber: `TX-${customerId}-${Date.now().toString().slice(-6)}`,
       date: date || new Date().toLocaleString(),
       items: [
@@ -89,7 +110,13 @@ export const TransactionSuccess = ({
       subtotal: numericAmount,
       total: numericAmount,
       paymentMethod: 'Cash',
-      footer: `Customer: ${customerName}`,
+      customerName,
+      accountNo: accountNumber,
+      openingBalance,
+      receivedAmount: numericAmount,
+      totalBalance,
+      collectorName: agentInfo?.agentName,
+      collectorPhone: agentInfo?.phoneNumber,
     };
 
     const success = await ReceiptPrinter.printReceipt(receiptData);
@@ -103,11 +130,14 @@ export const TransactionSuccess = ({
   }, [
     isConnected,
     amount,
-    mobilenumber,
     customerId,
+    accountNumber,
     date,
     scheme,
     customerName,
+    openingBalance,
+    totalBalance,
+    agentInfo,
     router,
   ]);
 
@@ -119,7 +149,12 @@ export const TransactionSuccess = ({
   }, [isConnected, onPrintReceipt]);
   return (
     <View style={styles.container}>
-      <View style={styles.content}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps='handled'
+      >
         <View style={styles.statusSection}>
           <View style={styles.statusCircle}>
             <Icon source='check' size={32} color='#0D9F59' />
@@ -175,13 +210,16 @@ export const TransactionSuccess = ({
           </Card.Content>
         </Card>
 
-        <View style={styles.actionRow}>
+        <View
+          style={[styles.actionRow, stackActions && styles.actionRowStacked]}
+        >
           <Button
             mode='outlined'
             onPress={onSendSms}
             style={[
               styles.actionButton,
-              styles.actionButtonLeft,
+              !stackActions && styles.actionButtonLeft,
+              stackActions && styles.stackedActionButton,
               styles.smsButton,
             ]}
             labelStyle={styles.actionLabel}
@@ -193,7 +231,11 @@ export const TransactionSuccess = ({
           <Button
             mode='outlined'
             onPress={onPrintReceipt}
-            style={[styles.actionButton, styles.printButton]}
+            style={[
+              styles.actionButton,
+              stackActions && styles.stackedActionButton,
+              styles.printButton,
+            ]}
             labelStyle={styles.actionLabel}
             contentStyle={styles.actionContent}
             icon='printer'
@@ -203,9 +245,11 @@ export const TransactionSuccess = ({
             Print Receipt
           </Button>
         </View>
-      </View>
+      </ScrollView>
 
-      <View style={styles.footer}>
+      <View
+        style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}
+      >
         <Button
           mode='contained'
           onPress={onDone}
@@ -224,12 +268,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F7FA',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  content: {
+    flexGrow: 1,
     paddingHorizontal: 16,
     paddingTop: 32,
     paddingBottom: 24,
-  },
-  content: {
-    flex: 1,
   },
   statusSection: {
     alignItems: 'center',
@@ -301,6 +348,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 24,
   },
+  actionRowStacked: {
+    flexDirection: 'column',
+  },
   actionButton: {
     flex: 1,
     borderRadius: 14,
@@ -309,6 +359,11 @@ const styles = StyleSheet.create({
   },
   actionButtonLeft: {
     marginRight: 12,
+  },
+  stackedActionButton: {
+    flex: 0,
+    width: '100%',
+    marginBottom: 12,
   },
   smsButton: {
     borderColor: '#007AFF',
@@ -324,7 +379,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   footer: {
+    paddingHorizontal: 16,
     paddingTop: 16,
+    backgroundColor: '#F5F7FA',
   },
   doneButton: {
     borderRadius: 14,

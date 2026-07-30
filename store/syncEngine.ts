@@ -15,6 +15,10 @@ export async function processOutbox() {
     return;
   }
 
+  // Persisted data can outlive schema changes. Remove unrecoverable entries
+  // before they can produce empty transaction requests.
+  cleanupOutbox();
+
   const network = await NetInfo.fetch();
 
   if (network.isConnected !== true) {
@@ -48,7 +52,6 @@ export async function processOutbox() {
 
           error: undefined,
         });
-
       } catch (error: unknown) {
         const message = getErrorMessage(error, 'Sync failed');
 

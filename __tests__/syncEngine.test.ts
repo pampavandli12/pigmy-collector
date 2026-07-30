@@ -45,6 +45,23 @@ test('marks failed syncs and shows an error snackbar', async () => {
   expect(showSnackbar).toHaveBeenCalledWith('Transaction sync failed: Server unavailable', { type: 'error' });
 });
 
+test('removes malformed persisted entries before attempting sync', async () => {
+  (NetInfo.fetch as jest.Mock).mockResolvedValue({ isConnected: true });
+  store$.outbox.set({
+    malformed: {
+      status: 'failed',
+      retryCount: 4,
+      error: 'Network Error',
+    },
+  } as never);
+
+  await processOutbox();
+
+  expect(store$.outbox.malformed.peek()).toBeUndefined();
+  expect(createTransaction).not.toHaveBeenCalled();
+  expect(showSnackbar).not.toHaveBeenCalled();
+});
+
 test('deletes all outbox statuses from previous calendar days', () => {
   const old = new Date();
   old.setDate(old.getDate() - 1);
