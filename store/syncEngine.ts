@@ -1,23 +1,27 @@
 import NetInfo from '@react-native-community/netinfo';
 
 import { createTransaction } from '@/services/user';
+import { OutboxItem } from '@/types/user';
+import { getErrorMessage } from '@/utils/errors';
+import { showSnackbar } from '@/utils/snackbar';
 
+import { shouldRemoveOutboxItem } from './outboxPolicy';
 import { store$ } from './store';
 
 let syncing = false;
 
 export async function processOutbox() {
-  console.log('Checking outbox for pending transactions...', syncing);
-
   if (syncing) {
     return;
   }
 
+  // Persisted data can outlive schema changes. Remove unrecoverable entries
+  // before they can produce empty transaction requests.
+  cleanupOutbox();
+
   const network = await NetInfo.fetch();
 
-  if (!network.isConnected) {
-    console.log('No internet connection');
-
+  if (network.isConnected !== true) {
     return;
   }
 
@@ -35,12 +39,8 @@ export async function processOutbox() {
       })
       .sort((a, b) => a[1].createdAt - b[1].createdAt);
 
-    console.log(`Found ${pending.length} transactions to sync`);
-
     for (const [txId, item] of pending) {
       try {
-        console.log('Syncing transaction:', txId);
-
         // Mark syncing
         store$.outbox[txId].status.set('syncing');
 
@@ -52,18 +52,18 @@ export async function processOutbox() {
 
           error: undefined,
         });
-
-        console.log('Transaction synced:', txId);
-      } catch (e: any) {
-        console.log('Sync failed:', txId, e?.message);
+      } catch (error: unknown) {
+        const message = getErrorMessage(error, 'Sync failed');
 
         store$.outbox[txId].assign({
           status: 'failed',
 
           retryCount: item.retryCount + 1,
 
-          error: e?.message ?? 'Sync failed',
+          error: message,
         });
+
+        showSnackbar(`Transaction sync failed: ${message}`, { type: 'error' });
       }
     }
   } finally {
@@ -71,19 +71,15 @@ export async function processOutbox() {
   }
 }
 
-// Delete yesterday's transactions from outbox to prevent indefinite growth
+// The business retention policy removes every outbox item from previous
+// calendar days, regardless of its sync status.
 export function cleanupOutbox() {
   const outbox = store$.outbox.peek();
+  const retained = Object.fromEntries(
+    Object.entries(outbox).filter(([, item]) => !shouldRemoveOutboxItem(item)),
+  ) as Record<string, OutboxItem>;
 
-  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-
-  Object.entries(outbox).forEach(([txId, item]) => {
-    if (item?.createdAt < cutoff) {
-      // Remove the entry by creating a shallow copy without the key
-      const outboxCopy = { ...store$.outbox.peek() } as Record<string, unknown>;
-      delete outboxCopy[txId];
-      store$.outbox.set(outboxCopy as any);
-      console.log('Deleted old transaction from outbox:', txId);
-    }
-  });
+  if (Object.keys(retained).length !== Object.keys(outbox).length) {
+    store$.outbox.set(retained);
+  }
 }

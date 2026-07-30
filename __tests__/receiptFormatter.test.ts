@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
 import {
   formatBankReceipt,
   formatReceiptAmount,
@@ -51,7 +50,7 @@ test('formats a normal bank receipt without MSA or receipt number', () => {
   assert.match(receipt, /Amount in words:/);
   assert.match(receipt, /Two Hundred Fifty Five Rupees/);
   assert.match(receipt, /Collector: Ramesh Kumar/);
-  assert.match(receipt, /Phone: 9876543210/);
+  assert.match(receipt, /Agent No: 9876543210/);
   assert.match(receipt, /Thank You/);
   assert.doesNotMatch(receipt, /MSA/i);
   assert.doesNotMatch(receipt, /Receipt #|receiptNumber|TX-/);
@@ -115,8 +114,32 @@ test('omits missing collector phone without unsafe placeholders', () => {
     collectorPhone: undefined,
   });
 
-  assert.doesNotMatch(receipt, /^Phone:/m);
+  assert.doesNotMatch(receipt, /^Agent No:/m);
   assert.doesNotMatch(receipt, /undefined|null|NaN/);
+  assertNoOverflow(receipt);
+});
+
+test('prints agent details immediately above the final separator and thank you', () => {
+  const receipt = formatBankReceipt(baseReceipt);
+
+  assert.match(
+    receipt,
+    /Collector: Ramesh Kumar\nAgent No: 9876543210\n-{32}\n\s*Thank You/,
+  );
+  assert.doesNotMatch(receipt, /Customer Phone|Mobile/i);
+  assertNoOverflow(receipt);
+});
+
+test('wraps long bank and agent details without overflowing', () => {
+  const receipt = formatBankReceipt({
+    ...baseReceipt,
+    bankName: 'Sri Lakshmi Venkateshwara Urban Cooperative Bank Limited',
+    collectorName: 'Ramesh Venkatesh Narayanaswamy Collection Agent',
+  });
+
+  assert.match(receipt, /Sri Lakshmi Venkateshwara/);
+  assert.match(receipt, /Collector/);
+  assert.match(receipt, /Narayanaswamy/);
   assertNoOverflow(receipt);
 });
 

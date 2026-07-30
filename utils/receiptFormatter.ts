@@ -346,7 +346,7 @@ export function formatBankReceipt(
   addAmountLine(lines, 'Total Bal', data.totalBalance, width);
   addAmountInWords(lines, data.amountInWords, width);
   addLabelValue(lines, 'Collector', data.collectorName, width);
-  addLabelValue(lines, 'Phone', data.collectorPhone, width);
+  addLabelValue(lines, 'Agent No', data.collectorPhone, width);
   lines.push(RECEIPT_SEPARATOR.slice(0, width));
   lines.push(centerText('Thank You', width));
 

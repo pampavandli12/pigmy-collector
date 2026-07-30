@@ -34,11 +34,8 @@ export default function TabsLayout() {
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {
       if (state.isConnected) {
-        console.log('Internet restored');
-
         // Retry only existing queue
-        processOutbox();
-        cleanupOutbox();
+        void processOutbox().finally(cleanupOutbox);
       }
     });
 

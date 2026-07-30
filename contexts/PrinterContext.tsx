@@ -9,6 +9,7 @@ import ExpoThermalPrinter from "../modules/expo-thermal-printer/src/ExpoThermalP
 import BluetoothPrinterService, {
   PrinterDevice,
 } from "../services/BluetoothPrinterService";
+import { showSnackbar } from "../utils/snackbar";
 
 interface PrinterContextType {
   isConnected: boolean;
@@ -113,8 +114,8 @@ export const PrinterProvider: React.FC<{ children: React.ReactNode }> = ({
         }
       }
       return granted;
-    } catch (error) {
-      console.error("Permission error:", error);
+    } catch {
+      showSnackbar("Unable to request Bluetooth permission.", { type: "error" });
       return false;
     }
   }, []);
@@ -124,7 +125,9 @@ export const PrinterProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       const hasPermission = await requestPermissions();
       if (!hasPermission) {
-        console.log("Bluetooth permissions not granted");
+        showSnackbar("Bluetooth permission is required to find printers.", {
+          type: "error",
+        });
         setIsScanning(false);
         return;
       }
@@ -132,8 +135,8 @@ export const PrinterProvider: React.FC<{ children: React.ReactNode }> = ({
       const pairedDevices = await BluetoothPrinterService.scanPairedDevices();
       setAvailableDevices(pairedDevices);
       await BluetoothPrinterService.startScan();
-    } catch (error) {
-      console.error("Scan error:", error);
+    } catch {
+      showSnackbar("Unable to scan for printers.", { type: "error" });
       setIsScanning(false);
     }
   }, [requestPermissions]);
@@ -141,8 +144,8 @@ export const PrinterProvider: React.FC<{ children: React.ReactNode }> = ({
   const pairPrinter = useCallback(async (address: string): Promise<boolean> => {
     try {
       return await BluetoothPrinterService.pairPrinter(address);
-    } catch (error) {
-      console.error("Pairing error:", error);
+    } catch {
+      showSnackbar("Unable to pair with the printer.", { type: "error" });
       return false;
     }
   }, []);
@@ -159,8 +162,8 @@ export const PrinterProvider: React.FC<{ children: React.ReactNode }> = ({
           );
         }
         return success;
-      } catch (error) {
-        console.error("Connection error:", error);
+      } catch {
+        showSnackbar("Unable to connect to the printer.", { type: "error" });
         return false;
       }
     },
@@ -172,8 +175,8 @@ export const PrinterProvider: React.FC<{ children: React.ReactNode }> = ({
       await BluetoothPrinterService.disconnect();
       setIsConnected(false);
       setConnectedDevice(null);
-    } catch (error) {
-      console.error("Disconnect error:", error);
+    } catch {
+      showSnackbar("Unable to disconnect the printer.", { type: "error" });
     }
   }, []);
 

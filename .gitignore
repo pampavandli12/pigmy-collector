@@ -1,43 +1,90 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
-
-# dependencies
+# Dependencies
 node_modules/
 
-# Expo
+# Package-manager caches
+.npm/
+.yarn/
+.pnpm-store/
+
+# Expo and Metro
 .expo/
+.expo-shared/
 dist/
 web-build/
 expo-env.d.ts
+.metro-health-check*
 
-# Native
+# Tests and coverage
+coverage/
+.test-build/
+test-results/
+*.lcov
+
+# Generated native projects (Expo prebuild)
+/android/
+/ios/
+
+# Android and Gradle outputs, including local Expo modules
+**/.gradle/
+**/build/
+**/.cxx/
+**/.externalNativeBuild/
+local.properties
+captures/
 .kotlin/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+*.hprof
 *.orig.*
 *.jks
+*.keystore
+
+# Apple build outputs and signing material
+Pods/
+DerivedData/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.ipa
 *.p8
 *.p12
 *.key
 *.mobileprovision
 
-# Metro
-.metro-health-check*
-
-# debug
+# Logs and diagnostics
+*.log
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+pnpm-debug.*
+metro-error.log
 
-# macOS
-.DS_Store
+# Environment and local secrets
+.env
+.env.*
+!.env.example
+google-services.json
+GoogleService-Info.plist
 *.pem
 
-# local env files
-.env*.local
-
-# typescript
+# TypeScript and tooling caches
 *.tsbuildinfo
+.eslintcache
+.cache/
+.parcel-cache/
+.turbo/
 
-app-example
+# Editors and operating systems
+.DS_Store
+.AppleDouble
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
 
-# generated native folders
-/ios
-/android
+# Project-local generated/example directories
+app-example/
