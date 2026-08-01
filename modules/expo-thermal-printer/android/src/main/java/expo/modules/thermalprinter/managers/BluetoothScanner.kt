@@ -22,6 +22,8 @@ class BluetoothScanner(
 
   private val discovered = linkedMapOf<String, PrinterDevice>()
   private var receiverRegistered = false
+  private var scanActive = false
+  private var restartAfterCancellation = false
 
   private val receiver = object : BroadcastReceiver() {
     override fun onReceive(receiverContext: Context?, intent: Intent?) {
@@ -33,7 +35,12 @@ class BluetoothScanner(
           }
         }
         BluetoothAdapter.ACTION_DISCOVERY_FINISHED -> {
-          emitEvent("scanFinished", mapOf("devices" to discovered.values.map { it.toMap() }))
+          if (restartAfterCancellation) {
+            restartAfterCancellation = false
+            startAdapterDiscovery()
+          } else if (scanActive) {
+            finishScan()
+          }
         }
       }
     }
@@ -64,6 +71,8 @@ class BluetoothScanner(
 
     discovered.clear()
     registerReceiver()
+    scanActive = true
+    restartAfterCancellation = false
     emitEvent("scanStarted", emptyMap())
 
     getPairedPrinters().forEach { printer ->
@@ -72,22 +81,40 @@ class BluetoothScanner(
     }
 
     if (bluetoothAdapter.isDiscovering) {
+      // Discovery cancellation is asynchronous. Wait for ACTION_DISCOVERY_FINISHED
+      // before starting again, otherwise startDiscovery() commonly returns false.
+      restartAfterCancellation = true
       bluetoothAdapter.cancelDiscovery()
+      return
     }
 
-    val started = bluetoothAdapter.startDiscovery()
-    if (!started) {
-      emitEvent("scanFinished", mapOf("devices" to discovered.values.map { it.toMap() }))
-    }
+    startAdapterDiscovery()
   }
 
   @SuppressLint("MissingPermission")
   fun stopScan() {
     val bluetoothAdapter = adapter
+    restartAfterCancellation = false
+    val wasActive = scanActive
+    scanActive = false
     if (bluetoothAdapter?.isDiscovering == true) {
       bluetoothAdapter.cancelDiscovery()
     }
     unregisterReceiver()
+    if (wasActive) {
+      emitEvent("scanFinished", mapOf("devices" to discovered.values.map { it.toMap() }))
+    }
+  }
+
+  @SuppressLint("MissingPermission")
+  private fun startAdapterDiscovery() {
+    val started = adapter?.startDiscovery() == true
+    if (!started) finishScan()
+  }
+
+  private fun finishScan() {
+    if (!scanActive) return
+    scanActive = false
     emitEvent("scanFinished", mapOf("devices" to discovered.values.map { it.toMap() }))
   }
 

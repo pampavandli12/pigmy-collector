@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   ScrollView,
   StyleSheet,
   Text,
@@ -58,7 +57,7 @@ export default function PrinterManager({ onConnectSuccess }: PrinterManagerProps
   const handlePair = async (address: string) => {
     const success = await pairPrinter(address);
     if (success) {
-      Alert.alert("Success", "Printer paired successfully");
+      await handleConnect(address);
     } else {
       Alert.alert("Error", "Failed to pair printer");
     }
@@ -227,13 +226,13 @@ export default function PrinterManager({ onConnectSuccess }: PrinterManagerProps
         </TouchableOpacity>
 
         {availableDevices.length > 0 ? (
-          <FlatList
-            data={availableDevices}
-            renderItem={renderDeviceItem}
-            keyExtractor={(item) => item.address}
-            style={styles.deviceList}
-            scrollEnabled={false}
-          />
+          <View>
+            {availableDevices.map((device) => (
+              <React.Fragment key={device.address}>
+                {renderDeviceItem({ item: device })}
+              </React.Fragment>
+            ))}
+          </View>
         ) : (
           <Text style={styles.emptyText}>
             No printers found. Turn on the printer and scan again.
@@ -374,9 +373,6 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "600",
-  },
-  deviceList: {
-    maxHeight: 300,
   },
   deviceItem: {
     flexDirection: "row",

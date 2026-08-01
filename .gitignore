@@ -29,9 +29,13 @@ test-results/
 **/build/
 **/.cxx/
 **/.externalNativeBuild/
+/modules/*/android/.gradle/
+/modules/*/android/build/
+/modules/*/ios/build/
 local.properties
 captures/
 .kotlin/
+*.iml
 *.apk
 *.aab
 *.ap_
