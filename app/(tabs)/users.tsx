@@ -1,9 +1,17 @@
 import { useSelector } from '@legendapp/state/react';
 import { useRouter } from 'expo-router';
-import { useCallback } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import { Avatar, Card, IconButton, Searchbar, Text } from 'react-native-paper';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  FlatList,
+  ListRenderItem,
+  Platform,
+  RefreshControl,
+  StyleSheet,
+  View,
+} from 'react-native';
+import { IconButton, Searchbar, Text } from 'react-native-paper';
 
+import { CustomerListItem } from '@/components/CustomerListItem';
 import { store$ } from '@/store/store';
 
 import { filteredCustomers$ } from '@/store/selectors';
@@ -15,14 +23,28 @@ import { Customer } from '@/types/user';
 
 export default function Users() {
   const customers = useSelector(filteredCustomers$);
-  const searchQuery = useSelector(store$.searchQuery);
-
   const syncing = useSelector(store$.isRefreshingCustomers);
-  const voiceSearch = useCustomerVoiceSearch();
-
   const router = useRouter();
-
   const { user } = useAuth();
+  const [searchText, setSearchText] = useState(() =>
+    store$.searchQuery.peek(),
+  );
+
+  const handleVoiceResult = useCallback((transcript: string) => {
+    setSearchText(transcript);
+    store$.searchQuery.set(transcript);
+  }, []);
+  const voiceSearch = useCustomerVoiceSearch(handleVoiceResult);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (store$.searchQuery.peek() !== searchText) {
+        store$.searchQuery.set(searchText);
+      }
+    }, 150);
+
+    return () => clearTimeout(timeout);
+  }, [searchText]);
 
   const loadCustomers = useCallback(() => {
     if (!user) {
@@ -31,7 +53,7 @@ export default function Users() {
     actions.syncCustomers(user.agentCode, user.bankCode);
   }, [user]);
 
-  const handleCustomerPress = (customer: Customer) => {
+  const handleCustomerPress = useCallback((customer: Customer) => {
     router.push({
       pathname: '/userDetail',
       params: {
@@ -44,18 +66,27 @@ export default function Users() {
         mobilenumber: customer.mobilenumber,
       },
     });
-  };
+  }, [router]);
+
+  const handleSearchChange = useCallback((text: string) => {
+    voiceSearch.cancel();
+    setSearchText(text);
+  }, [voiceSearch]);
+
+  const renderCustomer: ListRenderItem<Customer> = useCallback(
+    ({ item }) => (
+      <CustomerListItem customer={item} onPress={handleCustomerPress} />
+    ),
+    [handleCustomerPress],
+  );
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Searchbar
           placeholder='Search customers'
-          onChangeText={(text) => {
-            voiceSearch.cancel();
-            store$.searchQuery.set(text);
-          }}
-          value={searchQuery}
+          onChangeText={handleSearchChange}
+          value={searchText}
           style={styles.searchbar}
           icon='magnify'
           iconColor='#4A90E2'
@@ -74,67 +105,30 @@ export default function Users() {
         />
       </View>
 
-      <ScrollView
+      <FlatList
+        data={customers}
+        renderItem={renderCustomer}
+        keyExtractor={(customer) => customer.accountNumber.toString()}
         style={styles.content}
+        contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps='handled'
+        initialNumToRender={10}
+        maxToRenderPerBatch={8}
+        updateCellsBatchingPeriod={32}
+        windowSize={7}
+        removeClippedSubviews={Platform.OS === 'android'}
         refreshControl={
           <RefreshControl refreshing={syncing} onRefresh={loadCustomers} />
         }
-      >
-        {customers?.map((customer) => (
-          <Card
-            key={customer.accountNumber.toString()}
-            style={styles.customerCard}
-            onPress={() => handleCustomerPress(customer)}
-          >
-            <Card.Content style={styles.cardContent}>
-              <View style={styles.customerInfo}>
-                <Avatar.Text
-                  size={45}
-                  label={
-                    customer.customerName?.trim()?.charAt(0)?.toUpperCase() ||
-                    'U'
-                  }
-                  style={styles.avatar}
-                />
-
-                <View style={styles.customerDetails}>
-                  <Text
-                    variant='titleMedium'
-                    style={styles.customerName}
-                    numberOfLines={1}
-                  >
-                    {customer.customerName?.trim() || 'Unknown Customer'}
-                  </Text>
-
-                  <Text variant='bodyMedium' style={styles.balance}>
-                    Balance: ₹{Number(customer.currentBalance || 0).toFixed(2)}
-                  </Text>
-
-                  <Text variant='bodyMedium' style={styles.account}>
-                    Acct: {customer.accountNumber}
-                  </Text>
-                </View>
-              </View>
-
-              <IconButton
-                icon='chevron-right'
-                size={24}
-                iconColor='#4A90E2'
-                style={styles.chevron}
-              />
-            </Card.Content>
-          </Card>
-        ))}
-
-        {customers.length === 0 && (
+        ListEmptyComponent={
           <View style={styles.emptyState}>
             <Text variant='bodyLarge' style={styles.emptyText}>
               No customers found
             </Text>
           </View>
-        )}
-      </ScrollView>
+        }
+      />
     </View>
   );
 }
@@ -162,52 +156,12 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  contentContainer: {
+    flexGrow: 1,
     paddingHorizontal: 16,
     paddingTop: 16,
-  },
-  customerCard: {
-    marginBottom: 12,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    elevation: 1,
-  },
-  cardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  customerInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    marginRight: 16,
-  },
-  customerDetails: {
-    flex: 1,
-  },
-  customerName: {
-    fontWeight: '700',
-    color: '#000',
-    marginBottom: 4,
-  },
-  balance: {
-    color: '#4A90E2',
-    fontSize: 14,
-    marginBottom: 2,
-  },
-  account: {
-    color: '#4A90E2',
-    fontSize: 14,
-  },
-  chevron: {
-    margin: 0,
+    paddingBottom: 4,
   },
   emptyState: {
     alignItems: 'center',

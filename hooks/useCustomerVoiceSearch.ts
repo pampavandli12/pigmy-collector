@@ -9,7 +9,7 @@ import { requestMicrophonePermission } from '@/services/microphonePermission';
 import { store$ } from '@/store/store';
 import { showSnackbar } from '@/utils/snackbar';
 
-export function useCustomerVoiceSearch() {
+export function useCustomerVoiceSearch(onResult?: (transcript: string) => void) {
   const [isListening, setIsListening] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
 
@@ -27,7 +27,11 @@ export function useCustomerVoiceSearch() {
     const transcript = event.results[0]?.transcript?.trim();
 
     if (transcript) {
-      store$.searchQuery.set(transcript);
+      if (onResult) {
+        onResult(transcript);
+      } else {
+        store$.searchQuery.set(transcript);
+      }
     }
   });
 

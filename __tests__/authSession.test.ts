@@ -1,6 +1,14 @@
-import { notifyUnauthorized, setUnauthorizedHandler } from '../services/authSession';
+import {
+  notifyAuthUserUpdated,
+  notifyUnauthorized,
+  setAuthUserUpdatedHandler,
+  setUnauthorizedHandler,
+} from '../services/authSession';
 
-afterEach(() => setUnauthorizedHandler(null));
+afterEach(() => {
+  setUnauthorizedHandler(null);
+  setAuthUserUpdatedHandler(null);
+});
 
 test('notifies the registered unauthorized handler', async () => {
   const handler = jest.fn();
@@ -12,4 +20,16 @@ test('notifies the registered unauthorized handler', async () => {
 test('allows notification when no handler is registered', async () => {
   setUnauthorizedHandler(null);
   await expect(notifyUnauthorized()).resolves.toBeUndefined();
+});
+
+test('notifies the provider when refreshed user data is available', () => {
+  const handler = jest.fn();
+  const user = {
+    agentCode: 1, agentName: 'Agent', bankCode: 'B', bankName: 'Bank Name',
+    phoneNumber: '9876543210', lastDepositDate: null, limitAmount: null,
+    graceDays: null, accessToken: 'new-access', refreshToken: 'new-refresh',
+  };
+  setAuthUserUpdatedHandler(handler);
+  notifyAuthUserUpdated(user);
+  expect(handler).toHaveBeenCalledWith(user);
 });

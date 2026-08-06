@@ -45,7 +45,7 @@ export class ReceiptPrinter {
    */
   static async printReceipt(data: ReceiptData): Promise<boolean> {
     try {
-      const receiptText = formatBankReceipt(toBankReceiptData(data));
+      const receiptText = formatReceiptData(data);
       await BluetoothPrinterService.printText(receiptText);
       return true;
     } catch (error) {
@@ -136,7 +136,11 @@ export class ReceiptPrinter {
   }
 }
 
-function toBankReceiptData(data: ReceiptData): BankReceiptData {
+export function formatReceiptData(data: ReceiptData): string {
+  return formatBankReceipt(toBankReceiptData(data));
+}
+
+export function toBankReceiptData(data: ReceiptData): BankReceiptData {
   const firstItem = data.items[0];
 
   return {

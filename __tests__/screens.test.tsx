@@ -3,6 +3,8 @@ jest.mock('../providers/AuthProvider', () => ({
     user: { agentCode: 1, bankCode: 'B' },
     login: jest.fn(),
     logout: jest.fn(),
+    setupPin: jest.fn(),
+    unlockWithPin: jest.fn(),
   }),
 }));
 jest.mock('../hooks/useCustomerVoiceSearch', () => ({

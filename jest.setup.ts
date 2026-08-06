@@ -34,3 +34,16 @@ jest.mock('expo-router', () => ({
     Protected: ({ children }: { children: React.ReactNode }) => children,
   }),
 }));
+
+jest.mock('react-native-share', () => ({
+  __esModule: true,
+  default: {
+    open: jest.fn(),
+    shareSingle: jest.fn(),
+    isPackageInstalled: jest.fn(),
+  },
+  Social: {
+    Whatsapp: 'whatsapp',
+    Whatsappbusiness: 'whatsappbusiness',
+  },
+}));

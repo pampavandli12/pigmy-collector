@@ -1,6 +1,10 @@
-import { setUnauthorizedHandler } from '@/services/authSession';
+import {
+  setAuthUserUpdatedHandler,
+  setUnauthorizedHandler,
+} from '@/services/authSession';
+import { getStoredUser } from '@/services/authStorage';
 import { AuthUser, authUserSchema } from '@/types/auth';
-import { SECURE_STORE_KEY } from '@/utils/constants';
+import { PIN_SECURE_STORE_KEY, SECURE_STORE_KEY } from '@/utils/constants';
 import { showSnackbar } from '@/utils/snackbar';
 import * as SecureStore from 'expo-secure-store';
 import React, {
@@ -14,12 +18,23 @@ import React, {
 import { View } from 'react-native';
 import { ActivityIndicator, useTheme } from 'react-native-paper';
 
+export type AuthStatus =
+  | 'loading'
+  | 'unauthenticated'
+  | 'pinSetupRequired'
+  | 'locked'
+  | 'unlocked';
+
 interface AuthContextType {
   user: AuthUser | null;
   isAuthenticated: boolean;
+  isUnlocked: boolean;
   isLoading: boolean;
+  authStatus: AuthStatus;
   login: (user: AuthUser) => Promise<void>;
   logout: () => Promise<void>;
+  setupPin: (pin: string) => Promise<void>;
+  unlockWithPin: (pin: string) => Promise<boolean>;
   getToken: () => string | null;
   getUser: () => AuthUser | null;
 }
@@ -30,34 +45,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [authStatus, setAuthStatus] = useState<AuthStatus>('loading');
+  const [hasPin, setHasPin] = useState(false);
   const theme = useTheme();
 
   useEffect(() => {
     const loadAuthState = async () => {
       try {
-        const storedUser = await SecureStore.getItemAsync(SECURE_STORE_KEY);
+        const [storedUser, storedPin] = await Promise.all([
+          getStoredUser(),
+          SecureStore.getItemAsync(PIN_SECURE_STORE_KEY),
+        ]);
+        const hasValidPin = storedPin !== null && /^\d{6}$/.test(storedPin);
+        setHasPin(hasValidPin);
 
-        if (!storedUser) {
-          return;
+        if (storedPin && !hasValidPin) {
+          await SecureStore.deleteItemAsync(PIN_SECURE_STORE_KEY);
         }
 
-        const parsedUser: unknown = JSON.parse(storedUser);
-        const result = authUserSchema.safeParse(parsedUser);
-
-        if (result.success) {
-          setUser(result.data);
+        if (storedUser) {
+          setUser(storedUser);
+          setAuthStatus(hasValidPin ? 'locked' : 'pinSetupRequired');
           return;
         }
-
-        await SecureStore.deleteItemAsync(SECURE_STORE_KEY);
+        setAuthStatus('unauthenticated');
       } catch (error) {
         showSnackbar(
           'Failed to load authentication state. Please log in again.',
         );
         await SecureStore.deleteItemAsync(SECURE_STORE_KEY);
-      } finally {
-        setIsLoading(false);
+        setUser(null);
+        setAuthStatus('unauthenticated');
       }
     };
 
@@ -72,38 +90,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       JSON.stringify(validatedUser),
     );
     setUser(validatedUser);
-  }, []);
+    setAuthStatus(hasPin ? 'unlocked' : 'pinSetupRequired');
+  }, [hasPin]);
 
   const logout = useCallback(async () => {
     await SecureStore.deleteItemAsync(SECURE_STORE_KEY);
     setUser(null);
+    setAuthStatus('unauthenticated');
+  }, []);
+
+  const setupPin = useCallback(async (pin: string) => {
+    if (!/^\d{6}$/.test(pin)) {
+      throw new Error('PIN must contain exactly six digits.');
+    }
+    await SecureStore.setItemAsync(PIN_SECURE_STORE_KEY, pin);
+    setHasPin(true);
+    setAuthStatus('unlocked');
+  }, []);
+
+  const unlockWithPin = useCallback(async (pin: string) => {
+    if (!/^\d{6}$/.test(pin)) return false;
+    const storedPin = await SecureStore.getItemAsync(PIN_SECURE_STORE_KEY);
+    const matches = storedPin === pin;
+    if (matches) setAuthStatus('unlocked');
+    return matches;
   }, []);
 
   useEffect(() => {
     setUnauthorizedHandler(logout);
+    setAuthUserUpdatedHandler(setUser);
 
     return () => {
       setUnauthorizedHandler(null);
+      setAuthUserUpdatedHandler(null);
     };
   }, [logout]);
 
-  const getToken = useCallback(() => user?.token ?? null, [user]);
+  const getToken = useCallback(() => user?.accessToken ?? null, [user]);
   const getUser = useCallback(() => user, [user]);
 
   const value = useMemo<AuthContextType>(
     () => ({
       user,
-      isAuthenticated: Boolean(user?.token),
-      isLoading,
+      isAuthenticated: Boolean(user?.accessToken),
+      isUnlocked: authStatus === 'unlocked',
+      isLoading: authStatus === 'loading',
+      authStatus,
       login,
       logout,
+      setupPin,
+      unlockWithPin,
       getToken,
       getUser,
     }),
-    [getToken, getUser, isLoading, login, logout, user],
+    [authStatus, getToken, getUser, login, logout, setupPin, unlockWithPin, user],
   );
 
-  if (isLoading) {
+  if (authStatus === 'loading') {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator animating={true} color={theme.colors.primary} />

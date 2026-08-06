@@ -18,6 +18,23 @@ jest.mock('expo-sms', () => ({
 jest.mock('../utils/ReceiptPrinter', () => ({
   ReceiptPrinter: { printReceipt: jest.fn().mockResolvedValue(true) },
 }));
+jest.mock('../utils/receiptPdf', () => ({
+  buildReceiptPdfDocument: jest.fn(() => ({ filename: 'receipt.pdf' })),
+  generateReceiptPdf: jest.fn().mockResolvedValue({
+    uri: 'file:///receipt.pdf',
+    filename: 'receipt.pdf',
+  }),
+}));
+jest.mock('../utils/whatsappReceipt', () => ({
+  getReceiptSharingUnavailableMessage: jest.fn().mockReturnValue(null),
+  getWhatsAppReceiptErrorMessage: jest
+    .fn()
+    .mockReturnValue('Unable to create or share the receipt on WhatsApp.'),
+  hasUsablePhoneNumber: (phone: string) => /^\d{10,15}$/.test(phone),
+  isShareCancellationError: jest.fn().mockReturnValue(false),
+  shareReceiptToWhatsApp: jest.fn().mockResolvedValue(undefined),
+  WhatsAppUnavailableError: class WhatsAppUnavailableError extends Error {},
+}));
 jest.mock('../providers/AuthProvider', () => ({
   useAuth: () => ({
     user: {
@@ -25,13 +42,13 @@ jest.mock('../providers/AuthProvider', () => ({
       agentName: 'Agent',
       bankCode: 'BANK',
       bankName: 'Pigmy Bank',
-      token: 'token',
+      accessToken: 'token',
       phoneNumber: '9876543210',
     },
   }),
 }));
 
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import * as SMS from 'expo-sms';
 import { PaperProvider } from 'react-native-paper';
 import { AppSnackbar } from '../components/AppSnackbar';
@@ -39,7 +56,10 @@ import PrinterManager from '../components/PrinterManager';
 import { TransactionForm } from '../components/TransactionForm';
 import { TransactionSuccess } from '../components/TransactionSuccess';
 import { ReceiptPrinter } from '../utils/ReceiptPrinter';
+import { generateReceiptPdf } from '../utils/receiptPdf';
 import { showSnackbar } from '../utils/snackbar';
+import { shareReceiptToWhatsApp } from '../utils/whatsappReceipt';
+import { getReceiptSharingUnavailableMessage } from '../utils/whatsappReceipt';
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
   <PaperProvider>{children}</PaperProvider>
@@ -76,6 +96,7 @@ test('shows an SMS error through the snackbar', async () => {
     <>
       <TransactionSuccess
         customerName='Customer'
+        mobilenumber='9123456780'
         openingBalance={100}
         totalBalance={200}
       />
@@ -190,7 +211,126 @@ test('keeps success actions and Done available in the responsive layout', () => 
 
   expect(screen.getByText('Send SMS')).toBeTruthy();
   expect(screen.getByText('Print Receipt')).toBeTruthy();
+  expect(screen.getByText('Send to WhatsApp')).toBeTruthy();
   expect(screen.getByText('Done')).toBeTruthy();
+});
+
+test('disables SMS and WhatsApp when the customer has no valid phone number', () => {
+  const screen = render(
+    <TransactionSuccess
+      mobilenumber=''
+      openingBalance={100}
+      totalBalance={200}
+    />,
+    { wrapper },
+  );
+
+  expect(
+    screen.getByRole('button', { name: 'Send SMS' }).props.accessibilityState
+      .disabled,
+  ).toBe(true);
+  expect(
+    screen.getByRole('button', { name: 'Send to WhatsApp' }).props
+      .accessibilityState.disabled,
+  ).toBe(true);
+});
+
+test('generates and shares a PDF receipt through WhatsApp', async () => {
+  const generate = generateReceiptPdf as jest.Mock;
+  const share = shareReceiptToWhatsApp as jest.Mock;
+  generate.mockClear();
+  share.mockClear();
+
+  const screen = render(
+    <TransactionSuccess
+      customerName='Customer'
+      customerId='2053'
+      accountNumber='60001'
+      amount='₹100'
+      openingBalance={900}
+      totalBalance={1000}
+      scheme='Pigmy Deposit'
+      date='July 30, 2026'
+      mobilenumber='9123456780'
+    />,
+    { wrapper },
+  );
+
+  fireEvent.press(screen.getByText('Send to WhatsApp'));
+
+  await waitFor(() => expect(generate).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+  expect(generate.mock.calls[0][0]).toEqual(
+    expect.objectContaining({
+      accountNo: '60001',
+      receivedAmount: 100,
+      totalBalance: 1000,
+    }),
+  );
+  expect(share).toHaveBeenCalledWith(
+    expect.objectContaining({
+      pdfUri: 'file:///receipt.pdf',
+      phone: '9123456780',
+      filename: 'receipt.pdf',
+    }),
+  );
+});
+
+test('coalesces rapid WhatsApp receipt taps into one share operation', async () => {
+  const share = shareReceiptToWhatsApp as jest.Mock;
+  let finishShare: (() => void) | undefined;
+  share.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finishShare = resolve;
+      }),
+  );
+
+  const screen = render(
+    <TransactionSuccess
+      customerName='Customer'
+      accountNumber='60001'
+      mobilenumber='9123456780'
+      openingBalance={900}
+      totalBalance={1000}
+    />,
+    { wrapper },
+  );
+
+  const button = screen.getByText('Send to WhatsApp');
+  fireEvent.press(button);
+  fireEvent.press(button);
+
+  await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+  await act(async () => finishShare?.());
+});
+
+test('reports an outdated native build without importing receipt modules', async () => {
+  const availability = getReceiptSharingUnavailableMessage as jest.Mock;
+  const generate = generateReceiptPdf as jest.Mock;
+  availability.mockReturnValueOnce('Receipt sharing requires the latest app build.');
+  generate.mockClear();
+
+  const screen = render(
+    <>
+      <TransactionSuccess
+        mobilenumber='9123456780'
+        openingBalance={100}
+        totalBalance={200}
+      />
+      <AppSnackbar />
+    </>,
+    { wrapper },
+  );
+
+  fireEvent.press(screen.getByText('Send to WhatsApp'));
+
+  await waitFor(() =>
+    expect(
+      screen.getByText('Receipt sharing requires the latest app build.'),
+    ).toBeTruthy(),
+  );
+  expect(generate).not.toHaveBeenCalled();
 });
 
 test('renders printer connection state and actions', () => {

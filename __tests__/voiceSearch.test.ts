@@ -41,6 +41,18 @@ test('stores recognized customer text', () => {
   expect(store$.searchQuery.peek()).toBe('Customer');
 });
 
+test('delivers recognized text to an optional result callback', () => {
+  const onResult = jest.fn();
+  renderHook(() => useCustomerVoiceSearch(onResult));
+  act(() =>
+    (globalThis as any).__speechHandlers.result({
+      results: [{ transcript: '  Voice Customer  ' }],
+    }),
+  );
+  expect(onResult).toHaveBeenCalledWith('Voice Customer');
+  expect(store$.searchQuery.peek()).toBe('');
+});
+
 test('shows useful recognition errors', () => {
   renderHook(() => useCustomerVoiceSearch());
   act(() => (globalThis as any).__speechHandlers.error({ error: 'network' }));

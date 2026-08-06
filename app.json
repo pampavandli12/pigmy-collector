@@ -52,7 +52,17 @@
       "expo-font",
       "expo-secure-store",
       "expo-sqlite",
-      "expo-speech-recognition"
+      "expo-speech-recognition",
+      [
+        "react-native-share",
+        {
+          "android": [
+            "com.whatsapp",
+            "com.whatsapp.w4b"
+          ]
+        }
+      ],
+      "expo-build-properties"
     ],
     "experiments": {
       "typedRoutes": true,

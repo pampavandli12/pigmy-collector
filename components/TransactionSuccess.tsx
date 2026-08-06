@@ -1,7 +1,16 @@
 import { usePrinter } from '@/contexts/PrinterContext';
 import { useAuth } from '@/providers/AuthProvider';
-import { ReceiptData, ReceiptPrinter } from '@/utils/ReceiptPrinter';
+import { ReceiptPrinter } from '@/utils/ReceiptPrinter';
+import { buildReceiptData } from '@/utils/receiptBuilder';
+import { generateReceiptPdf } from '@/utils/receiptPdf';
 import { showSnackbar } from '@/utils/snackbar';
+import {
+  getReceiptSharingUnavailableMessage,
+  getWhatsAppReceiptErrorMessage,
+  hasUsablePhoneNumber,
+  isShareCancellationError,
+  shareReceiptToWhatsApp,
+} from '@/utils/whatsappReceipt';
 import { useRouter } from 'expo-router';
 import * as SMS from 'expo-sms';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -60,14 +69,19 @@ export const TransactionSuccess = ({
 
   const { isConnected } = usePrinter();
   const [isPrinting, setIsPrinting] = useState(false);
+  const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false);
+  const whatsAppShareInProgress = useRef(false);
   const shouldPrintOnConnect = useRef(false);
   const router = useRouter();
   const { user: agentInfo } = useAuth();
   const insets = useSafeAreaInsets();
   const { width, fontScale } = useWindowDimensions();
   const stackActions = width < 380 || fontScale > 1.2;
+  const hasPhoneNumber = hasUsablePhoneNumber(mobilenumber);
 
   const onSendSms = async () => {
+    if (!hasPhoneNumber) return;
+
     try {
       const isAvailable = await SMS.isAvailableAsync();
       if (isAvailable) {
@@ -83,6 +97,34 @@ export const TransactionSuccess = ({
     }
   };
 
+  const createReceiptData = useCallback(
+    () =>
+      buildReceiptData({
+        amount,
+        customerId,
+        accountNumber,
+        date,
+        scheme,
+        customerName,
+        openingBalance,
+        totalBalance,
+        bankName: agentInfo?.bankName,
+        collectorName: agentInfo?.agentName,
+        collectorPhone: agentInfo?.phoneNumber,
+      }),
+    [
+      accountNumber,
+      agentInfo,
+      amount,
+      customerId,
+      customerName,
+      date,
+      openingBalance,
+      scheme,
+      totalBalance,
+    ],
+  );
+
   const onPrintReceipt = useCallback(async () => {
     if (!isConnected) {
       shouldPrintOnConnect.current = true;
@@ -94,32 +136,7 @@ export const TransactionSuccess = ({
     }
 
     setIsPrinting(true);
-    const numericAmount = Number(amount.replace(/[^0-9.]/g, '')) || 0;
-    const receiptData: ReceiptData = {
-      bankName: agentInfo?.bankName,
-      receiptNumber: `TX-${customerId}-${Date.now().toString().slice(-6)}`,
-      date: date || new Date().toLocaleString(),
-      items: [
-        {
-          name: `Deposit: ${scheme}`,
-          quantity: 1,
-          price: numericAmount,
-          total: numericAmount,
-        },
-      ],
-      subtotal: numericAmount,
-      total: numericAmount,
-      paymentMethod: 'Cash',
-      customerName,
-      accountNo: accountNumber,
-      openingBalance,
-      receivedAmount: numericAmount,
-      totalBalance,
-      collectorName: agentInfo?.agentName,
-      collectorPhone: agentInfo?.phoneNumber,
-    };
-
-    const success = await ReceiptPrinter.printReceipt(receiptData);
+    const success = await ReceiptPrinter.printReceipt(createReceiptData());
     setIsPrinting(false);
 
     if (success) {
@@ -129,16 +146,44 @@ export const TransactionSuccess = ({
     }
   }, [
     isConnected,
-    amount,
-    customerId,
-    accountNumber,
-    date,
-    scheme,
-    customerName,
-    openingBalance,
-    totalBalance,
-    agentInfo,
+    createReceiptData,
     router,
+  ]);
+
+  const onSendWhatsApp = useCallback(async () => {
+    if (!hasPhoneNumber || whatsAppShareInProgress.current) return;
+
+    const unavailableMessage = getReceiptSharingUnavailableMessage();
+    if (unavailableMessage) {
+      showSnackbar(unavailableMessage, { type: 'error' });
+      return;
+    }
+
+    whatsAppShareInProgress.current = true;
+    setIsSendingWhatsApp(true);
+    try {
+      const receiptData = createReceiptData();
+      const document = await generateReceiptPdf(receiptData);
+      await shareReceiptToWhatsApp({
+        pdfUri: document.uri,
+        phone: mobilenumber,
+        filename: document.filename,
+        message: `Receipt for ${customerName}'s ${scheme} deposit of ${amount}.`,
+      });
+    } catch (error) {
+      if (isShareCancellationError(error)) return;
+      showSnackbar(getWhatsAppReceiptErrorMessage(error), { type: 'error' });
+    } finally {
+      whatsAppShareInProgress.current = false;
+      setIsSendingWhatsApp(false);
+    }
+  }, [
+    amount,
+    createReceiptData,
+    customerName,
+    hasPhoneNumber,
+    mobilenumber,
+    scheme,
   ]);
 
   useEffect(() => {
@@ -225,6 +270,7 @@ export const TransactionSuccess = ({
             labelStyle={styles.actionLabel}
             contentStyle={styles.actionContent}
             icon='message-outline'
+            disabled={!hasPhoneNumber}
           >
             Send SMS
           </Button>
@@ -245,6 +291,18 @@ export const TransactionSuccess = ({
             Print Receipt
           </Button>
         </View>
+        <Button
+          mode='outlined'
+          onPress={onSendWhatsApp}
+          style={styles.whatsAppButton}
+          labelStyle={styles.actionLabel}
+          contentStyle={styles.actionContent}
+          icon='whatsapp'
+          loading={isSendingWhatsApp}
+          disabled={!hasPhoneNumber || isSendingWhatsApp}
+        >
+          Send to WhatsApp
+        </Button>
       </ScrollView>
 
       <View
@@ -370,6 +428,14 @@ const styles = StyleSheet.create({
   },
   printButton: {
     borderColor: '#CCCCCC',
+  },
+  whatsAppButton: {
+    width: '100%',
+    minHeight: 50,
+    marginTop: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#25D366',
   },
   actionLabel: {
     fontSize: 14,
