@@ -1,5 +1,6 @@
 import { fetchCustomers } from '@/services/user';
-import { store$ } from './store';
+import { getActiveAgentId, store$ } from './store';
+import { getAgentAccountId } from '@/services/authStorage';
 
 import { Customer, OutboxItem, TransactionPayload } from '@/types/user';
 import { showSnackbar } from '@/utils/snackbar';
@@ -111,10 +112,21 @@ export const actions = {
   },
 
   addTransaction(payload: TransactionPayload) {
+    if (
+      getActiveAgentId() !== null &&
+      getActiveAgentId() !==
+      getAgentAccountId({ agentCode: payload.agentCode, bankCode: payload.bankCode })
+    ) {
+      showSnackbar('The active agent changed. Please reopen the customer.', {
+        type: 'error',
+      });
+      return false;
+    }
+
     const existingTransaction = store$.outbox[payload.transactionId].peek();
 
     if (existingTransaction) {
-      return;
+      return false;
     }
 
     const createdAt = Date.now();
@@ -134,8 +146,9 @@ export const actions = {
 
     // Trigger immediate sync attempt
     processOutbox();
-    // Delete yesterday's transactions to prevent indefinite growth
+    // Remove only malformed persisted records; valid transactions are retained.
     cleanupOutbox();
+    return true;
   },
 
   retryFailedTransactions() {

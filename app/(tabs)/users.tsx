@@ -9,7 +9,12 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import { IconButton, Searchbar, Text } from 'react-native-paper';
+import {
+  ActivityIndicator,
+  IconButton,
+  Searchbar,
+  Text,
+} from 'react-native-paper';
 
 import { CustomerListItem } from '@/components/CustomerListItem';
 import { store$ } from '@/store/store';
@@ -20,6 +25,11 @@ import { useCustomerVoiceSearch } from '@/hooks/useCustomerVoiceSearch';
 import { useAuth } from '@/providers/AuthProvider';
 import { actions } from '@/store/actions';
 import { Customer } from '@/types/user';
+import {
+  evaluateGracePeriod,
+  GRACE_PERIOD_EXCEEDED_MESSAGE,
+} from '@/utils/gracePeriod';
+import { showSnackbar } from '@/utils/snackbar';
 
 export default function Users() {
   const customers = useSelector(filteredCustomers$);
@@ -29,6 +39,7 @@ export default function Users() {
   const [searchText, setSearchText] = useState(() =>
     store$.searchQuery.peek(),
   );
+  const [hasAttemptedInitialLoad, setHasAttemptedInitialLoad] = useState(false);
 
   const handleVoiceResult = useCallback((transcript: string) => {
     setSearchText(transcript);
@@ -50,23 +61,48 @@ export default function Users() {
     if (!user) {
       return;
     }
-    actions.syncCustomers(user.agentCode, user.bankCode);
+    void actions.syncCustomers(user.agentCode, user.bankCode);
   }, [user]);
 
-  const handleCustomerPress = useCallback((customer: Customer) => {
-    router.push({
-      pathname: '/userDetail',
-      params: {
-        id: customer.userId.toString(),
-        agentCode: customer.agentCode.toString(),
-        bankCode: customer.bankCode,
-        name: customer.customerName.trim(),
-        balance: customer.currentBalance.toString(),
-        account: customer.accountNumber.toString(),
-        mobilenumber: customer.mobilenumber,
-      },
-    });
-  }, [router]);
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    setHasAttemptedInitialLoad(true);
+    loadCustomers();
+  }, [loadCustomers, user]);
+
+  const handleCustomerPress = useCallback(
+    (customer: Customer) => {
+      const gracePeriod = evaluateGracePeriod(
+        user?.lastDepositDate,
+        user?.graceDays,
+      );
+
+      if (!gracePeriod.allowed) {
+        showSnackbar(GRACE_PERIOD_EXCEEDED_MESSAGE, {
+          type: 'error',
+          duration: 6000,
+        });
+        return;
+      }
+
+      router.push({
+        pathname: '/userDetail',
+        params: {
+          id: customer.userId.toString(),
+          agentCode: customer.agentCode.toString(),
+          bankCode: customer.bankCode,
+          name: customer.customerName.trim(),
+          balance: customer.currentBalance.toString(),
+          account: customer.accountNumber.toString(),
+          mobilenumber: customer.mobilenumber,
+        },
+      });
+    },
+    [router, user?.graceDays, user?.lastDepositDate],
+  );
 
   const handleSearchChange = useCallback((text: string) => {
     voiceSearch.cancel();
@@ -123,9 +159,18 @@ export default function Users() {
         }
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Text variant='bodyLarge' style={styles.emptyText}>
-              No customers found
-            </Text>
+            {!hasAttemptedInitialLoad || syncing ? (
+              <>
+                <ActivityIndicator size='large' color='#4A90E2' />
+                <Text variant='bodyLarge' style={styles.loadingText}>
+                  Loading customers...
+                </Text>
+              </>
+            ) : (
+              <Text variant='bodyLarge' style={styles.emptyText}>
+                No customers found
+              </Text>
+            )}
           </View>
         }
       />
@@ -170,5 +215,9 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     color: '#999',
+  },
+  loadingText: {
+    color: '#666',
+    marginTop: 12,
   },
 });

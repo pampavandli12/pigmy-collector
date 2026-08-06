@@ -39,7 +39,12 @@ export const todaysTransactions$ = computed(() => {
   return Object.values(outbox)
     .filter((item) => isToday(item.createdAt))
     .sort((a, b) => b.createdAt - a.createdAt)
-    .map((item) => ({ ...item.payload, createdAt: item.createdAt }));
+    .map((item) => ({
+      ...item.payload,
+      createdAt: item.createdAt,
+      status: item.status,
+      error: item.error,
+    }));
 });
 /**
  * Today's Total Collection

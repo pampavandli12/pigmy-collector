@@ -1,5 +1,5 @@
-//export const API_BASE_URL = 'http://10.0.2.2:1010';
-export const API_BASE_URL = 'https://pigmymobile-api.onrender.com';
+export const API_BASE_URL = 'http://10.0.2.2:1010';
+//export const API_BASE_URL = 'https://pigmymobile-api.onrender.com';
 
 export const API_ENDPOINTS = {
   LOGIN: `/pigmyMobile/v2/login`,
@@ -8,6 +8,7 @@ export const API_ENDPOINTS = {
   ADD_TRANSACTION: '/pigmyMobile/v2/transaction',
 } as const;
 export const SECURE_STORE_KEY = 'userInfo';
+export const AGENT_ACCOUNTS_SECURE_STORE_KEY = 'agentAccounts';
 export const PIN_SECURE_STORE_KEY = 'appPin';
 export const DB_NAME = 'pigmy_collector.db';
 export const TABLE_NAME = 'transactions';

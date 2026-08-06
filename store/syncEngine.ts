@@ -6,12 +6,11 @@ import { getErrorMessage } from '@/utils/errors';
 import { showSnackbar } from '@/utils/snackbar';
 
 import { shouldRemoveOutboxItem } from './outboxPolicy';
-import { store$ } from './store';
-
-let syncing = false;
+import { getActiveAgentId, store$, updateAgentOutboxItem } from './store';
+import { beginOutboxSync, endOutboxSync } from './syncCoordinator';
 
 export async function processOutbox() {
-  if (syncing) {
+  if (!beginOutboxSync()) {
     return;
   }
 
@@ -22,12 +21,12 @@ export async function processOutbox() {
   const network = await NetInfo.fetch();
 
   if (network.isConnected !== true) {
+    endOutboxSync();
     return;
   }
 
-  syncing = true;
-
   try {
+    const syncAccountId = getActiveAgentId();
     const outbox = store$.outbox.peek();
 
     const pending = Object.entries(outbox)
@@ -40,11 +39,22 @@ export async function processOutbox() {
       .sort((a, b) => a[1].createdAt - b[1].createdAt);
 
     for (const [txId, item] of pending) {
+      if (getActiveAgentId() !== syncAccountId) break;
       try {
         // Mark syncing
         store$.outbox[txId].status.set('syncing');
 
         await createTransaction(item.payload);
+
+        if (getActiveAgentId() !== syncAccountId) {
+          if (syncAccountId) {
+            updateAgentOutboxItem(syncAccountId, txId, {
+              status: 'synced',
+              error: undefined,
+            });
+          }
+          break;
+        }
 
         // Mark synced instead of deleting
         store$.outbox[txId].assign({
@@ -54,6 +64,17 @@ export async function processOutbox() {
         });
       } catch (error: unknown) {
         const message = getErrorMessage(error, 'Sync failed');
+
+        if (getActiveAgentId() !== syncAccountId) {
+          if (syncAccountId) {
+            updateAgentOutboxItem(syncAccountId, txId, {
+              status: 'failed',
+              retryCount: item.retryCount + 1,
+              error: message,
+            });
+          }
+          break;
+        }
 
         store$.outbox[txId].assign({
           status: 'failed',
@@ -67,12 +88,12 @@ export async function processOutbox() {
       }
     }
   } finally {
-    syncing = false;
+    endOutboxSync();
   }
 }
 
-// The business retention policy removes every outbox item from previous
-// calendar days, regardless of its sync status.
+// Persist every valid transaction indefinitely. Cleanup only protects the sync
+// loop from malformed records left behind by incompatible persisted schemas.
 export function cleanupOutbox() {
   const outbox = store$.outbox.peek();
   const retained = Object.fromEntries(

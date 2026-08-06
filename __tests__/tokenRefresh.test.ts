@@ -1,4 +1,5 @@
 import { refreshAccessToken } from '../services/tokenRefresh';
+import { API_BASE_URL } from '../utils/constants';
 
 const mockRefreshGet = jest.fn();
 
@@ -15,7 +16,7 @@ test('refreshes tokens with a GET query parameter', async () => {
     refreshToken: 'new-refresh',
   });
   expect(mockRefreshGet).toHaveBeenCalledWith(
-    'https://pigmymobile-api.onrender.com/pigmyMobile/v2/login/refresh',
+    `${API_BASE_URL}/pigmyMobile/v2/login/refresh`,
     {
       params: { refreshToken: 'old-refresh' },
       headers: { 'Content-Type': 'application/json' },
