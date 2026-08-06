@@ -1,7 +1,6 @@
 import axios from 'axios';
-import * as SecureStore from 'expo-secure-store';
-import { API_BASE_URL, SECURE_STORE_KEY } from '../utils/constants';
-import { notifyUnauthorized } from './authSession';
+import { API_BASE_URL } from '../utils/constants';
+import { handleAuthResponseError } from './authRefresh';
 import { getStoredToken } from './authStorage';
 
 export const api = axios.create({
@@ -28,15 +27,11 @@ api.interceptors.request.use(
   },
 );
 
-// Interceptor for logging out on forbidden responses and logging errors
+// Refresh expired access tokens once, and log out on non-recoverable auth errors.
 api.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    const status = error.response?.status;
-    if (status === 401 || status === 403) {
-      await SecureStore.deleteItemAsync(SECURE_STORE_KEY);
-      await notifyUnauthorized();
-    }
-    return Promise.reject(error);
-  },
+  (error) =>
+    handleAuthResponseError(error, (config) =>
+      api.request(config as Parameters<typeof api.request>[0]),
+    ),
 );

@@ -76,13 +76,19 @@ const theme = {
 };
 
 const InitialLayout = () => {
-  const { isAuthenticated } = useAuth();
+  const { authStatus, isAuthenticated, isUnlocked } = useAuth();
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Protected guard={!isAuthenticated}>
         <Stack.Screen name='index' options={{ headerShown: false }} />
       </Stack.Protected>
-      <Stack.Protected guard={isAuthenticated}>
+      <Stack.Protected guard={authStatus === 'pinSetupRequired'}>
+        <Stack.Screen name='pinSetup' options={{ headerShown: false }} />
+      </Stack.Protected>
+      <Stack.Protected guard={authStatus === 'locked'}>
+        <Stack.Screen name='pinUnlock' options={{ headerShown: false }} />
+      </Stack.Protected>
+      <Stack.Protected guard={isAuthenticated && isUnlocked}>
         <Stack.Screen name='(tabs)' options={{ headerShown: false }} />
         <Stack.Screen name='userDetail' options={{ headerShown: false }} />
         <Stack.Screen name='printer' options={{ headerShown: false }} />

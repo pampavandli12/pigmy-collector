@@ -11,12 +11,25 @@ const mockedApi = api as jest.Mocked<typeof api>;
 beforeEach(() => jest.clearAllMocks());
 
 test('posts normalized login credentials', async () => {
-  mockedApi.post.mockResolvedValueOnce({ data: { token: 'token' } });
-  await expect(userLogin('9876543210', 'secret')).resolves.toEqual({ token: 'token' });
+  mockedApi.post.mockResolvedValueOnce({ data: {
+    agentName: 'Agent', agentCode: 11, bankCode: 'AGT123', bankName: 'Bank Name',
+    phoneNumber: '9876543210', lastDepositDate: '2026-06-19', limitAmount: 50000,
+    graceDays: 0, refreshToken: 'refresh-token', accessToken: 'access-token',
+  } });
+  await expect(userLogin('9876543210', 'secret')).resolves.toEqual({
+    agentName: 'Agent', agentCode: 11, bankCode: 'AGT123', bankName: 'Bank Name',
+    phoneNumber: '9876543210', lastDepositDate: '2026-06-19', limitAmount: 50000,
+    graceDays: 0, refreshToken: 'refresh-token', accessToken: 'access-token',
+  });
   expect(mockedApi.post).toHaveBeenCalledWith('/pigmyMobile/v2/login', {
     mobileNumber: '9876543210',
     password: 'secret',
   });
+});
+
+test('rejects an incomplete login response', async () => {
+  mockedApi.post.mockResolvedValueOnce({ data: { accessToken: 'token' } });
+  await expect(userLogin('9876543210', 'secret')).rejects.toThrow();
 });
 
 test('fetches customers with agent and bank parameters', async () => {

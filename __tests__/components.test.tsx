@@ -20,10 +20,16 @@ jest.mock('../utils/ReceiptPrinter', () => ({
 }));
 jest.mock('../utils/receiptPdf', () => ({
   buildReceiptPdfDocument: jest.fn(() => ({ filename: 'receipt.pdf' })),
-  generateReceiptPdf: jest.fn().mockResolvedValue('file:///receipt.pdf'),
+  generateReceiptPdf: jest.fn().mockResolvedValue({
+    uri: 'file:///receipt.pdf',
+    filename: 'receipt.pdf',
+  }),
 }));
 jest.mock('../utils/whatsappReceipt', () => ({
   getReceiptSharingUnavailableMessage: jest.fn().mockReturnValue(null),
+  getWhatsAppReceiptErrorMessage: jest
+    .fn()
+    .mockReturnValue('Unable to create or share the receipt on WhatsApp.'),
   hasUsablePhoneNumber: (phone: string) => /^\d{10,15}$/.test(phone),
   isShareCancellationError: jest.fn().mockReturnValue(false),
   shareReceiptToWhatsApp: jest.fn().mockResolvedValue(undefined),
@@ -36,13 +42,13 @@ jest.mock('../providers/AuthProvider', () => ({
       agentName: 'Agent',
       bankCode: 'BANK',
       bankName: 'Pigmy Bank',
-      token: 'token',
+      accessToken: 'token',
       phoneNumber: '9876543210',
     },
   }),
 }));
 
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import * as SMS from 'expo-sms';
 import { PaperProvider } from 'react-native-paper';
 import { AppSnackbar } from '../components/AppSnackbar';
@@ -268,6 +274,35 @@ test('generates and shares a PDF receipt through WhatsApp', async () => {
       filename: 'receipt.pdf',
     }),
   );
+});
+
+test('coalesces rapid WhatsApp receipt taps into one share operation', async () => {
+  const share = shareReceiptToWhatsApp as jest.Mock;
+  let finishShare: (() => void) | undefined;
+  share.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finishShare = resolve;
+      }),
+  );
+
+  const screen = render(
+    <TransactionSuccess
+      customerName='Customer'
+      accountNumber='60001'
+      mobilenumber='9123456780'
+      openingBalance={900}
+      totalBalance={1000}
+    />,
+    { wrapper },
+  );
+
+  const button = screen.getByText('Send to WhatsApp');
+  fireEvent.press(button);
+  fireEvent.press(button);
+
+  await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+  await act(async () => finishShare?.());
 });
 
 test('reports an outdated native build without importing receipt modules', async () => {

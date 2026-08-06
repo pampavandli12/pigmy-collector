@@ -1,35 +1,52 @@
 import { cleanupOutbox, processOutbox } from '@/store/syncEngine';
 import NetInfo from '@react-native-community/netinfo';
-import { useEffect, useState } from 'react';
-import { StyleSheet } from 'react-native';
-import { BottomNavigation } from 'react-native-paper';
+import { useCallback, useEffect, useState } from 'react';
+import { InteractionManager, StyleSheet } from 'react-native';
+import {
+  BottomNavigation,
+  BottomNavigationRoute,
+} from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Dashboard from './dashboard';
 import Support from './support';
 import Users from './users';
 
+const routes: BottomNavigationRoute[] = [
+  {
+    key: 'dashboard',
+    title: 'Home',
+    focusedIcon: 'home',
+    unfocusedIcon: 'home-outline',
+  },
+  {
+    key: 'users',
+    title: 'Users',
+    focusedIcon: 'account-group',
+    unfocusedIcon: 'account-group-outline',
+  },
+  {
+    key: 'help',
+    title: 'Support',
+    focusedIcon: 'help-circle',
+    unfocusedIcon: 'help-circle-outline',
+  },
+];
+
+const renderScene = BottomNavigation.SceneMap({
+  dashboard: Dashboard,
+  users: Users,
+  help: Support,
+});
+
+const barStyle = {
+  backgroundColor: '#fff',
+  borderTopWidth: 1,
+  borderTopColor: '#e0e0e0',
+};
+
 export default function TabsLayout() {
   const [index, setIndex] = useState(0);
-  const [routes] = useState([
-    {
-      key: 'dashboard',
-      title: 'Home',
-      focusedIcon: 'home',
-      unfocusedIcon: 'home-outline',
-    },
-    {
-      key: 'users',
-      title: 'Users',
-      focusedIcon: 'account-group',
-      unfocusedIcon: 'account-group-outline',
-    },
-    {
-      key: 'help',
-      title: 'Support',
-      focusedIcon: 'help-circle',
-      unfocusedIcon: 'help-circle-outline',
-    },
-  ]);
+  const [preloadUsers, setPreloadUsers] = useState(false);
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {
@@ -42,11 +59,18 @@ export default function TabsLayout() {
     return unsubscribe;
   }, []);
 
-  const renderScene = BottomNavigation.SceneMap({
-    dashboard: Dashboard,
-    users: Users,
-    help: Support,
-  });
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      setPreloadUsers(true);
+    });
+    return () => task.cancel();
+  }, []);
+
+  const getLazy = useCallback(
+    ({ route }: { route: BottomNavigationRoute }) =>
+      route.key === 'users' ? !preloadUsers : undefined,
+    [preloadUsers],
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -54,11 +78,8 @@ export default function TabsLayout() {
         navigationState={{ index, routes }}
         onIndexChange={setIndex}
         renderScene={renderScene}
-        barStyle={{
-          backgroundColor: '#fff',
-          borderTopWidth: 1,
-          borderTopColor: '#e0e0e0',
-        }}
+        getLazy={getLazy}
+        barStyle={barStyle}
         activeColor='#4A90E2'
         inactiveColor='#999'
         labeled={true}

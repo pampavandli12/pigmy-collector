@@ -2,17 +2,14 @@ import { usePrinter } from '@/contexts/PrinterContext';
 import { useAuth } from '@/providers/AuthProvider';
 import { ReceiptPrinter } from '@/utils/ReceiptPrinter';
 import { buildReceiptData } from '@/utils/receiptBuilder';
-import {
-  buildReceiptPdfDocument,
-  generateReceiptPdf,
-} from '@/utils/receiptPdf';
+import { generateReceiptPdf } from '@/utils/receiptPdf';
 import { showSnackbar } from '@/utils/snackbar';
 import {
   getReceiptSharingUnavailableMessage,
+  getWhatsAppReceiptErrorMessage,
   hasUsablePhoneNumber,
   isShareCancellationError,
   shareReceiptToWhatsApp,
-  WhatsAppUnavailableError,
 } from '@/utils/whatsappReceipt';
 import { useRouter } from 'expo-router';
 import * as SMS from 'expo-sms';
@@ -73,6 +70,7 @@ export const TransactionSuccess = ({
   const { isConnected } = usePrinter();
   const [isPrinting, setIsPrinting] = useState(false);
   const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false);
+  const whatsAppShareInProgress = useRef(false);
   const shouldPrintOnConnect = useRef(false);
   const router = useRouter();
   const { user: agentInfo } = useAuth();
@@ -153,7 +151,7 @@ export const TransactionSuccess = ({
   ]);
 
   const onSendWhatsApp = useCallback(async () => {
-    if (!hasPhoneNumber || isSendingWhatsApp) return;
+    if (!hasPhoneNumber || whatsAppShareInProgress.current) return;
 
     const unavailableMessage = getReceiptSharingUnavailableMessage();
     if (unavailableMessage) {
@@ -161,26 +159,22 @@ export const TransactionSuccess = ({
       return;
     }
 
+    whatsAppShareInProgress.current = true;
     setIsSendingWhatsApp(true);
     try {
       const receiptData = createReceiptData();
-      const document = buildReceiptPdfDocument(receiptData);
-      const pdfUri = await generateReceiptPdf(receiptData);
+      const document = await generateReceiptPdf(receiptData);
       await shareReceiptToWhatsApp({
-        pdfUri,
+        pdfUri: document.uri,
         phone: mobilenumber,
         filename: document.filename,
         message: `Receipt for ${customerName}'s ${scheme} deposit of ${amount}.`,
       });
     } catch (error) {
       if (isShareCancellationError(error)) return;
-
-      const message =
-        error instanceof WhatsAppUnavailableError
-          ? error.message
-          : 'Unable to create or share the receipt on WhatsApp.';
-      showSnackbar(message, { type: 'error' });
+      showSnackbar(getWhatsAppReceiptErrorMessage(error), { type: 'error' });
     } finally {
+      whatsAppShareInProgress.current = false;
       setIsSendingWhatsApp(false);
     }
   }, [
@@ -188,7 +182,6 @@ export const TransactionSuccess = ({
     createReceiptData,
     customerName,
     hasPhoneNumber,
-    isSendingWhatsApp,
     mobilenumber,
     scheme,
   ]);
