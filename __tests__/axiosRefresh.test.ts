@@ -61,7 +61,10 @@ test('refreshes on 401, updates auth state, and replays with the new token', asy
   await expect(handleResponseError(401, config)).resolves.toMatchObject({
     data: { ok: true },
   });
-  expect(mockRefreshAccessToken).toHaveBeenCalledWith('old-refresh');
+  expect(mockRefreshAccessToken).toHaveBeenCalledWith(
+    'old-refresh',
+    '9876543210',
+  );
   expect(mockUpdateStoredTokensForAccount).toHaveBeenCalledWith('B:1', {
     accessToken: 'new-access',
     refreshToken: 'new-refresh',
@@ -80,13 +83,16 @@ test('shares one refresh across concurrent 401 responses', async () => {
   expect(mockApiRequest).toHaveBeenCalledTimes(2);
 });
 
-test('logs out on 403 without refreshing', async () => {
-  await expect(handleResponseError(403, { headers: {} })).rejects.toMatchObject({
-    response: { status: 403 },
+test('refreshes on 403 and replays with the new token', async () => {
+  await expect(handleResponseError(403, { headers: {} })).resolves.toMatchObject({
+    data: { ok: true },
   });
-  expect(mockRefreshAccessToken).not.toHaveBeenCalled();
-  expect(mockEndSession).toHaveBeenCalled();
-  expect(mockEndSession).toHaveBeenCalledWith('B:1');
+  expect(mockRefreshAccessToken).toHaveBeenCalledWith(
+    'old-refresh',
+    '9876543210',
+  );
+  expect(mockApiRequest.mock.calls[0][0].headers.Authorization).toBe('new-access');
+  expect(mockEndSession).not.toHaveBeenCalled();
 });
 
 test('logs out when refresh is unavailable', async () => {
@@ -107,6 +113,15 @@ test('does not refresh a replayed request twice', async () => {
   });
   expect(mockRefreshAccessToken).not.toHaveBeenCalled();
   expect(mockEndSession).toHaveBeenCalled();
+});
+
+test('ends the session when a request still gets 403 after refresh', async () => {
+  await expect(handleResponseError(403, {
+    headers: {},
+    _tokenRefreshAttempted: true,
+  })).rejects.toMatchObject({ response: { status: 403 } });
+  expect(mockRefreshAccessToken).not.toHaveBeenCalled();
+  expect(mockEndSession).toHaveBeenCalledWith('B:1');
 });
 
 test('does not log out when the replay fails for a non-auth reason', async () => {

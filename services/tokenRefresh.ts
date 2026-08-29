@@ -3,23 +3,30 @@ import { API_BASE_URL, API_ENDPOINTS } from '@/utils/constants';
 import type { AxiosStatic } from 'axios';
 
 type RefreshHttpClient = {
-  get: (
+  post: (
     url: string,
-    config: { params: { refreshToken: string }; headers: Record<string, string> },
+    data: {
+      refreshToken: string;
+      mobileNumber: string;
+    },
+    config: {
+      headers: Record<string, string>;
+    },
   ) => Promise<{ data: unknown }>;
 };
 
 export async function refreshAccessToken(
   refreshToken: string,
+  mobileNumber: string,
   client?: RefreshHttpClient,
 ) {
   const httpClient = client ?? getDefaultClient();
   // The default Axios client is isolated from the interceptors on the app's
   // custom `api` instance, so refresh failures cannot recursively refresh.
-  const response = await httpClient.get(
+  const response = await httpClient.post(
     `${API_BASE_URL}${API_ENDPOINTS.REFRESH_TOKEN}`,
+    { refreshToken, mobileNumber },
     {
-    params: { refreshToken },
       headers: { 'Content-Type': 'application/json' },
     },
   );
@@ -29,6 +36,8 @@ export async function refreshAccessToken(
 function getDefaultClient(): AxiosStatic {
   // Keep Axios loading lazy so the refresh service remains independently
   // testable without initializing a platform HTTP adapter.
-  const axiosModule = require('axios') as AxiosStatic & { default?: AxiosStatic };
+  const axiosModule = require('axios') as AxiosStatic & {
+    default?: AxiosStatic;
+  };
   return axiosModule.default ?? axiosModule;
 }

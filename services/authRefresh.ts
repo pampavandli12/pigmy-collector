@@ -45,7 +45,10 @@ async function refreshSession(
     throw new Error('No refresh token is available.');
   }
 
-  const tokens = await dependencies.refreshAccessToken(storedUser.refreshToken);
+  const tokens = await dependencies.refreshAccessToken(
+    storedUser.refreshToken,
+    storedUser.phoneNumber,
+  );
   const updatedUser = await dependencies.updateStoredTokensForAccount(
     accountId,
     tokens,
@@ -79,7 +82,10 @@ export async function handleAuthResponseError<T>(
   if (status !== 401 && status !== 403) return Promise.reject(error);
   if (!accountId) return Promise.reject(error);
 
-  if (status === 403 || originalRequest?._tokenRefreshAttempted) {
+  // The Pigmy API returns 403 (rather than only 401) when an access token has
+  // expired. Both statuses must therefore get one refresh attempt. A second
+  // auth failure after replay means the refreshed credentials are not usable.
+  if (originalRequest?._tokenRefreshAttempted) {
     await dependencies.endSession(accountId);
     return Promise.reject(error);
   }
