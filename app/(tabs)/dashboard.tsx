@@ -4,10 +4,42 @@ import {
   todaysTransactions$,
   totalCustomerCount$,
 } from '@/store/selectors';
+import { SyncStatus } from '@/types/user';
 import { useSelector } from '@legendapp/state/react';
 import { useCallback, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Avatar, Card, Icon, Text } from 'react-native-paper';
+import { AgentAccountSwitcher } from '@/components/AgentAccountSwitcher';
+
+const syncStatusPresentation: Record<
+  SyncStatus,
+  { label: string; icon: string; color: string; backgroundColor: string }
+> = {
+  synced: {
+    label: 'Synced',
+    icon: 'check-circle',
+    color: '#2E7D32',
+    backgroundColor: '#E8F5E9',
+  },
+  pending: {
+    label: 'Pending',
+    icon: 'clock-outline',
+    color: '#9A6700',
+    backgroundColor: '#FFF8E1',
+  },
+  syncing: {
+    label: 'Syncing',
+    icon: 'sync',
+    color: '#1565C0',
+    backgroundColor: '#E3F2FD',
+  },
+  failed: {
+    label: 'Failed',
+    icon: 'alert-circle',
+    color: '#C62828',
+    backgroundColor: '#FFEBEE',
+  },
+};
 
 export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false);
@@ -35,6 +67,7 @@ export default function Dashboard() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
+        <AgentAccountSwitcher />
         {/* Today's Collection Card */}
         <Card style={styles.collectionCard}>
           <Card.Content>
@@ -84,31 +117,54 @@ export default function Dashboard() {
 
         {/* Transaction List */}
         <View style={styles.transactionsList}>
-          {transactions.map((transaction, index) => (
-            <View key={index} style={styles.transactionItem}>
-              <Avatar.Text
-                size={48}
-                label={transaction.customerName.charAt(0).toUpperCase()}
-                style={styles.transactionAvatar}
-              />
-              <View style={styles.transactionInfo}>
-                <Text variant='titleMedium' style={styles.transactionName}>
-                  {transaction.customerName}
-                </Text>
-                <Text variant='bodySmall' style={styles.transactionDate}>
-                  {new Date(transaction.createdAt).toLocaleDateString()}
-                </Text>
+          {transactions.map((transaction) => {
+            const status = syncStatusPresentation[transaction.status];
+
+            return (
+              <View
+                key={transaction.transactionId}
+                style={styles.transactionItem}
+              >
+                <Avatar.Text
+                  size={48}
+                  label={transaction.customerName.charAt(0).toUpperCase()}
+                  style={styles.transactionAvatar}
+                />
+                <View style={styles.transactionInfo}>
+                  <Text variant='titleMedium' style={styles.transactionName}>
+                    {transaction.customerName}
+                  </Text>
+                  <Text variant='bodySmall' style={styles.transactionDate}>
+                    {new Date(transaction.createdAt).toLocaleDateString()}
+                  </Text>
+                </View>
+                <View style={styles.transactionRight}>
+                  <Text variant='titleMedium' style={styles.transactionAmount}>
+                    +{transaction.collectedAmount.toFixed(2)}
+                  </Text>
+                  <Text variant='bodySmall' style={styles.collectionType}>
+                    {transaction.collectiontype}
+                  </Text>
+                  <View
+                    style={[
+                      styles.syncBadge,
+                      { backgroundColor: status.backgroundColor },
+                    ]}
+                    accessible
+                    accessibilityLabel={`Sync status: ${status.label}`}
+                  >
+                    <Icon source={status.icon} size={14} color={status.color} />
+                    <Text
+                      variant='labelSmall'
+                      style={[styles.transactionStatus, { color: status.color }]}
+                    >
+                      {status.label}
+                    </Text>
+                  </View>
+                </View>
               </View>
-              <View style={styles.transactionRight}>
-                <Text variant='titleMedium' style={styles.transactionAmount}>
-                  +{transaction.collectedAmount.toFixed(2)}
-                </Text>
-                <Text variant='bodySmall' style={styles.transactionStatus}>
-                  {transaction.collectiontype}
-                </Text>
-              </View>
-            </View>
-          ))}
+            );
+          })}
           {transactions.length === 0 && (
             <View style={{ alignItems: 'center', marginTop: 32 }}>
               <Text variant='bodyMedium' style={{ color: '#666' }}>
@@ -270,8 +326,19 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   transactionStatus: {
-    color: '#4CAF50',
     fontWeight: '500',
+    marginLeft: 4,
+  },
+  collectionType: {
+    color: '#666',
+    marginBottom: 4,
+  },
+  syncBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   transactionContent: {
     flex: 1,

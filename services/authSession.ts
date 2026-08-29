@@ -1,7 +1,7 @@
 import { AuthUser } from '@/types/auth';
 
-type UnauthorizedHandler = () => void | Promise<void>;
-type AuthUserUpdatedHandler = (user: AuthUser) => void;
+type UnauthorizedHandler = (accountId: string) => void | Promise<void>;
+type AuthUserUpdatedHandler = (accountId: string, user: AuthUser) => void;
 
 let unauthorizedHandler: UnauthorizedHandler | null = null;
 let authUserUpdatedHandler: AuthUserUpdatedHandler | null = null;
@@ -10,8 +10,8 @@ export const setUnauthorizedHandler = (handler: UnauthorizedHandler | null) => {
   unauthorizedHandler = handler;
 };
 
-export const notifyUnauthorized = async () => {
-  await unauthorizedHandler?.();
+export const notifyUnauthorized = async (accountId: string) => {
+  await unauthorizedHandler?.(accountId);
 };
 
 export const setAuthUserUpdatedHandler = (
@@ -20,6 +20,6 @@ export const setAuthUserUpdatedHandler = (
   authUserUpdatedHandler = handler;
 };
 
-export const notifyAuthUserUpdated = (user: AuthUser) => {
-  authUserUpdatedHandler?.(user);
+export const notifyAuthUserUpdated = (accountId: string, user: AuthUser) => {
+  authUserUpdatedHandler?.(accountId, user);
 };

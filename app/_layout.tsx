@@ -1,4 +1,5 @@
 import { AuthProvider, useAuth } from '@/providers/AuthProvider';
+import { SessionFallbackDialog } from '@/components/SessionFallbackDialog';
 import {
   Roboto_400Regular,
   Roboto_500Medium,
@@ -119,6 +120,7 @@ export default function RootLayout() {
       <PrinterProvider>
         <AuthProvider>
           <InitialLayout />
+          <SessionFallbackDialog />
         </AuthProvider>
       </PrinterProvider>
       <AppSnackbar />

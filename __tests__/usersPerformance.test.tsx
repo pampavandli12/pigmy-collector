@@ -2,16 +2,23 @@ const mockPush = jest.fn();
 const mockVoiceCancel = jest.fn();
 const mockVoiceStart = jest.fn();
 let mockVoiceResult: ((transcript: string) => void) | undefined;
+let mockAuthUser = {
+  agentCode: 11,
+  bankCode: 'BANK',
+  lastDepositDate: '2099-01-01',
+  graceDays: 3,
+};
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
 }));
 jest.mock('../providers/AuthProvider', () => ({
-  useAuth: () => ({ user: { agentCode: 11, bankCode: 'BANK' } }),
+  useAuth: () => ({ user: mockAuthUser }),
 }));
 jest.mock('@/store/actions', () => ({
   actions: { syncCustomers: jest.fn() },
 }));
+jest.mock('../utils/snackbar', () => ({ showSnackbar: jest.fn() }));
 jest.mock('../hooks/useCustomerVoiceSearch', () => ({
   useCustomerVoiceSearch: (onResult: (transcript: string) => void) => {
     mockVoiceResult = onResult;
@@ -30,6 +37,8 @@ import Users from '../app/(tabs)/users';
 import { actions } from '../store/actions';
 import { store$ } from '../store/store';
 import { Customer } from '../types/user';
+import { GRACE_PERIOD_EXCEEDED_MESSAGE } from '../utils/gracePeriod';
+import { showSnackbar } from '../utils/snackbar';
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
   <PaperProvider>{children}</PaperProvider>
@@ -54,6 +63,12 @@ beforeEach(() => {
   jest.clearAllMocks();
   (actions.syncCustomers as jest.Mock).mockResolvedValue(undefined);
   mockVoiceResult = undefined;
+  mockAuthUser = {
+    agentCode: 11,
+    bankCode: 'BANK',
+    lastDepositDate: '2099-01-01',
+    graceDays: 3,
+  };
   store$.customers.set({});
   store$.searchQuery.set('');
   store$.isRefreshingCustomers.set(false);
@@ -76,6 +91,23 @@ test('virtualizes a collection of 5,000 customers with bounded batches', () => {
   expect(list.props.initialNumToRender).toBe(10);
   expect(list.props.maxToRenderPerBatch).toBe(8);
   expect(list.props.windowSize).toBe(7);
+});
+
+test('loads customers automatically on initial mount', () => {
+  render(<Users />, { wrapper });
+  expect(actions.syncCustomers).toHaveBeenCalledWith(11, 'BANK');
+});
+
+test('shows initial loading feedback before an empty result', () => {
+  (actions.syncCustomers as jest.Mock).mockImplementation(() => {
+    store$.isRefreshingCustomers.set(true);
+    return new Promise(() => undefined);
+  });
+
+  const screen = render(<Users />, { wrapper });
+
+  expect(screen.getByText('Loading customers...')).toBeTruthy();
+  expect(screen.queryByText('No customers found')).toBeNull();
 });
 
 test('debounces typed filtering and coalesces rapid changes', () => {
@@ -117,4 +149,24 @@ test('preserves refresh and customer navigation behavior', () => {
       params: expect.objectContaining({ account: '42' }),
     }),
   );
+});
+
+test('blocks customer navigation when the agent exceeds grace days', () => {
+  mockAuthUser = {
+    agentCode: 11,
+    bankCode: 'BANK',
+    lastDepositDate: '2026-08-01',
+    graceDays: 3,
+  };
+  jest.setSystemTime(new Date(2026, 7, 5, 12));
+  store$.customers.set({ 42: makeCustomer(42) });
+  const screen = render(<Users />, { wrapper });
+
+  fireEvent.press(screen.getByText('Customer 42'));
+
+  expect(mockPush).not.toHaveBeenCalled();
+  expect(showSnackbar).toHaveBeenCalledWith(GRACE_PERIOD_EXCEEDED_MESSAGE, {
+    type: 'error',
+    duration: 6000,
+  });
 });

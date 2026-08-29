@@ -17,6 +17,19 @@ export const authUserSchema = z
 
 export type AuthUser = z.infer<typeof authUserSchema>;
 
+export type AgentAccountStatus = 'available' | 'loginRequired';
+
+export type AgentAccountProfile = Omit<
+  AuthUser,
+  'accessToken' | 'refreshToken'
+>;
+
+export interface AgentAccountSummary extends AgentAccountProfile {
+  accountId: string;
+  status: AgentAccountStatus;
+  lastUsedAt: number;
+}
+
 export const tokenRefreshResponseSchema = z
   .object({
     refreshToken: z.string().min(1),

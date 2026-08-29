@@ -28,16 +28,16 @@ function item(status: OutboxItem['status'], createdAt: number): OutboxItem {
   };
 }
 
-test('removes every transaction status from previous calendar days', () => {
+test('keeps every valid transaction status from previous calendar days', () => {
   for (const status of ['pending', 'syncing', 'failed', 'synced'] as const) {
     assert.equal(
       shouldRemoveOutboxItem(item(status, previousDay), now),
-      true,
+      false,
     );
   }
 });
 
-test('keeps transactions created at local midnight or later today', () => {
+test('keeps valid transactions created today', () => {
   assert.equal(
     shouldRemoveOutboxItem(item('pending', startOfToday), now),
     false,

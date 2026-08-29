@@ -1,14 +1,20 @@
 import { TransactionForm } from '@/components/TransactionForm';
 import { TransactionSuccess } from '@/components/TransactionSuccess';
+import { useAuth } from '@/providers/AuthProvider';
 import { actions } from '@/store/actions';
 import { store$ } from '@/store/store';
 import { TransactionPayload } from '@/types/user';
+import {
+  evaluateGracePeriod,
+  GRACE_PERIOD_EXCEEDED_MESSAGE,
+} from '@/utils/gracePeriod';
+import { showSnackbar } from '@/utils/snackbar';
 import { useSelector } from '@legendapp/state/react';
 import * as Crypto from 'expo-crypto';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
-import { IconButton, Text } from 'react-native-paper';
+import { Button, Icon, IconButton, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface TransactionSuccessSnapshot {
@@ -28,6 +34,7 @@ function getDisplayDate() {
 export default function UserDetail() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const { user } = useAuth();
   const [transactionSuccess, setTransactionSuccess] =
     useState<TransactionSuccessSnapshot | null>(null);
   const account = Array.isArray(params.account)
@@ -57,8 +64,25 @@ export default function UserDetail() {
   const [amount, setAmount] = useState('');
   const [scheme, setScheme] = useState('');
   const [date] = useState(getDisplayDate);
+  const gracePeriod = evaluateGracePeriod(
+    user?.lastDepositDate,
+    user?.graceDays,
+  );
 
   const handleConfirm = () => {
+    const currentGracePeriod = evaluateGracePeriod(
+      user?.lastDepositDate,
+      user?.graceDays,
+    );
+
+    if (!currentGracePeriod.allowed) {
+      showSnackbar(GRACE_PERIOD_EXCEEDED_MESSAGE, {
+        type: 'error',
+        duration: 6000,
+      });
+      return;
+    }
+
     const numericAmount = Number(amount);
     const openingBalance = Number(customer.balance || 0);
     const payload: TransactionPayload = {
@@ -72,7 +96,9 @@ export default function UserDetail() {
       accountNumber: Number(customer.account),
       transactionId: Crypto.randomUUID(),
     };
-    actions.addTransaction(payload);
+    if (!actions.addTransaction(payload)) {
+      return;
+    }
     setTransactionSuccess({
       amount: numericAmount,
       openingBalance,
@@ -101,7 +127,17 @@ export default function UserDetail() {
           <View style={styles.headerSpacer} />
         </View>
         {/* Transaction Form */}
-        {transactionSuccess ? (
+        {!gracePeriod.allowed ? (
+          <View style={styles.blockedContainer}>
+            <Icon source='alert-circle' size={56} color='#C62828' />
+            <Text variant='titleMedium' style={styles.blockedMessage}>
+              {GRACE_PERIOD_EXCEEDED_MESSAGE}
+            </Text>
+            <Button mode='contained' onPress={() => router.back()}>
+              Back to Users
+            </Button>
+          </View>
+        ) : transactionSuccess ? (
           <TransactionSuccess
             customerName={customer.name}
             customerId={customer.id}
@@ -158,6 +194,18 @@ const styles = StyleSheet.create({
   },
   headerSpacer: {
     width: 48,
+  },
+  blockedContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  blockedMessage: {
+    color: '#C62828',
+    textAlign: 'center',
+    marginTop: 16,
+    marginBottom: 24,
   },
   content: {
     flex: 1,

@@ -50,6 +50,7 @@ jest.mock('../providers/AuthProvider', () => ({
 
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import * as SMS from 'expo-sms';
+import { useState } from 'react';
 import { PaperProvider } from 'react-native-paper';
 import { AppSnackbar } from '../components/AppSnackbar';
 import PrinterManager from '../components/PrinterManager';
@@ -85,6 +86,56 @@ test('keeps transaction confirmation disabled until values match', () => {
     />,
     { wrapper },
   );
+  expect(
+    screen.getByRole('button', { name: 'Confirm + Save' }).props
+      .accessibilityState.disabled,
+  ).toBe(true);
+});
+
+const QuickAmountForm = () => {
+  const [amount, setAmount] = useState('');
+  return (
+    <TransactionForm
+      customer={{ id: '1', name: 'Customer', agentCode: 2, bankCode: 'B', balance: 10, account: '3', image: '' }}
+      amount={amount}
+      setAmount={setAmount}
+      scheme='Pigmy Deposit'
+      setScheme={jest.fn()}
+      date='July 18, 2026'
+      handleConfirm={jest.fn()}
+      isTransactionLoading={false}
+    />
+  );
+};
+
+test.each(['100', '200', '500'])(
+  'quick amount %s fills both amount fields and enables confirmation',
+  (quickAmount) => {
+    const screen = render(<QuickAmountForm />, { wrapper });
+
+    fireEvent.press(
+      screen.getByRole('button', { name: `Select ₹${quickAmount}` }),
+    );
+
+    expect(screen.getByLabelText('Amount').props.value).toBe(quickAmount);
+    expect(screen.getByLabelText('Reconfirm Amount').props.value).toBe(
+      quickAmount,
+    );
+    expect(
+      screen.getByRole('button', { name: 'Confirm + Save' }).props
+        .accessibilityState.disabled,
+    ).toBe(false);
+  },
+);
+
+test('manual amount edits preserve mismatch validation', () => {
+  const screen = render(<QuickAmountForm />, { wrapper });
+
+  fireEvent.press(screen.getByRole('button', { name: 'Select ₹100' }));
+  fireEvent.changeText(screen.getByLabelText('Amount'), '125');
+
+  expect(screen.getByLabelText('Amount').props.value).toBe('125');
+  expect(screen.getByLabelText('Reconfirm Amount').props.value).toBe('100');
   expect(
     screen.getByRole('button', { name: 'Confirm + Save' }).props
       .accessibilityState.disabled,

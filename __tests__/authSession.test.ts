@@ -13,13 +13,14 @@ afterEach(() => {
 test('notifies the registered unauthorized handler', async () => {
   const handler = jest.fn();
   setUnauthorizedHandler(handler);
-  await notifyUnauthorized();
+  await notifyUnauthorized('B:1');
   expect(handler).toHaveBeenCalledTimes(1);
+  expect(handler).toHaveBeenCalledWith('B:1');
 });
 
 test('allows notification when no handler is registered', async () => {
   setUnauthorizedHandler(null);
-  await expect(notifyUnauthorized()).resolves.toBeUndefined();
+  await expect(notifyUnauthorized('B:1')).resolves.toBeUndefined();
 });
 
 test('notifies the provider when refreshed user data is available', () => {
@@ -30,6 +31,6 @@ test('notifies the provider when refreshed user data is available', () => {
     graceDays: null, accessToken: 'new-access', refreshToken: 'new-refresh',
   };
   setAuthUserUpdatedHandler(handler);
-  notifyAuthUserUpdated(user);
-  expect(handler).toHaveBeenCalledWith(user);
+  notifyAuthUserUpdated('B:1', user);
+  expect(handler).toHaveBeenCalledWith('B:1', user);
 });

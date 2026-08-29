@@ -62,15 +62,44 @@ test('removes malformed persisted entries before attempting sync', async () => {
   expect(showSnackbar).not.toHaveBeenCalled();
 });
 
-test('deletes all outbox statuses from previous calendar days', () => {
+test('retains all valid outbox statuses from previous calendar days', () => {
   const old = new Date();
   old.setDate(old.getDate() - 1);
   old.setHours(23, 59, 59, 999);
   store$.outbox.set({
-    old: { payload, status: 'failed', retryCount: 1, createdAt: old.getTime() },
+    oldPending: { payload: { ...payload, transactionId: 'old-pending' }, status: 'pending', retryCount: 0, createdAt: old.getTime() },
+    oldSyncing: { payload: { ...payload, transactionId: 'old-syncing' }, status: 'syncing', retryCount: 0, createdAt: old.getTime() },
+    oldFailed: { payload: { ...payload, transactionId: 'old-failed' }, status: 'failed', retryCount: 1, createdAt: old.getTime() },
+    oldSynced: { payload: { ...payload, transactionId: 'old-synced' }, status: 'synced', retryCount: 0, createdAt: old.getTime() },
     recent: { payload: { ...payload, transactionId: 'recent' }, status: 'pending', retryCount: 0, createdAt: Date.now() },
   });
   cleanupOutbox();
-  expect(store$.outbox.old.peek()).toBeUndefined();
+  expect(Object.keys(store$.outbox.peek())).toEqual([
+    'oldPending',
+    'oldSyncing',
+    'oldFailed',
+    'oldSynced',
+    'recent',
+  ]);
   expect(store$.outbox.recent.peek()).toBeDefined();
+});
+
+test('syncs a failed transaction from a previous day and retains it', async () => {
+  (NetInfo.fetch as jest.Mock).mockResolvedValue({ isConnected: true });
+  (createTransaction as jest.Mock).mockResolvedValue({ ok: true });
+  const old = new Date();
+  old.setDate(old.getDate() - 1);
+  store$.outbox.old.set({
+    payload: { ...payload, transactionId: 'old' },
+    status: 'failed',
+    retryCount: 1,
+    createdAt: old.getTime(),
+  });
+
+  await processOutbox();
+
+  expect(createTransaction).toHaveBeenCalledWith(
+    expect.objectContaining({ transactionId: 'old' }),
+  );
+  expect(store$.outbox.old.peek()).toMatchObject({ status: 'synced' });
 });

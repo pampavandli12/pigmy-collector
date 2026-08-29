@@ -40,6 +40,12 @@ export const TransactionForm = ({
 }: TransactionFormProps) => {
   const [reconfirmAmount, setReconfirmAmount] = useState('');
   const schemeOptions = ['Pigmy Deposit', 'Daily Deposit'];
+  const quickAmounts = ['100', '200', '500'];
+
+  const selectQuickAmount = (value: string) => {
+    setAmount(value);
+    setReconfirmAmount(value);
+  };
 
   const amountMismatch = useMemo(() => {
     return amount !== reconfirmAmount;
@@ -84,17 +90,39 @@ export const TransactionForm = ({
             <Text variant='bodyMedium' style={styles.fieldLabel}>
               Amount
             </Text>
+            <View style={styles.quickAmountRow}>
+              {quickAmounts.map((quickAmount) => {
+                const isSelected =
+                  amount === quickAmount && reconfirmAmount === quickAmount;
+                return (
+                  <Button
+                    key={quickAmount}
+                    mode={isSelected ? 'contained' : 'outlined'}
+                    onPress={() => selectQuickAmount(quickAmount)}
+                    style={styles.quickAmountButton}
+                    contentStyle={styles.quickAmountButtonContent}
+                    accessibilityLabel={`Select ₹${quickAmount}`}
+                  >
+                    ₹{quickAmount}
+                  </Button>
+                );
+              })}
+            </View>
             <TextInput
               mode='flat'
               value={amount}
               onChangeText={setAmount}
               keyboardType='decimal-pad'
+              accessibilityLabel='Amount'
               style={styles.amountInput}
               contentStyle={styles.amountInputContent}
               underlineStyle={{ height: 0 }}
-              activeUnderlineColor='transparent'
             />
-            <HelperText type='error' visible={amountMismatch}>
+            <HelperText
+              type='error'
+              visible={amountMismatch}
+              style={styles.helperText}
+            >
               Amount mismatch, Please reconfirm the amount
             </HelperText>
           </View>
@@ -109,12 +137,16 @@ export const TransactionForm = ({
               value={reconfirmAmount}
               onChangeText={setReconfirmAmount}
               keyboardType='decimal-pad'
+              accessibilityLabel='Reconfirm Amount'
               style={styles.amountInput}
               contentStyle={styles.amountInputContent}
               underlineStyle={{ height: 0 }}
-              activeUnderlineColor='transparent'
             />
-            <HelperText type='error' visible={amountMismatch}>
+            <HelperText
+              type='error'
+              visible={amountMismatch}
+              style={styles.helperText}
+            >
               Amount mismatch, Please reconfirm the amount
             </HelperText>
           </View>
@@ -234,15 +266,15 @@ const styles = StyleSheet.create({
     margin: 0,
   },
   detailsSection: {
-    marginBottom: 24,
+    gap: 32,
+    marginBottom: 32,
   },
   sectionTitle: {
     fontWeight: '700',
     color: '#000',
-    marginBottom: 24,
   },
   fieldContainer: {
-    marginBottom: 32,
+    position: 'relative',
   },
   fieldLabel: {
     color: '#999',
@@ -256,8 +288,25 @@ const styles = StyleSheet.create({
     height: 60,
   },
   amountInputContent: {
-    paddingLeft: 16,
-    paddingTop: 8,
+    paddingLeft: 8,
+  },
+  quickAmountRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  quickAmountButton: {
+    flex: 1,
+    borderRadius: 8,
+  },
+  quickAmountButtonContent: {
+    minHeight: 44,
+  },
+  helperText: {
+    bottom: -24,
+    left: 0,
+    margin: 0,
+    position: 'absolute',
   },
   dateContainer: {
     backgroundColor: '#fff',

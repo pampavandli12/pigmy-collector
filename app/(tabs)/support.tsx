@@ -96,7 +96,7 @@ export default function Support() {
             labelStyle={styles.logoutButtonText}
             contentStyle={styles.logoutButtonContent}
           >
-            Logout
+            Log out current account
           </Button>
         </View>
       </ScrollView>

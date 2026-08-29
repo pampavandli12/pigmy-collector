@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../utils/constants';
 import { handleAuthResponseError } from './authRefresh';
-import { getStoredToken } from './authStorage';
+import { getStoredAuthContext } from './authStorage';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -13,10 +13,12 @@ export const api = axios.create({
 // Interceptor for adding auth token and logging requests/responses
 api.interceptors.request.use(
   async (config) => {
-    const token = await getStoredToken();
+    const auth = await getStoredAuthContext();
     config.headers['Content-Type'] = 'application/json';
-    if (token) {
-      config.headers.Authorization = token;
+    if (auth) {
+      config.headers.Authorization = auth.token;
+      (config as typeof config & { _agentAccountId?: string })._agentAccountId =
+        auth.accountId;
     } else {
       delete config.headers.Authorization;
     }
