@@ -1,5 +1,13 @@
-//export const API_BASE_URL = 'http://10.0.2.2:1010';
-export const API_BASE_URL = 'https://pigmymobile-api.onrender.com';
+import { Platform } from 'react-native';
+
+function getLocalDevApiBaseUrl() {
+  // Android emulators cannot reach the host machine via localhost.
+  const host = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
+  return `http://${host}:1010`;
+}
+
+export const API_BASE_URL = getLocalDevApiBaseUrl();
+//export const API_BASE_URL = 'https://pigmymobile-api.onrender.com';
 
 export const API_ENDPOINTS = {
   LOGIN: `/pigmyMobile/v2/login`,
