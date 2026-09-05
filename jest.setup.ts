@@ -20,6 +20,7 @@ jest.mock('expo-secure-store', () => ({
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn() }),
+  useFocusEffect: (callback: () => void) => callback(),
   useLocalSearchParams: () => ({
     id: '1',
     name: 'Customer',

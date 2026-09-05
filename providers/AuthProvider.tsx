@@ -9,7 +9,9 @@ import {
   getStoredAccounts,
   getStoredUser,
   saveAndActivateAccount,
+  updateStoredAgentProfile,
 } from '@/services/authStorage';
+import { authenticateAgent } from '@/services/authenticate';
 import { activateAgentStore } from '@/store/store';
 import { waitForOutboxIdle } from '@/store/syncCoordinator';
 import {
@@ -26,9 +28,10 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
-import { View } from 'react-native';
+import { AppState, View } from 'react-native';
 import { ActivityIndicator, useTheme } from 'react-native-paper';
 
 export type AuthStatus =
@@ -60,7 +63,7 @@ interface AuthContextType {
 export interface SessionNotice {
   expiredAgentName: string;
   replacementAgentName: string | null;
-  reason: 'expired' | 'manual';
+  reason: 'expired' | 'manual' | 'revoked';
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -74,6 +77,87 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [authStatus, setAuthStatus] = useState<AuthStatus>('loading');
   const [hasPin, setHasPin] = useState(false);
   const theme = useTheme();
+  const authStatusRef = useRef(authStatus);
+  const userRef = useRef(user);
+  const hasPinRef = useRef(hasPin);
+
+  useEffect(() => {
+    authStatusRef.current = authStatus;
+  }, [authStatus]);
+
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
+  useEffect(() => {
+    hasPinRef.current = hasPin;
+  }, [hasPin]);
+
+  const deactivateAccount = useCallback(
+    async (
+      accountId: string,
+      reason: SessionNotice['reason'],
+      activeUserHint?: AuthUser,
+    ) => {
+      const result = await deactivateStoredAccount(accountId, activeUserHint);
+      setAccounts(await getStoredAccounts());
+      if (!result.wasActive || !result.disabledAccount) return;
+
+      if (result.activeUser) {
+        activateAgentStore(result.activeUser);
+        setUser(result.activeUser);
+        setAuthStatus('unlocked');
+      } else {
+        setUser(null);
+        setAuthStatus('unauthenticated');
+      }
+      setSessionNotice({
+        expiredAgentName: result.disabledAccount.agentName,
+        replacementAgentName: result.activeUser?.agentName ?? null,
+        reason,
+      });
+    },
+    [],
+  );
+
+  const verifyAgentSession = useCallback(
+    async (activeUser: AuthUser): Promise<'active' | 'revoked'> => {
+      const authStatus = await authenticateAgent(activeUser.phoneNumber);
+      const accountId = getAgentAccountId(activeUser);
+      const updatedUser = await updateStoredAgentProfile(accountId, {
+        limitAmount: authStatus.limitAmount,
+        lastDepositDate: authStatus.lastDepositDate,
+        graceDays: authStatus.graceDays,
+      });
+
+      setUser(updatedUser);
+      activateAgentStore(updatedUser);
+      setAccounts(await getStoredAccounts());
+
+      if (authStatus.isAgentRevoked) {
+        await deactivateAccount(accountId, 'revoked', updatedUser);
+        return 'revoked';
+      }
+
+      return 'active';
+    },
+    [deactivateAccount],
+  );
+
+  const verifyAgentOnLockScreen = useCallback(
+    async (activeUser: AuthUser) => {
+      try {
+        return await verifyAgentSession(activeUser);
+      } catch {
+        showSnackbar(
+          'Unable to verify agent status. You can still unlock with your PIN.',
+          { type: 'error' },
+        );
+        return 'active' as const;
+      }
+    },
+    [verifyAgentSession],
+  );
 
   useEffect(() => {
     const loadAuthState = async () => {
@@ -102,7 +186,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         if (initialUser) {
           activateAgentStore(initialUser, true);
           setUser(initialUser);
-          setAuthStatus(hasValidPin ? 'locked' : 'pinSetupRequired');
+
+          if (hasValidPin) {
+            const status = await verifyAgentOnLockScreen(initialUser);
+            setAuthStatus(status === 'revoked' ? 'unauthenticated' : 'locked');
+            return;
+          }
+
+          setAuthStatus('pinSetupRequired');
           return;
         }
         setAuthStatus('unauthenticated');
@@ -117,7 +208,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     };
 
     loadAuthState();
-  }, []);
+  }, [verifyAgentOnLockScreen]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (
+        (nextState === 'background' || nextState === 'inactive') &&
+        hasPinRef.current &&
+        userRef.current &&
+        authStatusRef.current === 'unlocked'
+      ) {
+        setAuthStatus('locked');
+        return;
+      }
+
+      if (
+        nextState === 'active' &&
+        hasPinRef.current &&
+        userRef.current &&
+        authStatusRef.current === 'locked'
+      ) {
+        const activeUser = userRef.current;
+        setAuthStatus('loading');
+        void verifyAgentOnLockScreen(activeUser).then((status) => {
+          setAuthStatus(status === 'revoked' ? 'unauthenticated' : 'locked');
+        });
+      }
+    });
+
+    return () => subscription.remove();
+  }, [verifyAgentOnLockScreen]);
 
   const login = useCallback(async (nextUser: AuthUser) => {
     const validatedUser = authUserSchema.parse(nextUser);
@@ -153,33 +273,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     setAccounts(await getStoredAccounts());
     setAuthStatus('unlocked');
   }, []);
-
-  const deactivateAccount = useCallback(
-    async (
-      accountId: string,
-      reason: SessionNotice['reason'],
-      activeUserHint?: AuthUser,
-    ) => {
-      const result = await deactivateStoredAccount(accountId, activeUserHint);
-      setAccounts(await getStoredAccounts());
-      if (!result.wasActive || !result.disabledAccount) return;
-
-      if (result.activeUser) {
-        activateAgentStore(result.activeUser);
-        setUser(result.activeUser);
-        setAuthStatus('unlocked');
-      } else {
-        setUser(null);
-        setAuthStatus('unauthenticated');
-      }
-      setSessionNotice({
-        expiredAgentName: result.disabledAccount.agentName,
-        replacementAgentName: result.activeUser?.agentName ?? null,
-        reason,
-      });
-    },
-    [],
-  );
 
   const logout = useCallback(async () => {
     if (!user) return;

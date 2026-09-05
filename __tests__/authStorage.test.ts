@@ -2,6 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 import {
   getStoredToken,
   getStoredUser,
+  updateStoredAgentProfile,
   updateStoredTokens,
 } from '../services/authStorage';
 
@@ -65,4 +66,35 @@ test('replaces both stored tokens without changing user metadata', async () => {
       refreshToken: 'new-refresh',
     }),
   );
+});
+
+test('updates stored agent profile fields for the active account', async () => {
+  const storedUser = {
+    agentCode: 1,
+    agentName: 'Agent',
+    bankCode: 'B',
+    bankName: 'Bank Name',
+    phoneNumber: '9876543210',
+    lastDepositDate: '2026-06-19',
+    limitAmount: 50000,
+    graceDays: 0,
+    accessToken: 'access',
+    refreshToken: 'refresh',
+  };
+  (SecureStore.getItemAsync as jest.Mock).mockResolvedValue(
+    JSON.stringify(storedUser),
+  );
+
+  await expect(
+    updateStoredAgentProfile('B:1', {
+      limitAmount: 40000,
+      lastDepositDate: '2026-08-06',
+      graceDays: 2,
+    }),
+  ).resolves.toEqual({
+    ...storedUser,
+    limitAmount: 40000,
+    lastDepositDate: '2026-08-06',
+    graceDays: 2,
+  });
 });

@@ -18,6 +18,12 @@ jest.mock('../hooks/useCustomerVoiceSearch', () => ({
   useCustomerVoiceSearch: () => ({ isActive: false, start: jest.fn(), cancel: jest.fn() }),
 }));
 jest.mock('../services/login', () => ({ userLogin: jest.fn() }));
+jest.mock('../services/user', () => ({
+  fetchCollections: jest.fn().mockResolvedValue({
+    totalTransactions: 0,
+    totalAmountCollected: 0,
+  }),
+}));
 jest.mock('../store/actions', () => ({
   actions: { syncCustomers: jest.fn(), addTransaction: jest.fn() },
 }));
@@ -33,7 +39,8 @@ jest.mock('../utils/ReceiptPrinter', () => ({
   ReceiptPrinter: { printReceipt: jest.fn() },
 }));
 
-import { render } from '@testing-library/react-native';
+import { fetchCollections } from '../services/user';
+import { render, waitFor } from '@testing-library/react-native';
 import { PaperProvider } from 'react-native-paper';
 import Dashboard from '../app/(tabs)/dashboard';
 import Support from '../app/(tabs)/support';
@@ -47,6 +54,10 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
   <PaperProvider>{children}</PaperProvider>
 );
 
+const mockedFetchCollections = fetchCollections as jest.MockedFunction<
+  typeof fetchCollections
+>;
+
 beforeEach(() => {
   mockAuthUser = {
     agentCode: 1,
@@ -57,6 +68,10 @@ beforeEach(() => {
   store$.customers.set({});
   store$.outbox.set({});
   store$.searchQuery.set('');
+  mockedFetchCollections.mockResolvedValue({
+    totalTransactions: 0,
+    totalAmountCollected: 0,
+  });
 });
 
 test('renders the sign-in screen', () => {
@@ -65,10 +80,27 @@ test('renders the sign-in screen', () => {
   expect(screen.getByText('Login')).toBeTruthy();
 });
 
-test('renders dashboard empty state and totals', () => {
+test('renders dashboard empty state and totals', async () => {
   const screen = render(<Dashboard />, { wrapper });
   expect(screen.getByText("Today's Collection")).toBeTruthy();
+  await waitFor(() =>
+    expect(mockedFetchCollections).toHaveBeenCalledWith({
+      agentCode: 1,
+      bankCode: 'B',
+      graceDays: 3,
+    }),
+  );
   expect(screen.getByText('No transactions yet')).toBeTruthy();
+});
+
+test('renders dashboard totals from the collections API', async () => {
+  mockedFetchCollections.mockResolvedValue({
+    totalTransactions: 1,
+    totalAmountCollected: 1500,
+  });
+  const screen = render(<Dashboard />, { wrapper });
+  expect(await screen.findByText(/₹\s*1,500/)).toBeTruthy();
+  expect(await screen.findByText("Today's Transactions")).toBeTruthy();
 });
 
 test('renders customer search and empty state after initial loading', () => {
@@ -122,6 +154,7 @@ test('blocks direct access to the deposit form after grace days expire', () => {
     bankCode: 'B',
     lastDepositDate: '2026-08-01',
     graceDays: 3,
+    limitAmount: 50000,
   };
   jest.useFakeTimers().setSystemTime(new Date(2026, 7, 5, 12));
 
@@ -135,4 +168,41 @@ test('blocks direct access to the deposit form after grace days expire', () => {
   expect(screen.queryByText('Deposit Details')).toBeNull();
   expect(screen.getByText('Back to Users')).toBeTruthy();
   jest.useRealTimers();
+});
+
+test('blocks direct access to the deposit form when the daily limit is reached', () => {
+  mockAuthUser = {
+    agentCode: 1,
+    bankCode: 'B',
+    lastDepositDate: '2099-01-01',
+    graceDays: 3,
+    limitAmount: 50000,
+  };
+  store$.outbox.set({
+    'tx-1': {
+      payload: {
+        transactionId: 'tx-1',
+        userId: 1,
+        agentCode: 1,
+        bankCode: 'B',
+        collectedAmount: 50000,
+        schemename: 'Pigmy Deposit',
+        collectiontype: 'cash',
+        customerName: 'Customer',
+        accountNumber: 3,
+      },
+      status: 'synced',
+      retryCount: 0,
+      createdAt: Date.now(),
+    },
+  });
+
+  const screen = render(<UserDetail />, { wrapper });
+
+  expect(
+    screen.getByText(
+      'Daily collection limit exceeded. Please deposit the collected amount to the bank.',
+    ),
+  ).toBeTruthy();
+  expect(screen.queryByText('Deposit Details')).toBeNull();
 });

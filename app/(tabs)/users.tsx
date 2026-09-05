@@ -19,12 +19,16 @@ import {
 import { CustomerListItem } from '@/components/CustomerListItem';
 import { store$ } from '@/store/store';
 
-import { filteredCustomers$ } from '@/store/selectors';
+import { filteredCustomers$, todaysCollectionAmount$ } from '@/store/selectors';
 
 import { useCustomerVoiceSearch } from '@/hooks/useCustomerVoiceSearch';
 import { useAuth } from '@/providers/AuthProvider';
 import { actions } from '@/store/actions';
 import { Customer } from '@/types/user';
+import {
+  COLLECTION_LIMIT_EXCEEDED_MESSAGE,
+  evaluateCollectionLimit,
+} from '@/utils/collectionLimit';
 import {
   evaluateGracePeriod,
   GRACE_PERIOD_EXCEEDED_MESSAGE,
@@ -33,6 +37,7 @@ import { showSnackbar } from '@/utils/snackbar';
 
 export default function Users() {
   const customers = useSelector(filteredCustomers$);
+  const todaysCollected = useSelector(todaysCollectionAmount$);
   const syncing = useSelector(store$.isRefreshingCustomers);
   const router = useRouter();
   const { user } = useAuth();
@@ -88,6 +93,19 @@ export default function Users() {
         return;
       }
 
+      const collectionLimit = evaluateCollectionLimit(
+        user?.limitAmount,
+        todaysCollected,
+      );
+
+      if (!collectionLimit.allowed) {
+        showSnackbar(COLLECTION_LIMIT_EXCEEDED_MESSAGE, {
+          type: 'error',
+          duration: 6000,
+        });
+        return;
+      }
+
       router.push({
         pathname: '/userDetail',
         params: {
@@ -101,7 +119,7 @@ export default function Users() {
         },
       });
     },
-    [router, user?.graceDays, user?.lastDepositDate],
+    [router, todaysCollected, user?.graceDays, user?.lastDepositDate, user?.limitAmount],
   );
 
   const handleSearchChange = useCallback((text: string) => {
