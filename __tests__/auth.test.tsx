@@ -2,7 +2,16 @@ import * as SecureStore from 'expo-secure-store';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import React from 'react';
 import { AuthProvider, useAuth } from '../providers/AuthProvider';
+import { authenticateAgent } from '../services/authenticate';
 import { authUserSchema } from '../types/auth';
+
+jest.mock('../services/authenticate', () => ({
+  authenticateAgent: jest.fn(),
+}));
+
+const mockedAuthenticateAgent = authenticateAgent as jest.MockedFunction<
+  typeof authenticateAgent
+>;
 
 const user = {
   agentCode: 1,
@@ -20,6 +29,12 @@ const user = {
 beforeEach(() => {
   jest.clearAllMocks();
   (SecureStore.getItemAsync as jest.Mock).mockResolvedValue(null);
+  mockedAuthenticateAgent.mockResolvedValue({
+    limitAmount: 50000,
+    isAgentRevoked: false,
+    lastDepositDate: '2026-06-19',
+    graceDays: 0,
+  });
 });
 
 test('validates complete authentication users', () => {
@@ -38,6 +53,29 @@ test('restores a valid stored user in the locked state', async () => {
   await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
   expect(result.current.user).toEqual(user);
   expect(result.current.authStatus).toBe('locked');
+  expect(mockedAuthenticateAgent).toHaveBeenCalledWith('9876543210');
+});
+
+test('logs out revoked agents when the lock screen loads', async () => {
+  mockedAuthenticateAgent.mockResolvedValueOnce({
+    limitAmount: 50000,
+    isAgentRevoked: true,
+    lastDepositDate: '2026-06-19',
+    graceDays: 0,
+  });
+  (SecureStore.getItemAsync as jest.Mock).mockImplementation((key: string) =>
+    Promise.resolve(key === 'userInfo' ? JSON.stringify(user) : '123456'),
+  );
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <AuthProvider>{children}</AuthProvider>
+  );
+  const { result } = renderHook(() => useAuth(), { wrapper });
+  await waitFor(() => expect(result.current.authStatus).toBe('unauthenticated'));
+  expect(result.current.user).toBeNull();
+  expect(result.current.sessionNotice).toMatchObject({
+    expiredAgentName: 'Agent',
+    reason: 'revoked',
+  });
 });
 
 test('sets up a PIN and keeps it when logging out', async () => {

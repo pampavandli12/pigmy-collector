@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 export interface Customer {
   accountNumber: number;
   customerName: string;
@@ -40,7 +42,16 @@ export interface OutboxItem {
 
   createdAt: number;
 }
-// TODO: remove this after legend state implementation
+
 export interface LocalTransaction extends TransactionPayload {
   date: string;
 }
+
+export const collectionSummarySchema = z
+  .object({
+    totalTransactions: z.number().int().nonnegative(),
+    totalAmountCollected: z.number().nonnegative(),
+  })
+  .strict();
+
+export type CollectionSummary = z.infer<typeof collectionSummarySchema>;

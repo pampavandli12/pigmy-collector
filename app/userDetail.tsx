@@ -2,8 +2,13 @@ import { TransactionForm } from '@/components/TransactionForm';
 import { TransactionSuccess } from '@/components/TransactionSuccess';
 import { useAuth } from '@/providers/AuthProvider';
 import { actions } from '@/store/actions';
+import { todaysCollectionAmount$ } from '@/store/selectors';
 import { store$ } from '@/store/store';
 import { TransactionPayload } from '@/types/user';
+import {
+  COLLECTION_LIMIT_EXCEEDED_MESSAGE,
+  evaluateCollectionLimit,
+} from '@/utils/collectionLimit';
 import {
   evaluateGracePeriod,
   GRACE_PERIOD_EXCEEDED_MESSAGE,
@@ -42,6 +47,7 @@ export default function UserDetail() {
     : params.account;
   const accountNumber = Number(account);
   const storedCustomer = useSelector(store$.customers[accountNumber]);
+  const todaysCollected = useSelector(todaysCollectionAmount$);
 
   // Parse customer data from params
   const customer = {
@@ -68,6 +74,15 @@ export default function UserDetail() {
     user?.lastDepositDate,
     user?.graceDays,
   );
+  const collectionLimit = evaluateCollectionLimit(
+    user?.limitAmount,
+    todaysCollected,
+  );
+  const blockedMessage = !gracePeriod.allowed
+    ? GRACE_PERIOD_EXCEEDED_MESSAGE
+    : !collectionLimit.allowed
+      ? COLLECTION_LIMIT_EXCEEDED_MESSAGE
+      : null;
 
   const handleConfirm = () => {
     const currentGracePeriod = evaluateGracePeriod(
@@ -84,6 +99,19 @@ export default function UserDetail() {
     }
 
     const numericAmount = Number(amount);
+    const currentCollectionLimit = evaluateCollectionLimit(
+      user?.limitAmount,
+      todaysCollected,
+      numericAmount,
+    );
+
+    if (!currentCollectionLimit.allowed) {
+      showSnackbar(COLLECTION_LIMIT_EXCEEDED_MESSAGE, {
+        type: 'error',
+        duration: 6000,
+      });
+      return;
+    }
     const openingBalance = Number(customer.balance || 0);
     const payload: TransactionPayload = {
       userId: Number(customer.id),
@@ -127,11 +155,11 @@ export default function UserDetail() {
           <View style={styles.headerSpacer} />
         </View>
         {/* Transaction Form */}
-        {!gracePeriod.allowed ? (
+        {blockedMessage ? (
           <View style={styles.blockedContainer}>
             <Icon source='alert-circle' size={56} color='#C62828' />
             <Text variant='titleMedium' style={styles.blockedMessage}>
-              {GRACE_PERIOD_EXCEEDED_MESSAGE}
+              {blockedMessage}
             </Text>
             <Button mode='contained' onPress={() => router.back()}>
               Back to Users

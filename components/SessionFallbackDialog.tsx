@@ -11,7 +11,9 @@ export function SessionFallbackDialog() {
   const reason =
     sessionNotice.reason === 'expired'
       ? 'session has expired.'
-      : 'account has been logged out.';
+      : sessionNotice.reason === 'revoked'
+        ? 'account has been revoked.'
+        : 'account has been logged out.';
 
   return (
     <Portal>

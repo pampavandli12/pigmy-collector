@@ -39,6 +39,17 @@ export const tokenRefreshResponseSchema = z
 
 export type TokenRefreshResponse = z.infer<typeof tokenRefreshResponseSchema>;
 
+export const authenticateMeResponseSchema = z
+  .object({
+    limitAmount: z.number().nonnegative(),
+    isAgentRevoked: z.boolean(),
+    lastDepositDate: z.string().min(1),
+    graceDays: z.number().int().nonnegative(),
+  })
+  .strict();
+
+export type AuthenticateMeResponse = z.infer<typeof authenticateMeResponseSchema>;
+
 export const loginResponseSchema = z
   .object({
     agentName: z.string().min(1),

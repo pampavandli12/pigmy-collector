@@ -323,6 +323,44 @@ export async function updateStoredTokens(
   return saveAndActivateAccount(updated);
 }
 
+export async function updateStoredAgentProfile(
+  accountId: string,
+  profile: Pick<AuthUser, 'limitAmount' | 'lastDepositDate' | 'graceDays'>,
+): Promise<AuthUser> {
+  const accounts = await readStoredAccounts();
+  let account = accounts[accountId];
+  let current = account ? toAuthUser(account) : null;
+
+  if (!current) {
+    const active = await readActiveUser();
+    if (active && getAgentAccountId(active) === accountId) {
+      account = {
+        profile: toProfile(active),
+        accessToken: active.accessToken,
+        refreshToken: active.refreshToken,
+        status: 'available',
+        lastUsedAt: Date.now(),
+      };
+      accounts[accountId] = account;
+      current = active;
+    }
+  }
+
+  if (!current || !account) {
+    throw new Error('No authenticated agent account is stored.');
+  }
+
+  const updated = authUserSchema.parse({ ...current, ...profile });
+  account.profile = toProfile(updated);
+  await writeStoredAccounts(accounts);
+
+  const active = await readActiveUser();
+  if (active && getAgentAccountId(active) === accountId) {
+    await SecureStore.setItemAsync(SECURE_STORE_KEY, JSON.stringify(updated));
+  }
+  return updated;
+}
+
 export async function clearStoredAccounts() {
   await Promise.all([
     SecureStore.deleteItemAsync(SECURE_STORE_KEY),

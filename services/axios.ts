@@ -31,7 +31,6 @@ api.interceptors.request.use(
     } else {
       delete config.headers.Authorization;
     }
-    console.log('config', config);
     return config;
   },
   (error) => {

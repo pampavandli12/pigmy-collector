@@ -1,15 +1,14 @@
-import {
-  todaysCollectionAmount$,
-  todaysTransactionCount$,
-  todaysTransactions$,
-  totalCustomerCount$,
-} from '@/store/selectors';
-import { SyncStatus } from '@/types/user';
+import { AgentAccountSwitcher } from '@/components/AgentAccountSwitcher';
+import { useAuth } from '@/providers/AuthProvider';
+import { fetchCollections } from '@/services/user';
+import { todaysTransactions$, totalCustomerCount$ } from '@/store/selectors';
+import { CollectionSummary, SyncStatus } from '@/types/user';
+import { showSnackbar } from '@/utils/snackbar';
 import { useSelector } from '@legendapp/state/react';
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Avatar, Card, Icon, Text } from 'react-native-paper';
-import { AgentAccountSwitcher } from '@/components/AgentAccountSwitcher';
 
 const syncStatusPresentation: Record<
   SyncStatus,
@@ -41,23 +40,59 @@ const syncStatusPresentation: Record<
   },
 };
 
+const emptySummary: CollectionSummary = {
+  totalTransactions: 0,
+  totalAmountCollected: 0,
+};
+
+function formatCollectionAmount(amount: number) {
+  return amount.toLocaleString('en-IN', {
+    maximumFractionDigits: 2,
+  });
+}
+
 export default function Dashboard() {
+  const { user } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
+  const [collectionSummary, setCollectionSummary] =
+    useState<CollectionSummary>(emptySummary);
 
   const transactions = useSelector(todaysTransactions$);
-
-  const totalAmount = useSelector(todaysCollectionAmount$);
-
-  const totalCount = useSelector(todaysTransactionCount$);
   const totalCustomerCount = useSelector(totalCustomerCount$);
 
-  const onRefresh = useCallback(() => {
+  const loadCollectionSummary = useCallback(async () => {
+    if (!user) {
+      setCollectionSummary(emptySummary);
+      return;
+    }
+
+    try {
+      const summary = await fetchCollections({
+        agentCode: user.agentCode,
+        bankCode: user.bankCode,
+        graceDays: user.graceDays ?? 0,
+      });
+      setCollectionSummary(summary);
+    } catch {
+      showSnackbar('Unable to refresh collection summary.', { type: 'error' });
+    }
+  }, [user]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadCollectionSummary();
+    }, [loadCollectionSummary]),
+  );
+
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    // Simulate a network request or data refresh
-    setTimeout(() => {
+    try {
+      await loadCollectionSummary();
+    } finally {
       setRefreshing(false);
-    }, 1000);
-  }, []);
+    }
+  }, [loadCollectionSummary]);
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -68,7 +103,6 @@ export default function Dashboard() {
         }
       >
         <AgentAccountSwitcher />
-        {/* Today's Collection Card */}
         <Card style={styles.collectionCard}>
           <Card.Content>
             <View style={styles.collectionHeader}>
@@ -78,18 +112,17 @@ export default function Dashboard() {
               </Text>
             </View>
             <Text variant='displaySmall' style={styles.collectionAmount}>
-              ₹{totalAmount}
+              ₹{formatCollectionAmount(collectionSummary.totalAmountCollected)}
             </Text>
           </Card.Content>
         </Card>
 
-        {/* Transaction count / customer count */}
         <View style={styles.statsRow}>
           <Card style={styles.statCard}>
             <Card.Content style={styles.statContent}>
               <View style={styles.transactionContent}>
                 <Text variant='titleLarge' style={styles.statValue}>
-                  {totalCount}
+                  {collectionSummary.totalTransactions}
                 </Text>
                 <Text variant='bodySmall' style={styles.statLabel}>
                   Today&apos;s Transactions
@@ -108,14 +141,12 @@ export default function Dashboard() {
           </Card>
         </View>
 
-        {/* Recent Transactions */}
         <View style={styles.transactionsHeader}>
           <Text variant='titleLarge' style={styles.transactionsTitle}>
             Recent Transactions
           </Text>
         </View>
 
-        {/* Transaction List */}
         <View style={styles.transactionsList}>
           {transactions.map((transaction) => {
             const status = syncStatusPresentation[transaction.status];
