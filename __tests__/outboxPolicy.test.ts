@@ -21,6 +21,7 @@ function item(status: OutboxItem['status'], createdAt: number): OutboxItem {
       bankCode: 'bank',
       collectedAmount: 100,
       schemename: 'Pigmy Deposit',
+      schemeId: '38',
       collectiontype: 'cash',
       customerName: 'Customer',
       accountNumber: 3,

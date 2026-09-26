@@ -23,10 +23,15 @@ export interface TransactionPayload {
   collectedAmount: number;
 
   schemename: string;
+  schemeId: string;
   collectiontype: string;
 
   customerName: string;
   accountNumber: number;
+
+  bankType?: string;
+  agentName?: string;
+  finalAmount?: number;
 }
 
 export type SyncStatus = 'pending' | 'syncing' | 'failed' | 'synced';

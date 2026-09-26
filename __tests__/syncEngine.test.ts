@@ -12,7 +12,7 @@ import { showSnackbar } from '../utils/snackbar';
 
 const payload = {
   transactionId: 'tx-1', userId: 1, agentCode: 2, bankCode: 'B',
-  collectedAmount: 100, schemename: 'Pigmy Deposit', collectiontype: 'cash',
+  collectedAmount: 100, schemename: 'Pigmy Deposit', schemeId: '38', collectiontype: 'cash',
   customerName: 'Customer', accountNumber: 3,
 };
 

@@ -44,6 +44,8 @@ jest.mock('../providers/AuthProvider', () => ({
       bankName: 'Pigmy Bank',
       accessToken: 'token',
       phoneNumber: '9876543210',
+      bankType: 'peocit',
+      schemes: [{ schemeId: '38', schemeName: 'Pigmy Deposit' }],
     },
   }),
 }));

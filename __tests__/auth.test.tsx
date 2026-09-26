@@ -24,6 +24,8 @@ const user = {
   graceDays: 0,
   accessToken: 'access-token',
   refreshToken: 'refresh-token',
+  bankType: 'peocit',
+  schemes: [{ schemeId: '38', schemeName: 'Pigmy Deposit' }],
 };
 
 beforeEach(() => {

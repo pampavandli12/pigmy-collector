@@ -112,17 +112,25 @@ export default function UserDetail() {
       });
       return;
     }
+    const selectedScheme = user?.schemes.find((item) => item.schemeId === scheme);
+    if (!selectedScheme) {
+      return;
+    }
     const openingBalance = Number(customer.balance || 0);
     const payload: TransactionPayload = {
       userId: Number(customer.id),
       agentCode: customer.agentCode,
       bankCode: customer.bankCode,
       collectedAmount: numericAmount,
-      schemename: scheme,
+      schemename: selectedScheme.schemeName,
+      schemeId: selectedScheme.schemeId,
       collectiontype: 'cash',
       customerName: customer.name,
       accountNumber: Number(customer.account),
       transactionId: Crypto.randomUUID(),
+      bankType: user?.bankType,
+      agentName: user?.agentName,
+      finalAmount: openingBalance + numericAmount,
     };
     if (!actions.addTransaction(payload)) {
       return;
@@ -173,7 +181,10 @@ export default function UserDetail() {
             amount={`₹${transactionSuccess.amount}`}
             openingBalance={transactionSuccess.openingBalance}
             totalBalance={transactionSuccess.totalBalance}
-            scheme={scheme}
+            scheme={
+              user?.schemes.find((item) => item.schemeId === scheme)?.schemeName ??
+              ''
+            }
             date={date}
             mobilenumber={customer.mobilenumber}
             onDone={() => router.back()}

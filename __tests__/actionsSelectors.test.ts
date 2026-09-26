@@ -31,7 +31,7 @@ test('shows a snackbar when customer refresh fails', async () => {
 });
 
 test('adds a transaction only once and updates selectors', () => {
-  const payload = { transactionId: 'tx', userId: 1, agentCode: 2, bankCode: 'B', collectedAmount: 75, schemename: 'P', collectiontype: 'cash', customerName: 'A', accountNumber: 3 };
+  const payload = { transactionId: 'tx', userId: 1, agentCode: 2, bankCode: 'B', collectedAmount: 75, schemename: 'P', schemeId: '38', collectiontype: 'cash', customerName: 'A', accountNumber: 3 };
   actions.addTransaction(payload);
   actions.addTransaction(payload);
   expect(todaysTransactionCount$.peek()).toBe(1);
@@ -47,7 +47,7 @@ test('keeps previous-day transactions out of today selectors', () => {
   const old = new Date();
   old.setDate(old.getDate() - 1);
   store$.outbox.old.set({
-    payload: { transactionId: 'old', userId: 1, agentCode: 2, bankCode: 'B', collectedAmount: 25, schemename: 'P', collectiontype: 'cash', customerName: 'A', accountNumber: 3 },
+    payload: { transactionId: 'old', userId: 1, agentCode: 2, bankCode: 'B', collectedAmount: 25, schemename: 'P', schemeId: '38', collectiontype: 'cash', customerName: 'A', accountNumber: 3 },
     status: 'synced',
     retryCount: 0,
     createdAt: old.getTime(),

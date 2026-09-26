@@ -11,6 +11,7 @@ const oldUser = {
   agentCode: 1, agentName: 'Agent', bankCode: 'B', bankName: 'Bank Name',
   phoneNumber: '9876543210', lastDepositDate: null, limitAmount: null,
   graceDays: null, accessToken: 'old-access', refreshToken: 'old-refresh',
+  bankType: 'peocit', schemes: [],
 };
 const newUser = {
   ...oldUser,

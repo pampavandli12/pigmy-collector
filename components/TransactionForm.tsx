@@ -1,3 +1,4 @@
+import { useAuth } from '@/providers/AuthProvider';
 import { Picker } from '@react-native-picker/picker';
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
@@ -38,8 +39,9 @@ export const TransactionForm = ({
   handleConfirm,
   isTransactionLoading,
 }: TransactionFormProps) => {
+  const { user } = useAuth();
   const [reconfirmAmount, setReconfirmAmount] = useState('');
-  const schemeOptions = ['Pigmy Deposit', 'Daily Deposit'];
+  const schemeOptions = user?.schemes ?? [];
   const quickAmounts = ['100', '200', '500'];
 
   const selectQuickAmount = (value: string) => {
@@ -163,7 +165,11 @@ export const TransactionForm = ({
               >
                 <Picker.Item label='Select scheme' value='' />
                 {schemeOptions.map((option) => (
-                  <Picker.Item key={option} label={option} value={option} />
+                  <Picker.Item
+                    key={option.schemeId}
+                    label={option.schemeName}
+                    value={option.schemeId}
+                  />
                 ))}
               </Picker>
             </View>

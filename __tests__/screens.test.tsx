@@ -110,7 +110,7 @@ test('renders customer search and empty state after initial loading', () => {
 });
 
 test('renders dashboard sync status labels', () => {
-  const basePayload = { userId: 1, agentCode: 2, bankCode: 'B', collectedAmount: 10, schemename: 'P', collectiontype: 'cash', customerName: 'Customer', accountNumber: 3 };
+  const basePayload = { userId: 1, agentCode: 2, bankCode: 'B', collectedAmount: 10, schemename: 'P', schemeId: '38', collectiontype: 'cash', customerName: 'Customer', accountNumber: 3 };
   store$.outbox.set(Object.fromEntries(
     (['synced', 'pending', 'syncing', 'failed'] as const).map((status, index) => [
       status,
@@ -187,6 +187,7 @@ test('blocks direct access to the deposit form when the daily limit is reached',
         bankCode: 'B',
         collectedAmount: 50000,
         schemename: 'Pigmy Deposit',
+        schemeId: '38',
         collectiontype: 'cash',
         customerName: 'Customer',
         accountNumber: 3,
