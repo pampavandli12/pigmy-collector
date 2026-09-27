@@ -1,9 +1,19 @@
 let syncing = false;
+let rerunRequested = false;
 let idleResolvers: (() => void)[] = [];
 
 export function beginOutboxSync() {
-  if (syncing) return false;
+  if (syncing) {
+    rerunRequested = true;
+    return false;
+  }
   syncing = true;
+  return true;
+}
+
+export function takeOutboxRerun() {
+  if (!rerunRequested) return false;
+  rerunRequested = false;
   return true;
 }
 
@@ -12,6 +22,12 @@ export function endOutboxSync() {
   const resolvers = idleResolvers;
   idleResolvers = [];
   resolvers.forEach((resolve) => resolve());
+}
+
+export function resetOutboxSyncState() {
+  syncing = false;
+  rerunRequested = false;
+  idleResolvers = [];
 }
 
 export function waitForOutboxIdle() {

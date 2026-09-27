@@ -1,7 +1,14 @@
-import { collectionSummarySchema, Customer, TransactionPayload } from '@/types/user';
+import { collectionSummarySchema, Customer, customerListSchema, SyncableTransactionPayload } from '@/types/user';
 import { API_ENDPOINTS } from '@/utils/constants';
+import { getBankAdapter } from './banks/registry';
 import { getStoredUser } from './authStorage';
 import { api } from './axios';
+
+async function bankTypeHeaders() {
+  const storedUser = await getStoredUser();
+  const bankType = storedUser?.bankType?.trim();
+  return bankType ? { headers: { bankType } } : {};
+}
 
 export const fetchCustomers = async ({
   agentCode,
@@ -10,17 +17,15 @@ export const fetchCustomers = async ({
   agentCode: number;
   bankCode: string;
 }): Promise<Customer[]> => {
-  const storedUser = await getStoredUser();
-  const bankType = storedUser?.bankType;
   return api
     .get(API_ENDPOINTS.FETCH_CUSTOMERS, {
       params: {
         agentCode,
         bankCode,
       },
-      ...(bankType ? { headers: { bankType } } : {}),
+      ...(await bankTypeHeaders()),
     })
-    .then((response) => response.data);
+    .then((response) => customerListSchema.parse(response.data));
 };
 
 export const fetchCollections = async ({
@@ -34,62 +39,13 @@ export const fetchCollections = async ({
 }) => {
   const response = await api.get(API_ENDPOINTS.FETCH_COLLECTIONS, {
     params: { agentCode, bankCode, graceDays },
+    ...(await bankTypeHeaders()),
   });
   return collectionSummarySchema.parse(response.data);
 };
 
-const BANKSOFT = 'banksoft';
-const PEOCIT = 'peocit';
-
-function toBanksoftTransaction(payload: TransactionPayload) {
-  return {
-    userId: payload.userId,
-    agentCode: payload.agentCode,
-    bankCode: payload.bankCode,
-    collectedAmount: payload.collectedAmount,
-    schemename: payload.schemename,
-    schemeId: payload.schemeId,
-    collectiontype: payload.collectiontype,
-    customerName: payload.customerName,
-    accountNumber: payload.accountNumber,
-    transactionId: payload.transactionId,
-  };
-}
-
-function toPeocitTransaction(payload: TransactionPayload) {
-  if (!payload.agentName || typeof payload.finalAmount !== 'number') {
-    throw new Error('Peocit transaction is missing agent name or final amount.');
-  }
-
-  return {
-    userId: payload.userId,
-    agentCode: payload.agentCode,
-    agentName: payload.agentName,
-    bankCode: payload.bankCode,
-    collectedAmount: payload.collectedAmount,
-    finalAmount: payload.finalAmount,
-    schemename: payload.schemename,
-    schemeId: payload.schemeId,
-    collectiontype: payload.collectiontype,
-    customerName: payload.customerName,
-    accountNumber: payload.accountNumber,
-    transactionId: payload.transactionId,
-  };
-}
-
-export const createTransaction = async (payload: TransactionPayload) => {
-  const bankType = payload.bankType || BANKSOFT;
-  if (bankType === PEOCIT) {
-    return api
-      .post(API_ENDPOINTS.ADD_TRANSACTION_PEOCIT, toPeocitTransaction(payload))
-      .then((response) => response.data);
-  }
-
-  if (bankType !== BANKSOFT) {
-    throw new Error(`Unsupported bank type: ${bankType}`);
-  }
-
-  return api
-    .post(API_ENDPOINTS.ADD_TRANSACTION, toBanksoftTransaction(payload))
-    .then((response) => response.data);
+export const createTransaction = async (payload: SyncableTransactionPayload) => {
+  const adapter = getBankAdapter(payload);
+  const response = await api.post(adapter.endpoint, adapter.toRequest(payload));
+  return response.data;
 };

@@ -38,6 +38,7 @@ import UserDetail from '../app/userDetail';
 import { store$ } from '../store/store';
 import { COLLECTION_LIMIT_EXCEEDED_MESSAGE } from '../utils/collectionLimit';
 import { showSnackbar } from '../utils/snackbar';
+import { INVALID_DEPOSIT_MESSAGE } from '../types/user';
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
   <PaperProvider>{children}</PaperProvider>
@@ -101,7 +102,8 @@ test('blocks confirmation when a new deposit would exceed the daily limit', () =
     .mockImplementationOnce(() => [null, jest.fn()])
     .mockImplementationOnce(() => ['1001', jest.fn()])
     .mockImplementationOnce(() => ['Pigmy Deposit', jest.fn()])
-    .mockImplementationOnce(() => ['January 1, 2026', jest.fn()]);
+    .mockImplementationOnce(() => ['January 1, 2026', jest.fn()])
+    .mockImplementationOnce(() => [false, jest.fn()]);
 
   const screen = render(<UserDetail />, { wrapper });
   fireEvent.press(screen.getByText('Test Confirm'));
@@ -111,6 +113,26 @@ test('blocks confirmation when a new deposit would exceed the daily limit', () =
     COLLECTION_LIMIT_EXCEEDED_MESSAGE,
     { type: 'error', duration: 6000 },
   );
+
+  useStateSpy.mockRestore();
+});
+
+test('refuses a zero deposit before it can be queued', () => {
+  const useStateSpy = jest.spyOn(React, 'useState');
+  useStateSpy
+    .mockImplementationOnce(() => [null, jest.fn()])
+    .mockImplementationOnce(() => ['0', jest.fn()])
+    .mockImplementationOnce(() => ['38', jest.fn()])
+    .mockImplementationOnce(() => ['January 1, 2026', jest.fn()])
+    .mockImplementationOnce(() => [false, jest.fn()]);
+
+  const screen = render(<UserDetail />, { wrapper });
+  fireEvent.press(screen.getByText('Test Confirm'));
+
+  expect(mockAddTransaction).not.toHaveBeenCalled();
+  expect(showSnackbar).toHaveBeenCalledWith(INVALID_DEPOSIT_MESSAGE, {
+    type: 'error',
+  });
 
   useStateSpy.mockRestore();
 });

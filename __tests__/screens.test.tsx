@@ -1,4 +1,10 @@
-let mockAuthUser = {
+let mockAuthUser: {
+  agentCode: number;
+  bankCode: string;
+  lastDepositDate: string;
+  graceDays: number;
+  limitAmount?: number | null;
+} = {
   agentCode: 1,
   bankCode: 'B',
   lastDepositDate: '2099-01-01',
@@ -130,9 +136,9 @@ test('renders dashboard sync status labels', () => {
   expect(screen.getByText('Failed')).toBeTruthy();
 });
 
-test('renders support and logout controls', () => {
+test('renders settings and logout controls', () => {
   const screen = render(<Support />, { wrapper });
-  expect(screen.getByText('Call Us')).toBeTruthy();
+  expect(screen.getByText('Setup Printer')).toBeTruthy();
   expect(screen.getByText('Log out current account')).toBeTruthy();
 });
 

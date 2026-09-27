@@ -13,22 +13,17 @@ export interface Customer {
   userId: number;
 }
 
-export interface TransactionPayload {
+export interface SyncableTransactionPayload {
   transactionId: string;
-
   userId: number;
   agentCode: number;
   bankCode: string;
-
   collectedAmount: number;
-
   schemename: string;
   schemeId: string;
   collectiontype: string;
-
   customerName: string;
   accountNumber: number;
-
   bankType?: string;
   agentName?: string;
   finalAmount?: number;
@@ -37,7 +32,7 @@ export interface TransactionPayload {
 export type SyncStatus = 'pending' | 'syncing' | 'failed' | 'synced';
 
 export interface OutboxItem {
-  payload: TransactionPayload;
+  payload: SyncableTransactionPayload;
 
   status: SyncStatus;
 
@@ -46,11 +41,69 @@ export interface OutboxItem {
   error?: string;
 
   createdAt: number;
+
+  nextRetryAt?: number;
+
+  retryHeld?: boolean;
 }
 
-export interface LocalTransaction extends TransactionPayload {
+export const INVALID_DEPOSIT_MESSAGE = 'Enter an amount greater than zero.';
+export const UNABLE_TO_SAVE_DEPOSIT_MESSAGE = 'Unable to save this deposit.';
+export const SCHEME_REQUIRED_MESSAGE = 'Select a scheme.';
+
+export const customerSchema = z.object({
+  accountNumber: z.number().int(),
+  customerName: z.string().min(1),
+  currentBalance: z.number().finite(),
+  lastDepositDate: z.string(),
+  schemeId: z.string(),
+  agentCode: z.number().int(),
+  bankCode: z.string().min(1),
+  mobilenumber: z.string(),
+  userId: z.number().int(),
+});
+
+export const customerListSchema = z.array(customerSchema);
+
+const transactionFields = {
+  transactionId: z.string().min(1),
+  userId: z.number().int(),
+  agentCode: z.number().int(),
+  bankCode: z.string().min(1),
+  collectedAmount: z.number().finite().positive(),
+  schemename: z.string().min(1),
+  schemeId: z.string().min(1),
+  collectiontype: z.string().min(1),
+  customerName: z.string().min(1),
+  accountNumber: z.number().int(),
+};
+
+export const banksoftTransactionSchema = z
+  .object({
+    ...transactionFields,
+    bankType: z.literal('banksoft'),
+  })
+  .strict();
+
+export const peocitTransactionSchema = z
+  .object({
+    ...transactionFields,
+    bankType: z.literal('peocit'),
+    agentName: z.string().min(1),
+    finalAmount: z.number().finite(),
+  })
+  .strict();
+
+export const transactionPayloadSchema = z.discriminatedUnion('bankType', [
+  banksoftTransactionSchema,
+  peocitTransactionSchema,
+]);
+
+export type TransactionPayload = z.infer<typeof transactionPayloadSchema>;
+
+export type LocalTransaction = TransactionPayload & {
   date: string;
-}
+};
 
 export const collectionSummarySchema = z
   .object({

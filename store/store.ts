@@ -43,9 +43,9 @@ function removeStorage(key: string) {
 }
 
 export const store$ = observable<AppState>({
-  customers: loadStorage('customers', {}),
+  customers: {},
 
-  outbox: loadStorage('outbox', {}),
+  outbox: {},
 
   searchQuery: '',
 

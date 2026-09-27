@@ -1,5 +1,7 @@
 import { computed } from '@legendapp/state';
 
+import { isToday } from '@/utils/isToday';
+
 import { store$ } from './store';
 
 export const filteredCustomers$ = computed(() => {
@@ -17,18 +19,6 @@ export const filteredCustomers$ = computed(() => {
       customer.accountNumber.toString().includes(query),
   );
 });
-
-function isToday(timestamp: number) {
-  const today = new Date();
-
-  const date = new Date(timestamp);
-
-  return (
-    date.getDate() === today.getDate() &&
-    date.getMonth() === today.getMonth() &&
-    date.getFullYear() === today.getFullYear()
-  );
-}
 
 /**
  * Today's Transactions

@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import { UnsupportedBankTypeError } from '../services/banks/errors';
 import {
+  buildSyncFailure,
   isValidOutboxItem,
   shouldRemoveOutboxItem,
 } from '../store/outboxPolicy';
@@ -43,6 +45,19 @@ test('keeps valid transactions created today', () => {
     shouldRemoveOutboxItem(item('pending', startOfToday), now),
     false,
   );
+});
+
+test('holds an unsupported bank type instead of retrying it', () => {
+  const failure = buildSyncFailure(
+    item('pending', now),
+    'Unsupported bank type: other',
+    new UnsupportedBankTypeError('other'),
+    now,
+  );
+
+  assert.equal(failure.retryHeld, true);
+  assert.equal(failure.nextRetryAt, undefined);
+  assert.equal(failure.retryCount, 1);
 });
 
 test('removes malformed persisted entries that cannot be synchronized', () => {

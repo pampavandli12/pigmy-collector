@@ -29,6 +29,21 @@ interface TransactionFormProps {
   handleConfirm: () => void;
   isTransactionLoading: boolean;
 }
+
+function parseDepositAmount(value: string) {
+  const trimmed = String(value ?? '').trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const numericAmount = Number(trimmed);
+  if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+    return null;
+  }
+
+  return numericAmount;
+}
+
 export const TransactionForm = ({
   customer,
   amount,
@@ -49,12 +64,21 @@ export const TransactionForm = ({
     setReconfirmAmount(value);
   };
 
+  const parsedAmount = parseDepositAmount(amount);
+  const parsedReconfirmAmount = parseDepositAmount(reconfirmAmount);
+  const bothAmountsEntered =
+    String(amount ?? '').trim() !== '' && String(reconfirmAmount ?? '').trim() !== '';
   const amountMismatch = useMemo(() => {
-    return amount !== reconfirmAmount;
-  }, [amount, reconfirmAmount]);
+    return bothAmountsEntered && parsedAmount !== parsedReconfirmAmount;
+  }, [bothAmountsEntered, parsedAmount, parsedReconfirmAmount]);
   const disableConfirm = useMemo(() => {
-    return !amount || !reconfirmAmount || !scheme || amount !== reconfirmAmount;
-  }, [amount, reconfirmAmount, scheme]);
+    return (
+      parsedAmount === null ||
+      parsedReconfirmAmount === null ||
+      parsedAmount !== parsedReconfirmAmount ||
+      !scheme
+    );
+  }, [parsedAmount, parsedReconfirmAmount, scheme]);
   return (
     <View style={styles.keyboardView}>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -160,7 +184,7 @@ export const TransactionForm = ({
             <View style={styles.pickerContainer}>
               <Picker
                 selectedValue={scheme}
-                onValueChange={(itemValue) => setScheme(itemValue)}
+                onValueChange={(itemValue) => setScheme(String(itemValue ?? ''))}
                 style={styles.picker}
               >
                 <Picker.Item label='Select scheme' value='' />

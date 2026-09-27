@@ -1,24 +1,15 @@
+import { getAgentAccountId } from '@/services/authStorage';
+import { isRegisteredBankType } from '@/services/banks/registry';
 import { fetchCustomers } from '@/services/user';
 import { getActiveAgentId, store$ } from './store';
-import { getAgentAccountId } from '@/services/authStorage';
 
-import { Customer, OutboxItem, TransactionPayload } from '@/types/user';
+import { Customer, OutboxItem, SyncableTransactionPayload, transactionPayloadSchema } from '@/types/user';
+import { isToday } from '@/utils/isToday';
 import { showSnackbar } from '@/utils/snackbar';
 import { cleanupOutbox, processOutbox } from './syncEngine';
 
-function isToday(timestamp: number) {
-  const today = new Date();
-  const date = new Date(timestamp);
-
-  return (
-    date.getDate() === today.getDate() &&
-    date.getMonth() === today.getMonth() &&
-    date.getFullYear() === today.getFullYear()
-  );
-}
-
 function updateCustomerBalanceForToday(
-  payload: TransactionPayload,
+  payload: SyncableTransactionPayload,
   createdAt: number,
 ) {
   if (!isToday(createdAt)) {
@@ -37,12 +28,12 @@ function updateCustomerBalanceForToday(
   );
 }
 
-function getTodaysTransactionTotalsByAccount() {
+function getTodaysUnsyncedTotalsByAccount() {
   const outbox = store$.outbox.peek();
 
   return Object.values(outbox).reduce(
     (acc, item) => {
-      if (!item || !isToday(item.createdAt)) {
+      if (!item || item.status === 'synced' || !isToday(item.createdAt)) {
         return acc;
       }
 
@@ -59,23 +50,16 @@ function getTodaysTransactionTotalsByAccount() {
 }
 
 function mergeFetchedCustomersWithLocalBalances(customers: Customer[]) {
-  const existingCustomers = store$.customers.peek();
-  const todaysTransactionTotals = getTodaysTransactionTotalsByAccount();
+  const todaysUnsyncedTotals = getTodaysUnsyncedTotalsByAccount();
 
   return customers.reduce(
     (acc, customer) => {
-      const existingCustomer = existingCustomers[customer.accountNumber];
       const fetchedBalance = Number(customer.currentBalance || 0);
-      const localTransactionTotal =
-        todaysTransactionTotals[customer.accountNumber] || 0;
-      const localBalance =
-        existingCustomer?.currentBalance ?? fetchedBalance + localTransactionTotal;
+      const unsyncedTotal = todaysUnsyncedTotals[customer.accountNumber] || 0;
 
       acc[customer.accountNumber] = {
         ...customer,
-        currentBalance: localTransactionTotal
-          ? Math.max(fetchedBalance, Number(localBalance || 0))
-          : customer.currentBalance,
+        currentBalance: fetchedBalance + unsyncedTotal,
       };
 
       return acc;
@@ -97,12 +81,14 @@ export const actions = {
         agentCode,
         bankCode,
       });
+      console.log('customers', customers);
       const mapped = mergeFetchedCustomersWithLocalBalances(customers);
 
       store$.customers.set(mapped);
 
       store$.lastCustomerSync.set(Date.now());
-    } catch {
+    } catch(error) {
+      console.log('error', error);
       showSnackbar('Unable to refresh customers. Showing offline data.', {
         type: 'error',
       });
@@ -111,11 +97,21 @@ export const actions = {
     }
   },
 
-  addTransaction(payload: TransactionPayload) {
+  addTransaction(payload: unknown) {
+    const parsed = transactionPayloadSchema.safeParse(payload);
+    if (!parsed.success) {
+      return false;
+    }
+    const validPayload = parsed.data;
+
+    if (!isRegisteredBankType(validPayload.bankType)) {
+      return false;
+    }
+
     if (
       getActiveAgentId() !== null &&
       getActiveAgentId() !==
-      getAgentAccountId({ agentCode: payload.agentCode, bankCode: payload.bankCode })
+      getAgentAccountId({ agentCode: validPayload.agentCode, bankCode: validPayload.bankCode })
     ) {
       showSnackbar('The active agent changed. Please reopen the customer.', {
         type: 'error',
@@ -123,7 +119,7 @@ export const actions = {
       return false;
     }
 
-    const existingTransaction = store$.outbox[payload.transactionId].peek();
+    const existingTransaction = store$.outbox[validPayload.transactionId].peek();
 
     if (existingTransaction) {
       return false;
@@ -132,7 +128,7 @@ export const actions = {
     const createdAt = Date.now();
 
     const transaction: OutboxItem = {
-      payload,
+      payload: validPayload,
 
       status: 'pending',
 
@@ -141,8 +137,8 @@ export const actions = {
       createdAt,
     };
 
-    store$.outbox[payload.transactionId].set(transaction);
-    updateCustomerBalanceForToday(payload, createdAt);
+    store$.outbox[validPayload.transactionId].set(transaction);
+    updateCustomerBalanceForToday(validPayload, createdAt);
 
     // Trigger immediate sync attempt
     processOutbox();
@@ -156,7 +152,13 @@ export const actions = {
 
     Object.keys(outbox).forEach((txId) => {
       if (outbox[txId].status === 'failed') {
-        store$.outbox[txId].status.set('pending');
+        store$.outbox[txId].assign({
+          status: 'pending',
+          retryCount: 0,
+          retryHeld: false,
+          nextRetryAt: undefined,
+          error: undefined,
+        });
       }
     });
   },

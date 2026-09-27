@@ -1,9 +1,12 @@
 import * as SecureStore from 'expo-secure-store';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import React from 'react';
+import { AppState } from 'react-native';
 import { AuthProvider, useAuth } from '../providers/AuthProvider';
 import { authenticateAgent } from '../services/authenticate';
+import { saveAndActivateAccount } from '../services/authStorage';
 import { authUserSchema } from '../types/auth';
+import { hashPin, resetPinAttempts } from '../utils/appPin';
 
 jest.mock('../services/authenticate', () => ({
   authenticateAgent: jest.fn(),
@@ -30,6 +33,7 @@ const user = {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  resetPinAttempts();
   (SecureStore.getItemAsync as jest.Mock).mockResolvedValue(null);
   mockedAuthenticateAgent.mockResolvedValue({
     limitAmount: 50000,
@@ -90,7 +94,10 @@ test('sets up a PIN and keeps it when logging out', async () => {
   expect(SecureStore.setItemAsync).toHaveBeenCalledWith('userInfo', JSON.stringify(user));
   expect(result.current.authStatus).toBe('pinSetupRequired');
   await act(async () => result.current.setupPin('123456'));
-  expect(SecureStore.setItemAsync).toHaveBeenCalledWith('appPin', '123456');
+  expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
+    'appPin',
+    await hashPin('123456'),
+  );
   expect(result.current.authStatus).toBe('unlocked');
   await act(async () => result.current.logout());
   expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith('userInfo');
@@ -112,6 +119,26 @@ test('unlocks only when the stored PIN matches', async () => {
     await expect(result.current.unlockWithPin('123456')).resolves.toBe(true);
   });
   expect(result.current.authStatus).toBe('unlocked');
+});
+
+test('locks the PIN after repeated incorrect attempts', async () => {
+  (SecureStore.getItemAsync as jest.Mock).mockImplementation((key: string) =>
+    Promise.resolve(key === 'userInfo' ? JSON.stringify(user) : '123456'),
+  );
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <AuthProvider>{children}</AuthProvider>
+  );
+  const { result } = renderHook(() => useAuth(), { wrapper });
+  await waitFor(() => expect(result.current.authStatus).toBe('locked'));
+
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    await expect(result.current.unlockWithPin('000000')).resolves.toBe(false);
+  }
+
+  await expect(result.current.unlockWithPin('000000')).rejects.toThrow(
+    'Too many incorrect PIN attempts. Try again later.',
+  );
+  expect(result.current.authStatus).toBe('locked');
 });
 
 test('requires PIN setup for a migrated legacy session', async () => {
@@ -148,4 +175,100 @@ test('a fresh API login is unlocked when the device already has a PIN', async ()
   await waitFor(() => expect(result.current.authStatus).toBe('unauthenticated'));
   await act(async () => result.current.login(user));
   expect(result.current.authStatus).toBe('unlocked');
+});
+
+test('locks onto the fallback account when the active agent is revoked', async () => {
+  const values = new Map<string, string>();
+  (SecureStore.getItemAsync as jest.Mock).mockImplementation((key: string) =>
+    Promise.resolve(values.get(key) ?? null),
+  );
+  (SecureStore.setItemAsync as jest.Mock).mockImplementation(
+    (key: string, value: string) => {
+      values.set(key, value);
+      return Promise.resolve();
+    },
+  );
+  (SecureStore.deleteItemAsync as jest.Mock).mockImplementation((key: string) => {
+    values.delete(key);
+    return Promise.resolve();
+  });
+
+  const fallback = {
+    ...user,
+    agentCode: 2,
+    agentName: 'Fallback',
+    phoneNumber: '9876543211',
+    accessToken: 'fallback-access',
+    refreshToken: 'fallback-refresh',
+  };
+  const active = {
+    ...user,
+    agentCode: 3,
+    agentName: 'Active',
+    phoneNumber: '9876543212',
+    accessToken: 'active-access',
+    refreshToken: 'active-refresh',
+  };
+  await saveAndActivateAccount(fallback);
+  await saveAndActivateAccount(active);
+  values.set('appPin', '123456');
+  mockedAuthenticateAgent.mockResolvedValue({
+    limitAmount: 50000,
+    isAgentRevoked: true,
+    lastDepositDate: '2026-06-19',
+    graceDays: 0,
+  });
+
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <AuthProvider>{children}</AuthProvider>
+  );
+  const { result } = renderHook(() => useAuth(), { wrapper });
+
+  await waitFor(() => expect(result.current.authStatus).toBe('locked'));
+  expect(result.current.user?.agentName).toBe('Fallback');
+  expect(result.current.user?.agentCode).toBe(2);
+  expect(result.current.sessionNotice).toMatchObject({
+    expiredAgentName: 'Active',
+    replacementAgentName: 'Fallback',
+    reason: 'revoked',
+  });
+});
+
+test('locks only after the app enters the background', async () => {
+  const listeners = new Set<(state: string) => void>();
+  const subscription = jest
+    .spyOn(AppState, 'addEventListener')
+    .mockImplementation((_type, listener) => {
+      const typedListener = listener as (state: string) => void;
+      listeners.add(typedListener);
+      return {
+        remove: () => {
+          listeners.delete(typedListener);
+        },
+      };
+    });
+  (SecureStore.getItemAsync as jest.Mock).mockImplementation((key: string) =>
+    Promise.resolve(key === 'userInfo' ? JSON.stringify(user) : '123456'),
+  );
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <AuthProvider>{children}</AuthProvider>
+  );
+  const { result } = renderHook(() => useAuth(), { wrapper });
+
+  await waitFor(() => expect(result.current.authStatus).toBe('locked'));
+  await act(async () => {
+    await result.current.unlockWithPin('123456');
+  });
+  expect(result.current.authStatus).toBe('unlocked');
+
+  await act(async () => {
+    listeners.forEach((listener) => listener('inactive'));
+  });
+  expect(result.current.authStatus).toBe('unlocked');
+
+  await act(async () => {
+    listeners.forEach((listener) => listener('background'));
+  });
+  expect(result.current.authStatus).toBe('locked');
+  subscription.mockRestore();
 });

@@ -5,88 +5,110 @@ import { OutboxItem } from '@/types/user';
 import { getErrorMessage } from '@/utils/errors';
 import { showSnackbar } from '@/utils/snackbar';
 
-import { shouldRemoveOutboxItem } from './outboxPolicy';
+import { buildSyncFailure, canAutoRetry, shouldRemoveOutboxItem } from './outboxPolicy';
 import { getActiveAgentId, store$, updateAgentOutboxItem } from './store';
-import { beginOutboxSync, endOutboxSync } from './syncCoordinator';
+import {
+  beginOutboxSync,
+  endOutboxSync,
+  takeOutboxRerun,
+} from './syncCoordinator';
+
+function isOffline(network: {
+  isConnected?: boolean | null;
+  isInternetReachable?: boolean | null;
+}) {
+  return network.isConnected !== true || network.isInternetReachable === false;
+}
+
+function recoverInterruptedSyncs() {
+  const outbox = store$.outbox.peek();
+
+  for (const [txId, item] of Object.entries(outbox)) {
+    if (item?.status === 'syncing') {
+      store$.outbox[txId].status.set('pending');
+    }
+  }
+}
+
+async function runOutboxPass() {
+  // Persisted data can outlive schema changes. Remove unrecoverable entries
+  // before they can produce empty transaction requests.
+  cleanupOutbox();
+  recoverInterruptedSyncs();
+
+  const network = await NetInfo.fetch();
+
+  if (isOffline(network)) {
+    return;
+  }
+
+  const syncAccountId = getActiveAgentId();
+  const outbox = store$.outbox.peek();
+
+  const pending = Object.entries(outbox)
+    .filter(([, item]) => {
+      return (
+        item?.status === 'pending' ||
+        (item?.status === 'failed' && canAutoRetry(item))
+      );
+    })
+    .sort((a, b) => a[1].createdAt - b[1].createdAt);
+
+  for (const [txId, item] of pending) {
+    if (getActiveAgentId() !== syncAccountId) break;
+    const notifyOnFailure = item.status !== 'failed';
+    try {
+      store$.outbox[txId].status.set('syncing');
+
+      await createTransaction(item.payload);
+
+      if (getActiveAgentId() !== syncAccountId) {
+        if (syncAccountId) {
+          updateAgentOutboxItem(syncAccountId, txId, {
+            status: 'synced',
+            error: undefined,
+            nextRetryAt: undefined,
+            retryHeld: false,
+          });
+        }
+        break;
+      }
+
+      store$.outbox[txId].assign({
+        status: 'synced',
+        error: undefined,
+        nextRetryAt: undefined,
+        retryHeld: false,
+      });
+    } catch (error: unknown) {
+      const message = getErrorMessage(error, 'Sync failed');
+      const failure = buildSyncFailure(item, message, error);
+
+      if (getActiveAgentId() !== syncAccountId) {
+        if (syncAccountId) {
+          updateAgentOutboxItem(syncAccountId, txId, failure);
+        }
+        break;
+      }
+
+      store$.outbox[txId].assign(failure);
+
+      if (notifyOnFailure) {
+        showSnackbar(`Transaction sync failed: ${message}`, { type: 'error' });
+      }
+    }
+  }
+}
 
 export async function processOutbox() {
   if (!beginOutboxSync()) {
     return;
   }
 
-  // Persisted data can outlive schema changes. Remove unrecoverable entries
-  // before they can produce empty transaction requests.
-  cleanupOutbox();
-
-  const network = await NetInfo.fetch();
-
-  if (network.isConnected !== true) {
-    endOutboxSync();
-    return;
-  }
-
   try {
-    const syncAccountId = getActiveAgentId();
-    const outbox = store$.outbox.peek();
-
-    const pending = Object.entries(outbox)
-      .filter(([_, item]) => {
-        return (
-          (item && item.status === 'pending') ||
-          (item && item.status === 'failed')
-        );
-      })
-      .sort((a, b) => a[1].createdAt - b[1].createdAt);
-
-    for (const [txId, item] of pending) {
-      if (getActiveAgentId() !== syncAccountId) break;
-      try {
-        // Mark syncing
-        store$.outbox[txId].status.set('syncing');
-
-        await createTransaction(item.payload);
-
-        if (getActiveAgentId() !== syncAccountId) {
-          if (syncAccountId) {
-            updateAgentOutboxItem(syncAccountId, txId, {
-              status: 'synced',
-              error: undefined,
-            });
-          }
-          break;
-        }
-
-        // Mark synced instead of deleting
-        store$.outbox[txId].assign({
-          status: 'synced',
-
-          error: undefined,
-        });
-      } catch (error: unknown) {
-        const message = getErrorMessage(error, 'Sync failed');
-
-        if (getActiveAgentId() !== syncAccountId) {
-          if (syncAccountId) {
-            updateAgentOutboxItem(syncAccountId, txId, {
-              status: 'failed',
-              retryCount: item.retryCount + 1,
-              error: message,
-            });
-          }
-          break;
-        }
-
-        store$.outbox[txId].assign({
-          status: 'failed',
-
-          retryCount: item.retryCount + 1,
-
-          error: message,
-        });
-
-        showSnackbar(`Transaction sync failed: ${message}`, { type: 'error' });
-      }
-    }
+    do {
+      await runOutboxPass();
+    } while (takeOutboxRerun());
   } finally {
     endOutboxSync();
   }

@@ -4,6 +4,8 @@ jest.mock('../services/axios', () => ({
 
 import { api } from '../services/axios';
 import { userLogin } from '../services/login';
+import { banksoftAdapter } from '../services/banks/banksoft';
+import { peocitAdapter } from '../services/banks/peocit';
 import { createTransaction, fetchCollections, fetchCustomers } from '../services/user';
 import { loginResponseSchema } from '../types/auth';
 
@@ -61,6 +63,11 @@ test('fetches customers with agent and bank parameters', async () => {
   });
 });
 
+test('rejects a customer payload that is missing required fields', async () => {
+  mockedApi.get.mockResolvedValueOnce({ data: [{ accountNumber: 1 }] });
+  await expect(fetchCustomers({ agentCode: 7, bankCode: 'B1' })).rejects.toThrow();
+});
+
 test('sends the stored bank type when fetching customers', async () => {
   const { getItemAsync } = jest.requireMock('expo-secure-store') as {
     getItemAsync: jest.Mock;
@@ -79,6 +86,10 @@ test('sends the stored bank type when fetching customers', async () => {
 });
 
 test('fetches collection summary with agent, bank, and grace day parameters', async () => {
+  const { getItemAsync } = jest.requireMock('expo-secure-store') as {
+    getItemAsync: jest.Mock;
+  };
+  getItemAsync.mockResolvedValue(null);
   mockedApi.get.mockResolvedValueOnce({
     data: { totalTransactions: 1, totalAmountCollected: 1500 },
   });
@@ -92,6 +103,78 @@ test('fetches collection summary with agent, bank, and grace day parameters', as
     '/pigmyMobile/v2/transaction/fetchCollections',
     { params: { agentCode: 11, bankCode: 'AGT123', graceDays: 2 } },
   );
+});
+
+test('sends the stored bank type when fetching collections', async () => {
+  const { getItemAsync } = jest.requireMock('expo-secure-store') as {
+    getItemAsync: jest.Mock;
+  };
+  getItemAsync.mockImplementation((key: string) =>
+    Promise.resolve(
+      key === 'userInfo' ? JSON.stringify(storedLoginUser) : null,
+    ),
+  );
+  mockedApi.get.mockResolvedValueOnce({
+    data: { totalTransactions: 1, totalAmountCollected: 1500 },
+  });
+  await fetchCollections({ agentCode: 11, bankCode: 'AGT123', graceDays: 2 });
+  expect(mockedApi.get).toHaveBeenCalledWith(
+    '/pigmyMobile/v2/transaction/fetchCollections',
+    {
+      params: { agentCode: 11, bankCode: 'AGT123', graceDays: 2 },
+      headers: { bankType: 'peocit' },
+    },
+  );
+});
+
+test('builds a peocit payload with final amount and a banksoft payload without it', () => {
+  const draft = {
+    transactionId: 'tx',
+    userId: 1,
+    agentCode: 2,
+    bankCode: 'B1',
+    collectedAmount: 1500,
+    schemename: 'Pigmy Deposit',
+    schemeId: '38',
+    collectiontype: 'cash',
+    customerName: 'Customer',
+    accountNumber: 101,
+    openingBalance: 500,
+    agentName: 'Agent',
+  };
+
+  expect(peocitAdapter.buildPayload(draft)).toEqual({
+    transactionId: 'tx',
+    userId: 1,
+    agentCode: 2,
+    bankCode: 'B1',
+    collectedAmount: 1500,
+    schemename: 'Pigmy Deposit',
+    schemeId: '38',
+    collectiontype: 'cash',
+    customerName: 'Customer',
+    accountNumber: 101,
+    bankType: 'peocit',
+    agentName: 'Agent',
+    finalAmount: 2000,
+  });
+
+  const banksoftPayload = banksoftAdapter.buildPayload(draft);
+  expect(banksoftPayload).toEqual({
+    transactionId: 'tx',
+    userId: 1,
+    agentCode: 2,
+    bankCode: 'B1',
+    collectedAmount: 1500,
+    schemename: 'Pigmy Deposit',
+    schemeId: '38',
+    collectiontype: 'cash',
+    customerName: 'Customer',
+    accountNumber: 101,
+    bankType: 'banksoft',
+  });
+  expect(banksoftPayload).not.toHaveProperty('finalAmount');
+  expect(banksoftPayload).not.toHaveProperty('agentName');
 });
 
 test('posts banksoft transactions with scheme id and without peocit fields', async () => {
@@ -174,6 +257,18 @@ test('does not post an incomplete peocit transaction', async () => {
       bankType: 'peocit',
     }),
   ).rejects.toThrow('Peocit transaction is missing agent name or final amount.');
+  expect(mockedApi.post).not.toHaveBeenCalled();
+});
+
+test('does not post an empty bank type as a banksoft transaction', async () => {
+  await expect(
+    createTransaction({
+      transactionId: 'tx', userId: 1, agentCode: 2, bankCode: 'B1',
+      collectedAmount: 100, schemename: 'Pigmy Deposit', schemeId: '38',
+      collectiontype: 'cash', customerName: 'Customer', accountNumber: 3,
+      bankType: '',
+    }),
+  ).rejects.toThrow('Unsupported bank type: ');
   expect(mockedApi.post).not.toHaveBeenCalled();
 });
 

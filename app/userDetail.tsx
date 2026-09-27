@@ -1,10 +1,19 @@
 import { TransactionForm } from '@/components/TransactionForm';
+import {
+  getRegisteredBankAdapter,
+  UNSUPPORTED_BANK_DEPOSIT_MESSAGE,
+} from '@/services/banks/registry';
 import { TransactionSuccess } from '@/components/TransactionSuccess';
 import { useAuth } from '@/providers/AuthProvider';
 import { actions } from '@/store/actions';
 import { todaysCollectionAmount$ } from '@/store/selectors';
 import { store$ } from '@/store/store';
-import { TransactionPayload } from '@/types/user';
+import {
+  INVALID_DEPOSIT_MESSAGE,
+  SCHEME_REQUIRED_MESSAGE,
+  transactionPayloadSchema,
+  UNABLE_TO_SAVE_DEPOSIT_MESSAGE,
+} from '@/types/user';
 import {
   COLLECTION_LIMIT_EXCEEDED_MESSAGE,
   evaluateCollectionLimit,
@@ -13,11 +22,12 @@ import {
   evaluateGracePeriod,
   GRACE_PERIOD_EXCEEDED_MESSAGE,
 } from '@/utils/gracePeriod';
+import { getErrorMessage } from '@/utils/errors';
 import { showSnackbar } from '@/utils/snackbar';
 import { useSelector } from '@legendapp/state/react';
 import * as Crypto from 'expo-crypto';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { Button, Icon, IconButton, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -70,6 +80,8 @@ export default function UserDetail() {
   const [amount, setAmount] = useState('');
   const [scheme, setScheme] = useState('');
   const [date] = useState(getDisplayDate);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const gracePeriod = evaluateGracePeriod(
     user?.lastDepositDate,
     user?.graceDays,
@@ -85,61 +97,102 @@ export default function UserDetail() {
       : null;
 
   const handleConfirm = () => {
-    const currentGracePeriod = evaluateGracePeriod(
-      user?.lastDepositDate,
-      user?.graceDays,
-    );
-
-    if (!currentGracePeriod.allowed) {
-      showSnackbar(GRACE_PERIOD_EXCEEDED_MESSAGE, {
-        type: 'error',
-        duration: 6000,
-      });
+    if (submittingRef.current) {
       return;
     }
+    submittingRef.current = true;
+    setIsSubmitting(true);
 
-    const numericAmount = Number(amount);
-    const currentCollectionLimit = evaluateCollectionLimit(
-      user?.limitAmount,
-      todaysCollected,
-      numericAmount,
-    );
-
-    if (!currentCollectionLimit.allowed) {
-      showSnackbar(COLLECTION_LIMIT_EXCEEDED_MESSAGE, {
-        type: 'error',
-        duration: 6000,
-      });
-      return;
-    }
-    const selectedScheme = user?.schemes.find((item) => item.schemeId === scheme);
-    if (!selectedScheme) {
-      return;
-    }
-    const openingBalance = Number(customer.balance || 0);
-    const payload: TransactionPayload = {
-      userId: Number(customer.id),
-      agentCode: customer.agentCode,
-      bankCode: customer.bankCode,
-      collectedAmount: numericAmount,
-      schemename: selectedScheme.schemeName,
-      schemeId: selectedScheme.schemeId,
-      collectiontype: 'cash',
-      customerName: customer.name,
-      accountNumber: Number(customer.account),
-      transactionId: Crypto.randomUUID(),
-      bankType: user?.bankType,
-      agentName: user?.agentName,
-      finalAmount: openingBalance + numericAmount,
+    const release = () => {
+      submittingRef.current = false;
+      setIsSubmitting(false);
     };
-    if (!actions.addTransaction(payload)) {
-      return;
+
+    try {
+      const currentGracePeriod = evaluateGracePeriod(
+        user?.lastDepositDate,
+        user?.graceDays,
+      );
+
+      if (!currentGracePeriod.allowed) {
+        showSnackbar(GRACE_PERIOD_EXCEEDED_MESSAGE, {
+          type: 'error',
+          duration: 6000,
+        });
+        release();
+        return;
+      }
+
+      const numericAmount = Number(amount);
+      if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+        showSnackbar(INVALID_DEPOSIT_MESSAGE, { type: 'error' });
+        release();
+        return;
+      }
+      const currentCollectionLimit = evaluateCollectionLimit(
+        user?.limitAmount,
+        todaysCollected,
+        numericAmount,
+      );
+
+      if (!currentCollectionLimit.allowed) {
+        showSnackbar(COLLECTION_LIMIT_EXCEEDED_MESSAGE, {
+          type: 'error',
+          duration: 6000,
+        });
+        release();
+        return;
+      }
+      const selectedScheme = user?.schemes?.find(
+        (item) => item.schemeId === String(scheme),
+      );
+      if (!selectedScheme) {
+        showSnackbar(SCHEME_REQUIRED_MESSAGE, { type: 'error' });
+        release();
+        return;
+      }
+      const adapter = getRegisteredBankAdapter(user?.bankType);
+      if (!adapter) {
+        showSnackbar(UNSUPPORTED_BANK_DEPOSIT_MESSAGE, { type: 'error' });
+        release();
+        return;
+      }
+      const openingBalance = Number(customer.balance || 0);
+      const payload = adapter.buildPayload({
+        userId: Number(customer.id),
+        agentCode: customer.agentCode,
+        bankCode: customer.bankCode,
+        collectedAmount: numericAmount,
+        schemename: selectedScheme.schemeName,
+        schemeId: selectedScheme.schemeId,
+        collectiontype: 'cash',
+        customerName: customer.name,
+        accountNumber: Number(customer.account),
+        transactionId: Crypto.randomUUID(),
+        openingBalance,
+        agentName: user?.agentName,
+      });
+      const parsedPayload = transactionPayloadSchema.safeParse(payload);
+      if (!parsedPayload.success) {
+        showSnackbar(UNABLE_TO_SAVE_DEPOSIT_MESSAGE, { type: 'error' });
+        release();
+        return;
+      }
+      if (!actions.addTransaction(parsedPayload.data)) {
+        release();
+        return;
+      }
+      setTransactionSuccess({
+        amount: numericAmount,
+        openingBalance,
+        totalBalance: openingBalance + numericAmount,
+      });
+    } catch (error: unknown) {
+      showSnackbar(getErrorMessage(error, UNABLE_TO_SAVE_DEPOSIT_MESSAGE), {
+        type: 'error',
+      });
+      release();
     }
-    setTransactionSuccess({
-      amount: numericAmount,
-      openingBalance,
-      totalBalance: openingBalance + numericAmount,
-    });
   };
 
   return (
@@ -182,8 +235,8 @@ export default function UserDetail() {
             openingBalance={transactionSuccess.openingBalance}
             totalBalance={transactionSuccess.totalBalance}
             scheme={
-              user?.schemes.find((item) => item.schemeId === scheme)?.schemeName ??
-              ''
+              user?.schemes?.find((item) => item.schemeId === String(scheme))
+                ?.schemeName ?? ''
             }
             date={date}
             mobilenumber={customer.mobilenumber}
@@ -198,7 +251,7 @@ export default function UserDetail() {
             setScheme={setScheme}
             date={date}
             handleConfirm={handleConfirm}
-            isTransactionLoading={false}
+            isTransactionLoading={isSubmitting}
           />
         )}
       </KeyboardAvoidingView>

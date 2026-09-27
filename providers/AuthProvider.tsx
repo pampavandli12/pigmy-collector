@@ -12,6 +12,7 @@ import {
   updateStoredAgentProfile,
 } from '@/services/authStorage';
 import { authenticateAgent } from '@/services/authenticate';
+import { initPersistence } from '@/store/persistence';
 import { activateAgentStore } from '@/store/store';
 import { waitForOutboxIdle } from '@/store/syncCoordinator';
 import {
@@ -19,6 +20,14 @@ import {
   AuthUser,
   authUserSchema,
 } from '@/types/auth';
+import {
+  assertPinAvailable,
+  clearPinAttempts,
+  hashPin,
+  isUsableStoredPin,
+  recordFailedPinAttempt,
+  storedPinMatches,
+} from '@/utils/appPin';
 import { PIN_SECURE_STORE_KEY, SECURE_STORE_KEY } from '@/utils/constants';
 import { showSnackbar } from '@/utils/snackbar';
 import * as SecureStore from 'expo-secure-store';
@@ -101,12 +110,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     ) => {
       const result = await deactivateStoredAccount(accountId, activeUserHint);
       setAccounts(await getStoredAccounts());
-      if (!result.wasActive || !result.disabledAccount) return;
+      if (!result.wasActive || !result.disabledAccount) return 'ignored' as const;
 
       if (result.activeUser) {
         activateAgentStore(result.activeUser);
         setUser(result.activeUser);
-        setAuthStatus('unlocked');
+        setAuthStatus(hasPinRef.current ? 'locked' : 'pinSetupRequired');
       } else {
         setUser(null);
         setAuthStatus('unauthenticated');
@@ -116,6 +125,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         replacementAgentName: result.activeUser?.agentName ?? null,
         reason,
       });
+      return result.activeUser ? ('fallback' as const) : ('signedOut' as const);
     },
     [],
   );
@@ -135,8 +145,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setAccounts(await getStoredAccounts());
 
       if (authStatus.isAgentRevoked) {
-        await deactivateAccount(accountId, 'revoked', updatedUser);
-        return 'revoked';
+        const outcome = await deactivateAccount(accountId, 'revoked', updatedUser);
+        return outcome === 'ignored' ? 'active' : 'revoked';
       }
 
       return 'active';
@@ -162,13 +172,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     const loadAuthState = async () => {
       try {
+        await initPersistence();
         const [storedUser, storedPin] = await Promise.all([
           getStoredUser(),
           SecureStore.getItemAsync(PIN_SECURE_STORE_KEY),
         ]);
         const storedAccounts = await getStoredAccounts();
         setAccounts(storedAccounts);
-        const hasValidPin = storedPin !== null && /^\d{6}$/.test(storedPin);
+        const hasValidPin = isUsableStoredPin(storedPin);
+        hasPinRef.current = hasValidPin;
         setHasPin(hasValidPin);
 
         if (storedPin && !hasValidPin) {
@@ -189,7 +201,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
           if (hasValidPin) {
             const status = await verifyAgentOnLockScreen(initialUser);
-            setAuthStatus(status === 'revoked' ? 'unauthenticated' : 'locked');
+            if (status !== 'revoked') setAuthStatus('locked');
             return;
           }
 
@@ -213,7 +225,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (
-        (nextState === 'background' || nextState === 'inactive') &&
+        nextState === 'background' &&
         hasPinRef.current &&
         userRef.current &&
         authStatusRef.current === 'unlocked'
@@ -231,7 +243,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         const activeUser = userRef.current;
         setAuthStatus('loading');
         void verifyAgentOnLockScreen(activeUser).then((status) => {
-          setAuthStatus(status === 'revoked' ? 'unauthenticated' : 'locked');
+          if (status !== 'revoked') setAuthStatus('locked');
         });
       }
     });
@@ -243,6 +255,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const validatedUser = authUserSchema.parse(nextUser);
 
     const isFirstAccount = accounts.length === 0;
+    await initPersistence();
     await saveAndActivateAccount(validatedUser);
     activateAgentStore(validatedUser, isFirstAccount);
     setAccounts(await getStoredAccounts());
@@ -256,6 +269,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       if (getAgentAccountId(validated) !== accountId) {
         throw new Error('The credentials belong to a different agent account.');
       }
+      await initPersistence();
       await saveAndActivateAccount(validated);
       activateAgentStore(validated);
       setAccounts(await getStoredAccounts());
@@ -267,6 +281,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const switchAccount = useCallback(async (accountId: string) => {
     await waitForOutboxIdle();
+    await initPersistence();
     const nextUser = await activateStoredAccount(accountId);
     activateAgentStore(nextUser);
     setUser(nextUser);
@@ -284,21 +299,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     if (!/^\d{6}$/.test(pin)) {
       throw new Error('PIN must contain exactly six digits.');
     }
-    await SecureStore.setItemAsync(PIN_SECURE_STORE_KEY, pin);
+    await SecureStore.setItemAsync(PIN_SECURE_STORE_KEY, await hashPin(pin));
+    hasPinRef.current = true;
     setHasPin(true);
     setAuthStatus('unlocked');
   }, []);
 
   const unlockWithPin = useCallback(async (pin: string) => {
     if (!/^\d{6}$/.test(pin)) return false;
+    await assertPinAvailable();
     const storedPin = await SecureStore.getItemAsync(PIN_SECURE_STORE_KEY);
-    const matches = storedPin === pin;
-    if (matches) setAuthStatus('unlocked');
-    return matches;
+    if (!(await storedPinMatches(storedPin, pin))) {
+      await recordFailedPinAttempt();
+      return false;
+    }
+    await clearPinAttempts();
+    setAuthStatus('unlocked');
+    return true;
   }, []);
 
   useEffect(() => {
-    setUnauthorizedHandler((accountId) => deactivateAccount(accountId, 'expired'));
+    setUnauthorizedHandler(async (accountId) => {
+      await deactivateAccount(accountId, 'expired');
+    });
     setAuthUserUpdatedHandler((accountId, nextUser) => {
       setUser((current) =>
         current && getAgentAccountId(current) === accountId ? nextUser : current,

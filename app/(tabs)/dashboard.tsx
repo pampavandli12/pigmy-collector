@@ -72,6 +72,7 @@ export default function Dashboard() {
         bankCode: user.bankCode,
         graceDays: user.graceDays ?? 0,
       });
+      console.log('summary', summary);
       setCollectionSummary(summary);
     } catch {
       showSnackbar('Unable to refresh collection summary.', { type: 'error' });

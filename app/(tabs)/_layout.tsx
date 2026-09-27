@@ -26,9 +26,9 @@ const routes: BottomNavigationRoute[] = [
   },
   {
     key: 'help',
-    title: 'Support',
-    focusedIcon: 'help-circle',
-    unfocusedIcon: 'help-circle-outline',
+    title: 'Settings',
+    focusedIcon: 'cog',
+    unfocusedIcon: 'cog-outline',
   },
 ];
 
