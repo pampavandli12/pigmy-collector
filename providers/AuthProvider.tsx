@@ -77,6 +77,12 @@ export interface SessionNotice {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+// Grace window for the app-PIN auto-lock. Transient backgrounds — Bluetooth /
+// permission system dialogs during printer setup, for example — return well
+// within this window and must not force a PIN re-entry mid-flow. Only a real
+// app switch (longer absence) re-locks.
+const AUTO_LOCK_GRACE_MS = 3000;
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
@@ -89,6 +95,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const authStatusRef = useRef(authStatus);
   const userRef = useRef(user);
   const hasPinRef = useRef(hasPin);
+  const backgroundedAtRef = useRef<number | null>(null);
 
   useEffect(() => {
     authStatusRef.current = authStatus;
@@ -230,22 +237,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         userRef.current &&
         authStatusRef.current === 'unlocked'
       ) {
-        setAuthStatus('locked');
+        // Defer the decision to lock until we come back: record when we left.
+        // A transient background (e.g. a Bluetooth/permission system dialog)
+        // returns within AUTO_LOCK_GRACE_MS and must not force a PIN re-entry.
+        backgroundedAtRef.current = Date.now();
         return;
       }
 
-      if (
-        nextState === 'active' &&
-        hasPinRef.current &&
-        userRef.current &&
-        authStatusRef.current === 'locked'
-      ) {
-        const activeUser = userRef.current;
-        setAuthStatus('loading');
-        void verifyAgentOnLockScreen(activeUser).then((status) => {
-          if (status !== 'revoked') setAuthStatus('locked');
-        });
+      if (nextState !== 'active' || !hasPinRef.current || !userRef.current) {
+        return;
       }
+
+      const backgroundedAt = backgroundedAtRef.current;
+      backgroundedAtRef.current = null;
+
+      const lockAfterAbsence =
+        authStatusRef.current === 'unlocked' &&
+        backgroundedAt !== null &&
+        Date.now() - backgroundedAt >= AUTO_LOCK_GRACE_MS;
+
+      // Nothing to do for a brief return while unlocked; only lock after a real
+      // absence, or re-verify when we were already locked.
+      if (!lockAfterAbsence && authStatusRef.current !== 'locked') {
+        return;
+      }
+
+      const activeUser = userRef.current;
+      setAuthStatus('loading');
+      void verifyAgentOnLockScreen(activeUser).then((status) => {
+        if (status !== 'revoked') setAuthStatus('locked');
+      });
     });
 
     return () => subscription.remove();

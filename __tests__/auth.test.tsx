@@ -234,7 +234,7 @@ test('locks onto the fallback account when the active agent is revoked', async (
   });
 });
 
-test('locks only after the app enters the background', async () => {
+test('locks only after a real absence, not a transient background', async () => {
   const listeners = new Set<(state: string) => void>();
   const subscription = jest
     .spyOn(AppState, 'addEventListener')
@@ -266,9 +266,34 @@ test('locks only after the app enters the background', async () => {
   });
   expect(result.current.authStatus).toBe('unlocked');
 
+  // A transient background/foreground (e.g. a Bluetooth/permission system
+  // dialog) within the grace window must NOT re-lock the app.
+  const nowSpy = jest.spyOn(Date, 'now');
+  nowSpy.mockReturnValue(1_000);
   await act(async () => {
     listeners.forEach((listener) => listener('background'));
   });
-  expect(result.current.authStatus).toBe('locked');
+  expect(result.current.authStatus).toBe('unlocked');
+
+  nowSpy.mockReturnValue(1_500);
+  await act(async () => {
+    listeners.forEach((listener) => listener('active'));
+  });
+  expect(result.current.authStatus).toBe('unlocked');
+
+  // A real absence longer than the grace window re-locks on return.
+  nowSpy.mockReturnValue(10_000);
+  await act(async () => {
+    listeners.forEach((listener) => listener('background'));
+  });
+  expect(result.current.authStatus).toBe('unlocked');
+
+  nowSpy.mockReturnValue(20_000);
+  await act(async () => {
+    listeners.forEach((listener) => listener('active'));
+  });
+  await waitFor(() => expect(result.current.authStatus).toBe('locked'));
+
+  nowSpy.mockRestore();
   subscription.mockRestore();
 });

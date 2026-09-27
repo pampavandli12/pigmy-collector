@@ -14,6 +14,7 @@ let mockAuthUser: {
 jest.mock('../providers/AuthProvider', () => ({
   useAuth: () => ({
     user: mockAuthUser,
+    accounts: [],
     login: jest.fn(),
     logout: jest.fn(),
     setupPin: jest.fn(),
