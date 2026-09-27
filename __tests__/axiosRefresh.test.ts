@@ -11,6 +11,7 @@ const oldUser = {
   agentCode: 1, agentName: 'Agent', bankCode: 'B', bankName: 'Bank Name',
   phoneNumber: '9876543210', lastDepositDate: null, limitAmount: null,
   graceDays: null, accessToken: 'old-access', refreshToken: 'old-refresh',
+  bankType: 'peocit', schemes: [],
 };
 const newUser = {
   ...oldUser,
@@ -115,11 +116,22 @@ test('does not refresh a replayed request twice', async () => {
   expect(mockEndSession).toHaveBeenCalled();
 });
 
-test('ends the session when a request still gets 403 after refresh', async () => {
+test('does NOT log out when a request still gets 403 after refresh (business denial)', async () => {
+  // A 403 that persists after a successful token refresh is a business/permission
+  // denial, not a token problem — the agent must stay logged in.
   await expect(handleResponseError(403, {
     headers: {},
     _tokenRefreshAttempted: true,
   })).rejects.toMatchObject({ response: { status: 403 } });
+  expect(mockRefreshAccessToken).not.toHaveBeenCalled();
+  expect(mockEndSession).not.toHaveBeenCalled();
+});
+
+test('ends the session when a request still gets 401 after refresh', async () => {
+  await expect(handleResponseError(401, {
+    headers: {},
+    _tokenRefreshAttempted: true,
+  })).rejects.toMatchObject({ response: { status: 401 } });
   expect(mockRefreshAccessToken).not.toHaveBeenCalled();
   expect(mockEndSession).toHaveBeenCalledWith('B:1');
 });
@@ -131,4 +143,20 @@ test('does not log out when the replay fails for a non-auth reason', async () =>
     replayError,
   );
   expect(mockEndSession).not.toHaveBeenCalled();
+});
+
+test('keeps the session when the refresh call fails with a transient network error', async () => {
+  mockRefreshAccessToken.mockRejectedValue({ code: 'ECONNABORTED', message: 'timeout' });
+  await expect(handleResponseError(401, { headers: {} })).rejects.toMatchObject({
+    response: { status: 401 },
+  });
+  expect(mockEndSession).not.toHaveBeenCalled();
+});
+
+test('logs out when the server rejects the refresh token (admin reset / revoked)', async () => {
+  mockRefreshAccessToken.mockRejectedValue({ response: { status: 401 } });
+  await expect(handleResponseError(401, { headers: {} })).rejects.toMatchObject({
+    response: { status: 401 },
+  });
+  expect(mockEndSession).toHaveBeenCalledWith('B:1');
 });

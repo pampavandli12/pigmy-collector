@@ -50,6 +50,10 @@ export function evaluateGracePeriod(
   graceDays: number | null | undefined,
   now = new Date(),
 ): GracePeriodResult {
+  // Nothing to enforce until the backend provides both a real last-deposit date
+  // and a valid grace window. A brand-new agent (no prior deposit) or a profile
+  // missing/with invalid grace config must NOT be blocked from collecting — we
+  // only ever block when we can positively prove the window has elapsed.
   if (
     !lastDepositDate ||
     !Number.isInteger(graceDays) ||
@@ -58,13 +62,15 @@ export function evaluateGracePeriod(
     graceDays < 0 ||
     !Number.isFinite(now.getTime())
   ) {
-    return { allowed: false, deadline: null };
+    return { allowed: true, deadline: null };
   }
 
   const depositDate = parseDepositDate(lastDepositDate);
 
   if (!depositDate) {
-    return { allowed: false, deadline: null };
+    // A present-but-unparseable date is bad data, not proof of an expired
+    // window; allow the deposit rather than lock the agent out.
+    return { allowed: true, deadline: null };
   }
 
   const deadline = new Date(depositDate);

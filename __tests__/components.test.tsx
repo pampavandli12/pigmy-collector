@@ -44,6 +44,8 @@ jest.mock('../providers/AuthProvider', () => ({
       bankName: 'Pigmy Bank',
       accessToken: 'token',
       phoneNumber: '9876543210',
+      bankType: 'peocit',
+      schemes: [{ schemeId: '38', schemeName: 'Pigmy Deposit' }],
     },
   }),
 }));
@@ -51,7 +53,7 @@ jest.mock('../providers/AuthProvider', () => ({
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import * as SMS from 'expo-sms';
 import { useState } from 'react';
-import { PaperProvider } from 'react-native-paper';
+import { HelperText, PaperProvider } from 'react-native-paper';
 import { AppSnackbar } from '../components/AppSnackbar';
 import PrinterManager from '../components/PrinterManager';
 import { TransactionForm } from '../components/TransactionForm';
@@ -127,6 +129,32 @@ test.each(['100', '200', '500'])(
     ).toBe(false);
   },
 );
+
+test('keeps confirm disabled for zero and accepts equivalent positive amounts', () => {
+  const screen = render(<QuickAmountForm />, { wrapper });
+  const confirm = () => screen.getByRole('button', { name: 'Confirm + Save' });
+  const mismatchVisible = () =>
+    screen
+      .UNSAFE_getAllByType(HelperText)
+      .every((helper) => helper.props.visible === true);
+
+  fireEvent.changeText(screen.getByLabelText('Amount'), '100');
+  expect(confirm().props.accessibilityState.disabled).toBe(true);
+  expect(mismatchVisible()).toBe(false);
+
+  fireEvent.changeText(screen.getByLabelText('Amount'), '0');
+  fireEvent.changeText(screen.getByLabelText('Reconfirm Amount'), '0.00');
+  expect(confirm().props.accessibilityState.disabled).toBe(true);
+
+  fireEvent.changeText(screen.getByLabelText('Amount'), '100');
+  fireEvent.changeText(screen.getByLabelText('Reconfirm Amount'), '100.0');
+  expect(confirm().props.accessibilityState.disabled).toBe(false);
+  expect(mismatchVisible()).toBe(false);
+
+  fireEvent.changeText(screen.getByLabelText('Reconfirm Amount'), '50');
+  expect(confirm().props.accessibilityState.disabled).toBe(true);
+  expect(mismatchVisible()).toBe(true);
+});
 
 test('manual amount edits preserve mismatch validation', () => {
   const screen = render(<QuickAmountForm />, { wrapper });

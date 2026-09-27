@@ -31,6 +31,21 @@ export const getAgentAccountId = (
   user: Pick<AuthUser, 'agentCode' | 'bankCode'>,
 ) => `${user.bankCode}:${user.agentCode}`;
 
+// Serializes read-modify-write cycles on the stored-accounts blob. Overlapping
+// cycles (e.g. a token refresh landing while an agent-profile update is in flight)
+// would otherwise both read the old JSON and the later write would clobber the
+// earlier one — silently discarding a freshly refreshed token.
+let accountsWriteChain: Promise<unknown> = Promise.resolve();
+
+function serializeAccountWrite<T>(task: () => Promise<T>): Promise<T> {
+  const run = accountsWriteChain.then(task, task);
+  accountsWriteChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
 function toProfile(user: AuthUser): AgentAccountProfile {
   const { accessToken: _accessToken, refreshToken: _refreshToken, ...profile } =
     user;
@@ -140,43 +155,48 @@ export async function getStoredAccountUser(
   return account ? toAuthUser(account) : null;
 }
 
-export async function saveAndActivateAccount(user: AuthUser): Promise<AuthUser> {
-  const validated = authUserSchema.parse(user);
-  const accounts = await readStoredAccounts();
-  const accountId = getAgentAccountId(validated);
-  const now = Date.now();
-  accounts[accountId] = {
-    profile: toProfile(validated),
-    accessToken: validated.accessToken,
-    refreshToken: validated.refreshToken,
-    status: 'available',
-    lastUsedAt: now,
-  };
-  await Promise.all([
-    writeStoredAccounts(accounts),
-    SecureStore.setItemAsync(SECURE_STORE_KEY, JSON.stringify(validated)),
-  ]);
-  return validated;
+export function saveAndActivateAccount(user: AuthUser): Promise<AuthUser> {
+  return serializeAccountWrite(async () => {
+    const validated = authUserSchema.parse(user);
+    const accounts = await readStoredAccounts();
+    const accountId = getAgentAccountId(validated);
+    const now = Date.now();
+    accounts[accountId] = {
+      profile: toProfile(validated),
+      accessToken: validated.accessToken,
+      refreshToken: validated.refreshToken,
+      status: 'available',
+      lastUsedAt: now,
+    };
+    await Promise.all([
+      writeStoredAccounts(accounts),
+      SecureStore.setItemAsync(SECURE_STORE_KEY, JSON.stringify(validated)),
+    ]);
+    return validated;
+  });
 }
 
-export async function activateStoredAccount(accountId: string): Promise<AuthUser> {
-  const accounts = await readStoredAccounts();
-  const account = accounts[accountId];
-  const user = account ? toAuthUser(account) : null;
-  if (!user) throw new Error('This agent account requires login.');
+export function activateStoredAccount(accountId: string): Promise<AuthUser> {
+  return serializeAccountWrite(async () => {
+    const accounts = await readStoredAccounts();
+    const account = accounts[accountId];
+    const user = account ? toAuthUser(account) : null;
+    if (!user) throw new Error('This agent account requires login.');
 
-  account.lastUsedAt = Date.now();
-  await Promise.all([
-    writeStoredAccounts(accounts),
-    SecureStore.setItemAsync(SECURE_STORE_KEY, JSON.stringify(user)),
-  ]);
-  return user;
+    account.lastUsedAt = Date.now();
+    await Promise.all([
+      writeStoredAccounts(accounts),
+      SecureStore.setItemAsync(SECURE_STORE_KEY, JSON.stringify(user)),
+    ]);
+    return user;
+  });
 }
 
-export async function deactivateStoredAccount(
+export function deactivateStoredAccount(
   accountId: string,
   activeUserHint?: AuthUser,
 ): Promise<DeactivateAccountResult> {
+  return serializeAccountWrite(async () => {
   const [accounts, storedCurrentUser] = await Promise.all([
     readStoredAccounts(),
     readActiveUser(),
@@ -237,6 +257,7 @@ export async function deactivateStoredAccount(
     activeUser: fallbackUser,
     wasActive: true,
   };
+  });
 }
 
 async function readActiveUser(): Promise<AuthUser | null> {
@@ -292,26 +313,28 @@ export async function getStoredToken() {
   return (await getStoredAuthContext())?.token ?? null;
 }
 
-export async function updateStoredTokensForAccount(
+export function updateStoredTokensForAccount(
   accountId: string,
   tokens: TokenRefreshResponse,
 ): Promise<AuthUser> {
-  const accounts = await readStoredAccounts();
-  const account = accounts[accountId];
-  const current = account ? toAuthUser(account) : null;
-  if (!current) throw new Error('No authenticated agent account is stored.');
+  return serializeAccountWrite(async () => {
+    const accounts = await readStoredAccounts();
+    const account = accounts[accountId];
+    const current = account ? toAuthUser(account) : null;
+    if (!current) throw new Error('No authenticated agent account is stored.');
 
-  const updated = authUserSchema.parse({ ...current, ...tokens });
-  account.accessToken = updated.accessToken;
-  account.refreshToken = updated.refreshToken;
-  account.status = 'available';
-  await writeStoredAccounts(accounts);
+    const updated = authUserSchema.parse({ ...current, ...tokens });
+    account.accessToken = updated.accessToken;
+    account.refreshToken = updated.refreshToken;
+    account.status = 'available';
+    await writeStoredAccounts(accounts);
 
-  const active = await readActiveUser();
-  if (active && getAgentAccountId(active) === accountId) {
-    await SecureStore.setItemAsync(SECURE_STORE_KEY, JSON.stringify(updated));
-  }
-  return updated;
+    const active = await readActiveUser();
+    if (active && getAgentAccountId(active) === accountId) {
+      await SecureStore.setItemAsync(SECURE_STORE_KEY, JSON.stringify(updated));
+    }
+    return updated;
+  });
 }
 
 export async function updateStoredTokens(
@@ -323,42 +346,44 @@ export async function updateStoredTokens(
   return saveAndActivateAccount(updated);
 }
 
-export async function updateStoredAgentProfile(
+export function updateStoredAgentProfile(
   accountId: string,
   profile: Pick<AuthUser, 'limitAmount' | 'lastDepositDate' | 'graceDays'>,
 ): Promise<AuthUser> {
-  const accounts = await readStoredAccounts();
-  let account = accounts[accountId];
-  let current = account ? toAuthUser(account) : null;
+  return serializeAccountWrite(async () => {
+    const accounts = await readStoredAccounts();
+    let account = accounts[accountId];
+    let current = account ? toAuthUser(account) : null;
 
-  if (!current) {
+    if (!current) {
+      const active = await readActiveUser();
+      if (active && getAgentAccountId(active) === accountId) {
+        account = {
+          profile: toProfile(active),
+          accessToken: active.accessToken,
+          refreshToken: active.refreshToken,
+          status: 'available',
+          lastUsedAt: Date.now(),
+        };
+        accounts[accountId] = account;
+        current = active;
+      }
+    }
+
+    if (!current || !account) {
+      throw new Error('No authenticated agent account is stored.');
+    }
+
+    const updated = authUserSchema.parse({ ...current, ...profile });
+    account.profile = toProfile(updated);
+    await writeStoredAccounts(accounts);
+
     const active = await readActiveUser();
     if (active && getAgentAccountId(active) === accountId) {
-      account = {
-        profile: toProfile(active),
-        accessToken: active.accessToken,
-        refreshToken: active.refreshToken,
-        status: 'available',
-        lastUsedAt: Date.now(),
-      };
-      accounts[accountId] = account;
-      current = active;
+      await SecureStore.setItemAsync(SECURE_STORE_KEY, JSON.stringify(updated));
     }
-  }
-
-  if (!current || !account) {
-    throw new Error('No authenticated agent account is stored.');
-  }
-
-  const updated = authUserSchema.parse({ ...current, ...profile });
-  account.profile = toProfile(updated);
-  await writeStoredAccounts(accounts);
-
-  const active = await readActiveUser();
-  if (active && getAgentAccountId(active) === accountId) {
-    await SecureStore.setItemAsync(SECURE_STORE_KEY, JSON.stringify(updated));
-  }
-  return updated;
+    return updated;
+  });
 }
 
 export async function clearStoredAccounts() {

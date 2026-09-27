@@ -5,20 +5,29 @@ jest.mock('../services/user', () => ({ createTransaction: jest.fn() }));
 jest.mock('../utils/snackbar', () => ({ showSnackbar: jest.fn() }));
 
 import NetInfo from '@react-native-community/netinfo';
+import { UnsupportedBankTypeError } from '../services/banks/errors';
 import { createTransaction } from '../services/user';
-import { cleanupOutbox, processOutbox } from '../store/syncEngine';
+import { resetOutboxSyncState } from '../store/syncCoordinator';
+import { cleanupOutbox, processOutbox, stopOutboxSync } from '../store/syncEngine';
 import { store$ } from '../store/store';
 import { showSnackbar } from '../utils/snackbar';
 
 const payload = {
   transactionId: 'tx-1', userId: 1, agentCode: 2, bankCode: 'B',
-  collectedAmount: 100, schemename: 'Pigmy Deposit', collectiontype: 'cash',
+  collectedAmount: 100, schemename: 'Pigmy Deposit', schemeId: '38', collectiontype: 'cash',
   customerName: 'Customer', accountNumber: 3,
 };
 
 beforeEach(() => {
   jest.clearAllMocks();
+  resetOutboxSyncState();
+  // Clear any backoff retry timer armed by a previous test's failed item.
+  stopOutboxSync();
   store$.outbox.set({});
+});
+
+afterEach(() => {
+  stopOutboxSync();
 });
 
 test('does not sync while offline', async () => {
@@ -102,4 +111,220 @@ test('syncs a failed transaction from a previous day and retains it', async () =
     expect.objectContaining({ transactionId: 'old' }),
   );
   expect(store$.outbox.old.peek()).toMatchObject({ status: 'synced' });
+});
+
+test('posts a transaction left in the syncing state', async () => {
+  (NetInfo.fetch as jest.Mock).mockResolvedValue({ isConnected: true });
+  (createTransaction as jest.Mock).mockResolvedValue({ ok: true });
+  store$.outbox['tx-1'].set({
+    payload,
+    status: 'syncing',
+    retryCount: 0,
+    createdAt: Date.now(),
+  });
+
+  await processOutbox();
+
+  expect(createTransaction).toHaveBeenCalledWith(
+    expect.objectContaining({ transactionId: 'tx-1' }),
+  );
+  expect(store$.outbox['tx-1'].status.peek()).toBe('synced');
+});
+
+test('posts a transaction queued while a sync is already running', async () => {
+  (NetInfo.fetch as jest.Mock).mockResolvedValue({ isConnected: true });
+  let releaseFirst: () => void = () => undefined;
+  const gate = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+  let enteredFirst: () => void = () => undefined;
+  const entered = new Promise<void>((resolve) => {
+    enteredFirst = resolve;
+  });
+
+  (createTransaction as jest.Mock).mockImplementation(
+    async (body: { transactionId: string }) => {
+      if (body.transactionId === 'tx-1') {
+        store$.outbox['tx-2'].set({
+          payload: { ...payload, transactionId: 'tx-2' },
+          status: 'pending',
+          retryCount: 0,
+          createdAt: Date.now(),
+        });
+        void processOutbox();
+        enteredFirst();
+        await gate;
+      }
+      return { ok: true };
+    },
+  );
+
+  store$.outbox['tx-1'].set({
+    payload,
+    status: 'pending',
+    retryCount: 0,
+    createdAt: Date.now(),
+  });
+
+  const done = processOutbox();
+  await entered;
+  expect(createTransaction).toHaveBeenCalledTimes(1);
+  releaseFirst();
+  await done;
+
+  expect(createTransaction).toHaveBeenCalledTimes(2);
+  expect(store$.outbox['tx-2'].status.peek()).toBe('synced');
+});
+
+test('does not post while connected without internet', async () => {
+  (NetInfo.fetch as jest.Mock).mockResolvedValue({
+    isConnected: true,
+    isInternetReachable: false,
+  });
+  store$.outbox['tx-1'].set({
+    payload,
+    status: 'pending',
+    retryCount: 0,
+    createdAt: Date.now(),
+  });
+
+  await processOutbox();
+
+  expect(createTransaction).not.toHaveBeenCalled();
+  expect(store$.outbox['tx-1'].status.peek()).toBe('pending');
+});
+
+test('returns an interrupted sync to pending while offline', async () => {
+  (NetInfo.fetch as jest.Mock).mockResolvedValue({ isConnected: false });
+  store$.outbox['tx-1'].set({
+    payload,
+    status: 'syncing',
+    retryCount: 0,
+    createdAt: Date.now(),
+  });
+
+  await processOutbox();
+
+  expect(createTransaction).not.toHaveBeenCalled();
+  expect(store$.outbox['tx-1'].status.peek()).toBe('pending');
+});
+
+test('waits before retrying a network failure and snackbars once', async () => {
+  (NetInfo.fetch as jest.Mock).mockResolvedValue({ isConnected: true });
+  (createTransaction as jest.Mock).mockRejectedValue(new Error('Server unavailable'));
+  store$.outbox['tx-1'].set({
+    payload,
+    status: 'pending',
+    retryCount: 0,
+    createdAt: Date.now(),
+  });
+
+  await processOutbox();
+  await processOutbox();
+
+  expect(createTransaction).toHaveBeenCalledTimes(1);
+  expect(store$.outbox['tx-1'].peek()).toMatchObject({
+    status: 'failed',
+    retryCount: 1,
+  });
+  expect(store$.outbox['tx-1'].nextRetryAt.peek()).toBeGreaterThan(Date.now());
+  expect(showSnackbar).toHaveBeenCalledTimes(1);
+});
+
+test('holds an unsupported bank type until it is manually retried', async () => {
+  (NetInfo.fetch as jest.Mock).mockResolvedValue({ isConnected: true });
+  (createTransaction as jest.Mock).mockRejectedValue(
+    new UnsupportedBankTypeError('other'),
+  );
+  store$.outbox['tx-1'].set({
+    payload: { ...payload, bankType: 'other' },
+    status: 'pending',
+    retryCount: 0,
+    createdAt: Date.now(),
+  });
+
+  await processOutbox();
+  await processOutbox();
+
+  expect(createTransaction).toHaveBeenCalledTimes(1);
+  expect(store$.outbox['tx-1'].peek()).toMatchObject({
+    status: 'failed',
+    retryCount: 1,
+    retryHeld: true,
+  });
+});
+
+test('holds a client rejection until it is manually retried', async () => {
+  (NetInfo.fetch as jest.Mock).mockResolvedValue({ isConnected: true });
+  const rejection = new Error('Rejected');
+  Object.assign(rejection, { response: { status: 400 } });
+  (createTransaction as jest.Mock).mockRejectedValue(rejection);
+  store$.outbox['tx-1'].set({
+    payload,
+    status: 'pending',
+    retryCount: 0,
+    createdAt: Date.now(),
+  });
+
+  await processOutbox();
+  await processOutbox();
+
+  expect(createTransaction).toHaveBeenCalledTimes(1);
+  expect(store$.outbox['tx-1'].peek()).toMatchObject({
+    status: 'failed',
+    retryHeld: true,
+  });
+});
+
+test('schedules a backoff retry that drains the queue when it becomes due', async () => {
+  jest.useFakeTimers();
+  try {
+    (NetInfo.fetch as jest.Mock).mockResolvedValue({ isConnected: true });
+    (createTransaction as jest.Mock).mockRejectedValueOnce(
+      new Error('Server unavailable'),
+    );
+    store$.outbox['tx-1'].set({
+      payload,
+      status: 'pending',
+      retryCount: 0,
+      createdAt: Date.now(),
+    });
+
+    await processOutbox();
+    expect(store$.outbox['tx-1'].peek()).toMatchObject({
+      status: 'failed',
+      retryCount: 1,
+    });
+
+    // The next attempt succeeds; firing the scheduled backoff timer must
+    // re-drain the queue with no external trigger.
+    (createTransaction as jest.Mock).mockResolvedValueOnce({ ok: true });
+    await jest.runOnlyPendingTimersAsync();
+
+    expect(createTransaction).toHaveBeenCalledTimes(2);
+    expect(store$.outbox['tx-1'].status.peek()).toBe('synced');
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+test('stops automatic retries after the retry cap', async () => {
+  (NetInfo.fetch as jest.Mock).mockResolvedValue({ isConnected: true });
+  (createTransaction as jest.Mock).mockRejectedValue(new Error('Server unavailable'));
+  store$.outbox['tx-1'].set({
+    payload,
+    status: 'pending',
+    retryCount: 4,
+    createdAt: Date.now(),
+  });
+
+  await processOutbox();
+  await processOutbox();
+
+  expect(createTransaction).toHaveBeenCalledTimes(1);
+  expect(store$.outbox['tx-1'].peek()).toMatchObject({
+    status: 'failed',
+    retryCount: 5,
+    retryHeld: true,
+  });
 });
