@@ -12,6 +12,14 @@ jest.mock('../services/authenticate', () => ({
   authenticateAgent: jest.fn(),
 }));
 
+// Isolate the auth provider from the sync/network subsystem (which transitively
+// loads axios and its fetch adapter). AuthProvider only needs stopOutboxSync here.
+jest.mock('../store/syncEngine', () => ({
+  stopOutboxSync: jest.fn(),
+  processOutbox: jest.fn(),
+  cleanupOutbox: jest.fn(),
+}));
+
 const mockedAuthenticateAgent = authenticateAgent as jest.MockedFunction<
   typeof authenticateAgent
 >;

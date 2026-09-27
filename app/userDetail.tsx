@@ -52,29 +52,28 @@ export default function UserDetail() {
   const { user } = useAuth();
   const [transactionSuccess, setTransactionSuccess] =
     useState<TransactionSuccessSnapshot | null>(null);
-  const account = Array.isArray(params.account)
-    ? params.account[0]
-    : params.account;
+  // Route params can be string | string[] | undefined (deep link, back-stack
+  // restore). Coerce every field defensively so a missing param renders a safe
+  // empty state instead of crashing (e.g. `customer.name.charAt(0)`).
+  const firstParam = (value: string | string[] | undefined): string =>
+    (Array.isArray(value) ? value[0] : value) ?? '';
+
+  const account = firstParam(params.account);
   const accountNumber = Number(account);
   const storedCustomer = useSelector(store$.customers[accountNumber]);
   const todaysCollected = useSelector(todaysCollectionAmount$);
 
   // Parse customer data from params
   const customer = {
-    id: params.id as string,
-    name: params.name as string,
-    agentCode: Number(
-      Array.isArray(params.agentCode) ? params.agentCode[0] : params.agentCode,
-    ),
-    bankCode: params.bankCode as string,
+    id: firstParam(params.id),
+    name: firstParam(params.name),
+    agentCode: Number(firstParam(params.agentCode)),
+    bankCode: firstParam(params.bankCode),
     balance:
-      storedCustomer?.currentBalance ??
-      Number(
-        Array.isArray(params.balance) ? params.balance[0] : params.balance,
-      ),
-    account: account as string,
-    image: params.image as string,
-    mobilenumber: params.mobilenumber as string,
+      storedCustomer?.currentBalance ?? Number(firstParam(params.balance) || 0),
+    account,
+    image: firstParam(params.image),
+    mobilenumber: firstParam(params.mobilenumber),
   };
 
   const [amount, setAmount] = useState('');
@@ -216,17 +215,13 @@ export default function UserDetail() {
           <View style={styles.headerSpacer} />
         </View>
         {/* Transaction Form */}
-        {blockedMessage ? (
-          <View style={styles.blockedContainer}>
-            <Icon source='alert-circle' size={56} color='#C62828' />
-            <Text variant='titleMedium' style={styles.blockedMessage}>
-              {blockedMessage}
-            </Text>
-            <Button mode='contained' onPress={() => router.back()}>
-              Back to Users
-            </Button>
-          </View>
-        ) : transactionSuccess ? (
+        {/*
+          A completed deposit takes priority over the "blocked" gate: the deposit
+          that pushes today's total up to the limit is itself valid and its
+          receipt/print/WhatsApp actions must still be shown. The blocked gate only
+          prevents STARTING a new deposit when already over the limit / past grace.
+        */}
+        {transactionSuccess ? (
           <TransactionSuccess
             customerName={customer.name}
             customerId={customer.id}
@@ -242,6 +237,16 @@ export default function UserDetail() {
             mobilenumber={customer.mobilenumber}
             onDone={() => router.back()}
           />
+        ) : blockedMessage ? (
+          <View style={styles.blockedContainer}>
+            <Icon source='alert-circle' size={56} color='#C62828' />
+            <Text variant='titleMedium' style={styles.blockedMessage}>
+              {blockedMessage}
+            </Text>
+            <Button mode='contained' onPress={() => router.back()}>
+              Back to Users
+            </Button>
+          </View>
         ) : (
           <TransactionForm
             customer={customer}

@@ -12,9 +12,11 @@ import {
   updateStoredAgentProfile,
 } from '@/services/authStorage';
 import { authenticateAgent } from '@/services/authenticate';
+import { resetRefreshState } from '@/services/authRefresh';
 import { initPersistence } from '@/store/persistence';
 import { activateAgentStore } from '@/store/store';
 import { waitForOutboxIdle } from '@/store/syncCoordinator';
+import { stopOutboxSync } from '@/store/syncEngine';
 import {
   AgentAccountSummary,
   AuthUser,
@@ -28,7 +30,7 @@ import {
   recordFailedPinAttempt,
   storedPinMatches,
 } from '@/utils/appPin';
-import { PIN_SECURE_STORE_KEY, SECURE_STORE_KEY } from '@/utils/constants';
+import { PIN_SECURE_STORE_KEY } from '@/utils/constants';
 import { showSnackbar } from '@/utils/snackbar';
 import * as SecureStore from 'expo-secure-store';
 import React, {
@@ -121,9 +123,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       if (result.activeUser) {
         activateAgentStore(result.activeUser);
+        // Keep the refs in sync synchronously: a concurrent lock-screen verify
+        // may resolve in the same tick and must observe the new user/status
+        // (see verifyAgentOnLockScreen callers) rather than the pre-deactivation
+        // React state.
+        userRef.current = result.activeUser;
+        const nextStatus = hasPinRef.current ? 'locked' : 'pinSetupRequired';
+        authStatusRef.current = nextStatus;
         setUser(result.activeUser);
-        setAuthStatus(hasPinRef.current ? 'locked' : 'pinSetupRequired');
+        setAuthStatus(nextStatus);
       } else {
+        userRef.current = null;
+        authStatusRef.current = 'unauthenticated';
         setUser(null);
         setAuthStatus('unauthenticated');
       }
@@ -204,11 +215,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
         if (initialUser) {
           activateAgentStore(initialUser, true);
+          // Keep the ref in sync synchronously so the post-verify guard below sees
+          // the restored user (React state / the ref-sync effect won't have run
+          // yet at that point).
+          userRef.current = initialUser;
           setUser(initialUser);
 
           if (hasValidPin) {
             const status = await verifyAgentOnLockScreen(initialUser);
-            if (status !== 'revoked') setAuthStatus('locked');
+            // Don't force the lock screen if verification deactivated the account
+            // (revoked, or admin-reset via the interceptor) and left no active
+            // user — that would strand a null user behind the PIN gate.
+            if (status !== 'revoked' && userRef.current) {
+              setAuthStatus('locked');
+            }
             return;
           }
 
@@ -217,10 +237,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         }
         setAuthStatus('unauthenticated');
       } catch (error) {
+        // A transient failure here (SecureStore/MMKV/Crypto hiccup) must NOT
+        // destroy the stored session — deleting it would sign the agent out for a
+        // recoverable glitch. Corrupt/invalid auth is already dropped defensively
+        // by readActiveUser(); here we only surface the error and fall back to the
+        // login gate, leaving stored credentials intact for the next launch.
+        console.error('Failed to load authentication state:', error);
         showSnackbar(
-          'Failed to load authentication state. Please log in again.',
+          'Could not restore your session. Please try again.',
         );
-        await SecureStore.deleteItemAsync(SECURE_STORE_KEY);
         setUser(null);
         setAuthStatus('unauthenticated');
       }
@@ -265,7 +290,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       const activeUser = userRef.current;
       setAuthStatus('loading');
       void verifyAgentOnLockScreen(activeUser).then((status) => {
-        if (status !== 'revoked') setAuthStatus('locked');
+        // Skip re-locking if verification deactivated the account (revoked or
+        // admin-reset) and there is no longer an active user; deactivateAccount
+        // has already routed to the correct screen.
+        if (status !== 'revoked' && userRef.current) {
+          setAuthStatus('locked');
+        }
       });
     });
 
@@ -302,6 +332,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const switchAccount = useCallback(async (accountId: string) => {
     await waitForOutboxIdle();
+    // Tear down per-agent sync/refresh state before rebinding the store to the
+    // next agent so no stale timer or refresh entry fires against it.
+    stopOutboxSync();
+    resetRefreshState();
     await initPersistence();
     const nextUser = await activateStoredAccount(accountId);
     activateAgentStore(nextUser);
@@ -313,6 +347,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const logout = useCallback(async () => {
     if (!user) return;
     await waitForOutboxIdle();
+    stopOutboxSync();
+    resetRefreshState();
     await deactivateAccount(getAgentAccountId(user), 'manual', user);
   }, [deactivateAccount, user]);
 

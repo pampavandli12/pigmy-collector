@@ -72,10 +72,9 @@ export function buildSyncFailure(
   now = Date.now(),
 ): Partial<OutboxItem> {
   const retryCount = item.retryCount + 1;
-  const retryHeld =
-    isUnsupportedBankTypeError(error) ||
-    isDefiniteClientRejection(error) ||
-    retryCount >= MAX_AUTO_RETRIES;
+  const permanent =
+    isUnsupportedBankTypeError(error) || isDefiniteClientRejection(error);
+  const retryHeld = permanent || retryCount >= MAX_AUTO_RETRIES;
 
   return {
     status: 'failed',
@@ -83,5 +82,6 @@ export function buildSyncFailure(
     error: message,
     nextRetryAt: retryHeld ? undefined : now + retryDelayMs(retryCount),
     retryHeld,
+    permanent,
   };
 }

@@ -36,7 +36,8 @@ jest.mock('../store/actions', () => ({
 }));
 jest.mock('../components/PrinterManager', () => {
   const { Text } = require('react-native');
-  return () => <Text>Printer Manager</Text>;
+  const PrinterManager = () => <Text>Printer Manager</Text>;
+  return PrinterManager;
 });
 jest.mock('expo-crypto', () => ({ randomUUID: () => 'transaction-id' }));
 jest.mock('../contexts/PrinterContext', () => ({

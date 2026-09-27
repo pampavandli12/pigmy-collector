@@ -1,4 +1,4 @@
-import { cleanupOutbox, processOutbox } from '@/store/syncEngine';
+import { processOutbox } from '@/store/syncEngine';
 import NetInfo from '@react-native-community/netinfo';
 import { useCallback, useEffect, useState } from 'react';
 import { InteractionManager, StyleSheet } from 'react-native';
@@ -66,10 +66,16 @@ export default function TabsLayout() {
   };
 
   useEffect(() => {
+    // Drain once on mount: this also recovers any item left `syncing` by a prior
+    // app kill (recovery runs inside the pass even while offline).
+    void processOutbox();
+
     const unsubscribe = NetInfo.addEventListener((state) => {
       if (state.isConnected) {
-        // Retry only existing queue
-        void processOutbox().finally(cleanupOutbox);
+        // Retry the existing queue when connectivity returns. Cleanup runs inside
+        // the pass; processOutbox handles its own errors, so no unhandled
+        // rejection escapes here.
+        void processOutbox();
       }
     });
 

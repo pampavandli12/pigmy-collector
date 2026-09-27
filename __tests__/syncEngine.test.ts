@@ -8,7 +8,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { UnsupportedBankTypeError } from '../services/banks/errors';
 import { createTransaction } from '../services/user';
 import { resetOutboxSyncState } from '../store/syncCoordinator';
-import { cleanupOutbox, processOutbox } from '../store/syncEngine';
+import { cleanupOutbox, processOutbox, stopOutboxSync } from '../store/syncEngine';
 import { store$ } from '../store/store';
 import { showSnackbar } from '../utils/snackbar';
 
@@ -21,7 +21,13 @@ const payload = {
 beforeEach(() => {
   jest.clearAllMocks();
   resetOutboxSyncState();
+  // Clear any backoff retry timer armed by a previous test's failed item.
+  stopOutboxSync();
   store$.outbox.set({});
+});
+
+afterEach(() => {
+  stopOutboxSync();
 });
 
 test('does not sync while offline', async () => {
@@ -268,6 +274,38 @@ test('holds a client rejection until it is manually retried', async () => {
     status: 'failed',
     retryHeld: true,
   });
+});
+
+test('schedules a backoff retry that drains the queue when it becomes due', async () => {
+  jest.useFakeTimers();
+  try {
+    (NetInfo.fetch as jest.Mock).mockResolvedValue({ isConnected: true });
+    (createTransaction as jest.Mock).mockRejectedValueOnce(
+      new Error('Server unavailable'),
+    );
+    store$.outbox['tx-1'].set({
+      payload,
+      status: 'pending',
+      retryCount: 0,
+      createdAt: Date.now(),
+    });
+
+    await processOutbox();
+    expect(store$.outbox['tx-1'].peek()).toMatchObject({
+      status: 'failed',
+      retryCount: 1,
+    });
+
+    // The next attempt succeeds; firing the scheduled backoff timer must
+    // re-drain the queue with no external trigger.
+    (createTransaction as jest.Mock).mockResolvedValueOnce({ ok: true });
+    await jest.runOnlyPendingTimersAsync();
+
+    expect(createTransaction).toHaveBeenCalledTimes(2);
+    expect(store$.outbox['tx-1'].status.peek()).toBe('synced');
+  } finally {
+    jest.useRealTimers();
+  }
 });
 
 test('stops automatic retries after the retry cap', async () => {

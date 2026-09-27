@@ -81,14 +81,13 @@ export const actions = {
         agentCode,
         bankCode,
       });
-      console.log('customers', customers);
       const mapped = mergeFetchedCustomersWithLocalBalances(customers);
 
       store$.customers.set(mapped);
 
       store$.lastCustomerSync.set(Date.now());
-    } catch(error) {
-      console.log('error', error);
+    } catch (error) {
+      console.warn('Failed to refresh customers:', error);
       showSnackbar('Unable to refresh customers. Showing offline data.', {
         type: 'error',
       });
@@ -149,9 +148,13 @@ export const actions = {
 
   retryFailedTransactions() {
     const outbox = store$.outbox.peek();
+    let reset = 0;
 
     Object.keys(outbox).forEach((txId) => {
-      if (outbox[txId].status === 'failed') {
+      const item = outbox[txId];
+      // Skip permanent rejections (4xx / unsupported bank type): they will only
+      // immediately re-fail. Only revive transient failures.
+      if (item?.status === 'failed' && !item.permanent) {
         store$.outbox[txId].assign({
           status: 'pending',
           retryCount: 0,
@@ -159,7 +162,14 @@ export const actions = {
           nextRetryAt: undefined,
           error: undefined,
         });
+        reset += 1;
       }
     });
+
+    // A manual retry must actually kick off a sync; otherwise the items just sit
+    // `pending` until an unrelated trigger.
+    if (reset > 0) {
+      processOutbox();
+    }
   },
 };

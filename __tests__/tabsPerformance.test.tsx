@@ -24,7 +24,7 @@ jest.mock('react-native-paper', () => {
     return React.createElement(View);
   };
   BottomNavigation.SceneMap = () => () => null;
-  return { BottomNavigation };
+  return { BottomNavigation, useTheme: () => ({ colors: {} }) };
 });
 
 import { act, render } from '@testing-library/react-native';

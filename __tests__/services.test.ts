@@ -63,9 +63,26 @@ test('fetches customers with agent and bank parameters', async () => {
   });
 });
 
-test('rejects a customer payload that is missing required fields', async () => {
-  mockedApi.get.mockResolvedValueOnce({ data: [{ accountNumber: 1 }] });
-  await expect(fetchCustomers({ agentCode: 7, bankCode: 'B1' })).rejects.toThrow();
+test('skips malformed customer records instead of failing the whole list', async () => {
+  const validCustomer = {
+    accountNumber: 2,
+    customerName: 'Valid Customer',
+    currentBalance: 100,
+    lastDepositDate: '2026-08-01',
+    schemeId: 'S1',
+    agentCode: 7,
+    bankCode: 'B1',
+    mobilenumber: '9876543210',
+    userId: 42,
+  };
+  // One malformed record (missing required fields) must not blank the list — the
+  // valid record is still returned.
+  mockedApi.get.mockResolvedValueOnce({
+    data: [{ accountNumber: 1 }, validCustomer],
+  });
+  await expect(
+    fetchCustomers({ agentCode: 7, bankCode: 'B1' }),
+  ).resolves.toEqual([validCustomer]);
 });
 
 test('sends the stored bank type when fetching customers', async () => {

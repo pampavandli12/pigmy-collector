@@ -45,6 +45,11 @@ export interface OutboxItem {
   nextRetryAt?: number;
 
   retryHeld?: boolean;
+
+  // True when the failure is a definite rejection (4xx / unsupported bank type)
+  // that will never succeed on retry — distinct from a transient failure that
+  // merely exhausted its automatic attempts. A manual "retry failed" skips these.
+  permanent?: boolean;
 }
 
 export const INVALID_DEPOSIT_MESSAGE = 'Enter an amount greater than zero.';
