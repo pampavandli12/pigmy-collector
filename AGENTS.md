@@ -33,7 +33,7 @@ Use strict TypeScript and the `@/*` root alias. Follow existing React Native Pap
 
 ## Development & Testing Workflow
 
-Run `npm install` after dependency changes, `npm start` for Metro, `npm run android` or `npx expo run:android` for Android builds, and `npm run lint` before handoff. Expo Go is not sufficient because of the custom Bluetooth module. No automated test script is configured; manually verify login, customer refresh/search, deposit creation, offline retry after reconnect, SMS handoff, and physical printer connect/print flows.
+Run `pnpm install` after dependency changes, `pnpm start` for Metro, `pnpm run android` or `pnpm exec expo run:android` for Android builds, and `pnpm run lint` before handoff. Expo Go is not sufficient because of the custom Bluetooth module. No automated test script is configured; manually verify login, customer refresh/search, deposit creation, offline retry after reconnect, SMS handoff, and physical printer connect/print flows.
 
 ## Commit & PR Notes
 
