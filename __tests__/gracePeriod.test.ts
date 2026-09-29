@@ -45,9 +45,12 @@ test.each([
   ['2026-08-01', null],
   ['2026-08-01', -1],
   ['2026-08-01', 1.5],
-] as const)('blocks invalid or missing grace data', (date, graceDays) => {
-  expect(evaluateGracePeriod(date, graceDays, new Date(2026, 7, 1))).toEqual({
-    allowed: false,
-    deadline: null,
-  });
-});
+] as const)(
+  'allows deposits when grace data is missing or invalid (never lock the agent out)',
+  (date, graceDays) => {
+    expect(evaluateGracePeriod(date, graceDays, new Date(2026, 7, 1))).toEqual({
+      allowed: true,
+      deadline: null,
+    });
+  },
+);

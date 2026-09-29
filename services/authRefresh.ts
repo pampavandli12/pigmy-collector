@@ -36,6 +36,13 @@ const defaultDependencies: AuthRefreshDependencies = {
 
 const refreshPromises = new Map<string, Promise<Awaited<ReturnType<typeof refreshSession>>>>();
 
+// Drop any in-flight/settled refresh entries. Called on account switch/logout so a
+// stuck entry (e.g. a hung refresh) cannot block future refreshes for an account
+// id that is later re-used.
+export function resetRefreshState() {
+  refreshPromises.clear();
+}
+
 async function refreshSession(
   accountId: string,
   dependencies: AuthRefreshDependencies,
@@ -70,6 +77,29 @@ function getRefreshPromise(
   return promise;
 }
 
+// A transient network failure (dead/slow connection, request timeout) surfaces
+// as an error with NO HTTP `response`. Such failures must never end the session —
+// the credentials may be perfectly valid and simply unreachable. Anything the
+// server actually answered, and any local "credentials unusable" error, is not
+// transient.
+function isTransientNetworkError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const candidate = error as {
+    response?: unknown;
+    code?: string;
+    message?: string;
+  };
+  if (candidate.response) return false;
+  if (
+    candidate.code === 'ECONNABORTED' ||
+    candidate.code === 'ETIMEDOUT' ||
+    candidate.code === 'ERR_NETWORK'
+  ) {
+    return true;
+  }
+  return candidate.message === 'Network Error';
+}
+
 export async function handleAuthResponseError<T>(
   error: AuthHttpError,
   replayRequest: (config: RetryableRequestConfig) => Promise<T>,
@@ -82,11 +112,19 @@ export async function handleAuthResponseError<T>(
   if (status !== 401 && status !== 403) return Promise.reject(error);
   if (!accountId) return Promise.reject(error);
 
-  // The Pigmy API returns 403 (rather than only 401) when an access token has
-  // expired. Both statuses must therefore get one refresh attempt. A second
-  // auth failure after replay means the refreshed credentials are not usable.
+  // The Pigmy API returns 403 (not only 401) when an access token has expired, so
+  // both statuses get one refresh attempt. Once we've already refreshed and
+  // replayed this request:
+  //  - a repeat 401 means even the refreshed token is unauthenticated → the
+  //    credentials are no longer valid (e.g. an admin reset the account) → end
+  //    the session.
+  //  - a repeat 403 means the token is valid and the endpoint is denying for a
+  //    business/permission reason → surface the error to the caller WITHOUT
+  //    logging the agent out mid-session.
   if (originalRequest?._tokenRefreshAttempted) {
-    await dependencies.endSession(accountId);
+    if (status === 401) {
+      await dependencies.endSession(accountId);
+    }
     return Promise.reject(error);
   }
 
@@ -94,8 +132,15 @@ export async function handleAuthResponseError<T>(
   let updatedUser;
   try {
     updatedUser = await getRefreshPromise(accountId, dependencies);
-  } catch {
-    await dependencies.endSession(accountId);
+  } catch (refreshError) {
+    // The refresh call itself failed. A transient network error / timeout keeps
+    // the session (the request will be retried). Any other failure — the server
+    // rejected the refresh token, or there is no usable refresh credential —
+    // means the session cannot continue, so end it (this preserves the
+    // admin-reset / revoked-token forced logout).
+    if (!isTransientNetworkError(refreshError)) {
+      await dependencies.endSession(accountId);
+    }
     return Promise.reject(error);
   }
 

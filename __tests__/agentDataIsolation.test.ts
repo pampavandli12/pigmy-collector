@@ -13,6 +13,8 @@ function agent(agentCode: number): AuthUser {
     graceDays: null,
     accessToken: `access-${agentCode}`,
     refreshToken: `refresh-${agentCode}`,
+    bankType: 'peocit',
+    schemes: [{ schemeId: '38', schemeName: 'Pigmy Deposit' }],
   };
 }
 
@@ -43,6 +45,7 @@ test('customers and local transactions are restored only for their agent', () =>
         bankCode: firstAgent.bankCode,
         collectedAmount: 50,
         schemename: 'P',
+        schemeId: '38',
         collectiontype: 'cash',
         customerName: 'First customer',
         accountNumber: 1001,

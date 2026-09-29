@@ -25,13 +25,19 @@ export const useSnackbarStore = create<SnackbarStore>((set) => ({
   duration: 4000,
   type: 'info',
   showSnackbar: (message, options = {}) => {
+    // Reset to defaults on every call so a previous message's type/action/duration
+    // can't leak into this one (e.g. a success toast rendering with the prior
+    // error's red styling or a stale action handler).
     set({
       visible: true,
       message,
+      action: undefined,
+      duration: 4000,
+      type: 'info',
       ...options,
     });
   },
   hideSnackbar: () => {
-    set({ visible: false });
+    set({ visible: false, action: undefined });
   },
 }));

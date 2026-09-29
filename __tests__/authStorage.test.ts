@@ -13,6 +13,7 @@ test('returns a validated stored token', async () => {
     agentCode: 1, agentName: 'Agent', bankCode: 'B', bankName: 'Bank Name',
     phoneNumber: '9876543210', lastDepositDate: '2026-06-19', limitAmount: 50000,
     graceDays: 0, accessToken: 'secret', refreshToken: 'refresh',
+    bankType: 'peocit', schemes: [{ schemeId: '38', schemeName: 'Pigmy Deposit' }],
   }));
   await expect(getStoredToken()).resolves.toBe('secret');
 });
@@ -24,6 +25,7 @@ test('migrates a legacy stored user without losing its session', async () => {
   }));
   await expect(getStoredUser()).resolves.toMatchObject({
     accessToken: 'legacy-token', refreshToken: null, limitAmount: null,
+    bankType: '', schemes: [],
   });
   expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
     'userInfo', expect.stringContaining('"accessToken":"legacy-token"'),
@@ -46,6 +48,7 @@ test('replaces both stored tokens without changing user metadata', async () => {
     agentCode: 1, agentName: 'Agent', bankCode: 'B', bankName: 'Bank Name',
     phoneNumber: '9876543210', lastDepositDate: '2026-06-19', limitAmount: 50000,
     graceDays: 0, accessToken: 'old-access', refreshToken: 'old-refresh',
+    bankType: 'peocit', schemes: [{ schemeId: '38', schemeName: 'Pigmy Deposit' }],
   };
   (SecureStore.getItemAsync as jest.Mock).mockResolvedValue(
     JSON.stringify(storedUser),
@@ -80,6 +83,8 @@ test('updates stored agent profile fields for the active account', async () => {
     graceDays: 0,
     accessToken: 'access',
     refreshToken: 'refresh',
+    bankType: 'peocit',
+    schemes: [{ schemeId: '38', schemeName: 'Pigmy Deposit' }],
   };
   (SecureStore.getItemAsync as jest.Mock).mockResolvedValue(
     JSON.stringify(storedUser),
