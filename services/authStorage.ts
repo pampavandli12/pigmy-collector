@@ -305,7 +305,11 @@ export async function getStoredUser(): Promise<AuthUser | null> {
 export async function getStoredAuthContext() {
   const user = await getStoredUser();
   return user
-    ? { token: user.accessToken, accountId: getAgentAccountId(user) }
+    ? {
+        token: user.accessToken,
+        accountId: getAgentAccountId(user),
+        bankType: user.bankType,
+      }
     : null;
 }
 

@@ -3,6 +3,7 @@ import { isPublicAuthRoute } from '../utils/apiRoutes';
 import { API_BASE_URL } from '../utils/constants';
 import { handleAuthResponseError } from './authRefresh';
 import { getStoredAuthContext } from './authStorage';
+import { applyAuthHeaders } from './requestAuthHeaders';
 
 // A finite timeout is essential for a field app on flaky mobile networks:
 // without it a dead/slow connection hangs requests indefinitely, freezing the
@@ -25,20 +26,16 @@ api.interceptors.request.use(
     config.headers['Content-Type'] = 'application/json';
 
     if (isPublicAuthRoute(config.url)) {
-      delete config.headers.Authorization;
+      applyAuthHeaders(config.headers, null);
       delete (config as typeof config & { _agentAccountId?: string })
         ._agentAccountId;
       return config;
     }
 
     const auth = await getStoredAuthContext();
-    if (auth) {
-      config.headers.Authorization = auth.token;
-      (config as typeof config & { _agentAccountId?: string })._agentAccountId =
-        auth.accountId;
-    } else {
-      delete config.headers.Authorization;
-    }
+    applyAuthHeaders(config.headers, auth);
+    (config as typeof config & { _agentAccountId?: string })._agentAccountId =
+      auth?.accountId;
     return config;
   },
   (error) => {

@@ -1,14 +1,7 @@
 import { collectionSummarySchema, Customer, customerSchema, SyncableTransactionPayload } from '@/types/user';
 import { API_ENDPOINTS } from '@/utils/constants';
 import { getBankAdapter } from './banks/registry';
-import { getStoredUser } from './authStorage';
 import { api } from './axios';
-
-async function bankTypeHeaders() {
-  const storedUser = await getStoredUser();
-  const bankType = storedUser?.bankType?.trim();
-  return bankType ? { headers: { bankType } } : {};
-}
 
 export const fetchCustomers = async ({
   agentCode,
@@ -22,7 +15,6 @@ export const fetchCustomers = async ({
       agentCode,
       bankCode,
     },
-    ...(await bankTypeHeaders()),
   });
 
   // Parse per-record so a single malformed customer from the backend cannot
@@ -58,7 +50,6 @@ export const fetchCollections = async ({
 }) => {
   const response = await api.get(API_ENDPOINTS.FETCH_COLLECTIONS, {
     params: { agentCode, bankCode, graceDays },
-    ...(await bankTypeHeaders()),
   });
   return collectionSummarySchema.parse(response.data);
 };

@@ -85,23 +85,6 @@ test('skips malformed customer records instead of failing the whole list', async
   ).resolves.toEqual([validCustomer]);
 });
 
-test('sends the stored bank type when fetching customers', async () => {
-  const { getItemAsync } = jest.requireMock('expo-secure-store') as {
-    getItemAsync: jest.Mock;
-  };
-  getItemAsync.mockImplementation((key: string) =>
-    Promise.resolve(
-      key === 'userInfo' ? JSON.stringify(storedLoginUser) : null,
-    ),
-  );
-  mockedApi.get.mockResolvedValueOnce({ data: [] });
-  await fetchCustomers({ agentCode: 7, bankCode: 'B1' });
-  expect(mockedApi.get).toHaveBeenCalledWith('/pigmyMobile/v2/user', {
-    params: { agentCode: 7, bankCode: 'B1' },
-    headers: { bankType: 'peocit' },
-  });
-});
-
 test('fetches collection summary with agent, bank, and grace day parameters', async () => {
   const { getItemAsync } = jest.requireMock('expo-secure-store') as {
     getItemAsync: jest.Mock;
@@ -119,28 +102,6 @@ test('fetches collection summary with agent, bank, and grace day parameters', as
   expect(mockedApi.get).toHaveBeenCalledWith(
     '/pigmyMobile/v2/transaction/fetchCollections',
     { params: { agentCode: 11, bankCode: 'AGT123', graceDays: 2 } },
-  );
-});
-
-test('sends the stored bank type when fetching collections', async () => {
-  const { getItemAsync } = jest.requireMock('expo-secure-store') as {
-    getItemAsync: jest.Mock;
-  };
-  getItemAsync.mockImplementation((key: string) =>
-    Promise.resolve(
-      key === 'userInfo' ? JSON.stringify(storedLoginUser) : null,
-    ),
-  );
-  mockedApi.get.mockResolvedValueOnce({
-    data: { totalTransactions: 1, totalAmountCollected: 1500 },
-  });
-  await fetchCollections({ agentCode: 11, bankCode: 'AGT123', graceDays: 2 });
-  expect(mockedApi.get).toHaveBeenCalledWith(
-    '/pigmyMobile/v2/transaction/fetchCollections',
-    {
-      params: { agentCode: 11, bankCode: 'AGT123', graceDays: 2 },
-      headers: { bankType: 'peocit' },
-    },
   );
 });
 
