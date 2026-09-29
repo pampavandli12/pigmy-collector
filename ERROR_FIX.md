@@ -8,5 +8,5 @@ The app now uses the local Expo module at `modules/expo-thermal-printer`, and `s
 
 - Use a development build; Expo Go is not supported for native Bluetooth.
 - Keep Bluetooth permissions in `app.json` and the module Android manifest.
-- Rebuild Android after native module changes with `npm run android`.
+- Rebuild Android after native module changes with `pnpm run android`.
 - Test scan, pair, connect, print text, print QR, print image, and receipt printing on a physical Android device.

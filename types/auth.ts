@@ -1,5 +1,25 @@
 import { z } from 'zod';
 
+export const agentSchemeSchema = z
+  .object({
+    schemeId: z.string().min(1),
+    schemeName: z.string().min(1),
+  })
+  .strict();
+
+export type AgentScheme = z.infer<typeof agentSchemeSchema>;
+
+const loginSchemeSchema = z
+  .object({
+    schemeID: z.string().min(1),
+    schemeName: z.string().min(1),
+  })
+  .strict()
+  .transform(({ schemeID, schemeName }) => ({
+    schemeId: schemeID,
+    schemeName,
+  }));
+
 export const authUserSchema = z
   .object({
     agentCode: z.number().int(),
@@ -12,6 +32,8 @@ export const authUserSchema = z
     graceDays: z.number().int().nonnegative().nullable(),
     accessToken: z.string().min(1),
     refreshToken: z.string().min(1).nullable(),
+    bankType: z.string(),
+    schemes: z.array(agentSchemeSchema),
   })
   .strict();
 
@@ -62,6 +84,8 @@ export const loginResponseSchema = z
     graceDays: z.number().int().nonnegative(),
     refreshToken: z.string().min(1),
     accessToken: z.string().min(1),
+    bankType: z.string().min(1),
+    schemes: z.array(loginSchemeSchema),
   })
   .strict();
 
@@ -83,5 +107,7 @@ export const legacyAuthUserSchema = z
       graceDays: null,
       accessToken: token,
       refreshToken: null,
+      bankType: '',
+      schemes: [],
     }),
   );

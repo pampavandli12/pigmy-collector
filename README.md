@@ -57,7 +57,7 @@ export PATH=$PATH:$ANDROID_HOME/platform-tools
 2. **Install dependencies**
 
    ```bash
-   npm install
+   pnpm install
    ```
 
 ## Running the App
@@ -69,7 +69,7 @@ export PATH=$PATH:$ANDROID_HOME/platform-tools
 Build the development version for Android:
 
 ```bash
-npx expo run:android
+pnpm exec expo run:android
 ```
 
 This will:
@@ -84,7 +84,7 @@ This will:
 After the initial build, you can start the development server:
 
 ```bash
-npm start
+pnpm start
 ```
 
 Then press `a` to open on Android device/emulator.
@@ -92,7 +92,7 @@ Then press `a` to open on Android device/emulator.
 **Or run directly:**
 
 ```bash
-npx expo run:android
+pnpm exec expo run:android
 ```
 
 ## Project Structure
@@ -170,7 +170,7 @@ If you encounter build issues:
 cd android
 ./gradlew clean
 cd ..
-npx expo run:android
+pnpm exec expo run:android
 ```
 
 ### Debugging
@@ -203,15 +203,15 @@ To create a production APK:
 eas build --platform android --profile production
 ```
 
-(Requires EAS CLI: `npm install -g eas-cli`)
+(Requires EAS CLI: `pnpm add -g eas-cli`)
 
 ## Scripts
 
-- `npm start` - Start Expo development server
-- `npm run android` - Run on Android device/emulator
-- `npm run ios` - Run on iOS simulator (requires macOS)
-- `npm run web` - Run in web browser
-- `npm test` - Run tests
+- `pnpm start` - Start Expo development server
+- `pnpm run android` - Run on Android device/emulator
+- `pnpm run ios` - Run on iOS simulator (requires macOS)
+- `pnpm run web` - Run in web browser
+- `pnpm test` - Run tests
 
 ## Contributing
 

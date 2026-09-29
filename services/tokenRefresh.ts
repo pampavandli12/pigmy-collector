@@ -11,9 +11,14 @@ type RefreshHttpClient = {
     },
     config: {
       headers: Record<string, string>;
+      timeout?: number;
     },
   ) => Promise<{ data: unknown }>;
 };
+
+// Keep the refresh call bounded too; a hung refresh would otherwise never clear
+// its de-dup entry and would block every queued request behind it.
+const REFRESH_TIMEOUT_MS = 20000;
 
 export async function refreshAccessToken(
   refreshToken: string,
@@ -28,6 +33,7 @@ export async function refreshAccessToken(
     { refreshToken, mobileNumber },
     {
       headers: { 'Content-Type': 'application/json' },
+      timeout: REFRESH_TIMEOUT_MS,
     },
   );
   return tokenRefreshResponseSchema.parse(response.data);

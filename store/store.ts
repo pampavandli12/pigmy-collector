@@ -43,9 +43,9 @@ function removeStorage(key: string) {
 }
 
 export const store$ = observable<AppState>({
-  customers: loadStorage('customers', {}),
+  customers: {},
 
-  outbox: loadStorage('outbox', {}),
+  outbox: {},
 
   searchQuery: '',
 
@@ -68,9 +68,12 @@ store$.outbox.onChange(({ value }) => {
 
 store$.lastCustomerSync.onChange(({ value }) => {
   if (activeStoragePrefix && !isHydrating) {
+    // Persist as a JSON string so it round-trips through `loadStorage`'s
+    // getString + JSON.parse on rehydration. Writing a raw number would be
+    // unreadable by getString and silently reset to null every launch.
     value === null
       ? removeStorage(scopedKey('lastCustomerSync'))
-      : mmkv.set(scopedKey('lastCustomerSync'), value);
+      : mmkv.set(scopedKey('lastCustomerSync'), JSON.stringify(value));
   }
 });
 

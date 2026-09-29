@@ -7,7 +7,7 @@ description: Verify Pigmy Collector changes before handoff, especially because n
 
 ## Baseline Commands
 
-Run `npm run lint` before handoff when dependencies are installed. Use `npm start` for Metro and `npm run android` or `npx expo run:android` for native Android verification. Do not rely on Expo Go for printer-related changes.
+Run `pnpm run lint` before handoff when dependencies are installed. Use `pnpm start` for Metro and `pnpm run android` or `pnpm exec expo run:android` for native Android verification. Do not rely on Expo Go for printer-related changes.
 
 ## Manual QA Matrix
 

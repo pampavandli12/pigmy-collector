@@ -18,6 +18,18 @@ jest.mock('expo-secure-store', () => ({
   deleteItemAsync: jest.fn(),
 }));
 
+jest.mock('expo-crypto', () => {
+  const { createHash, randomBytes, randomUUID } = require('crypto');
+  return {
+    randomUUID,
+    CryptoDigestAlgorithm: { SHA256: 'SHA-256' },
+    digestStringAsync: jest.fn(async (_algorithm: string, value: string) =>
+      createHash('sha256').update(value).digest('hex'),
+    ),
+    getRandomBytesAsync: jest.fn(async (size: number) => randomBytes(size)),
+  };
+});
+
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn() }),
   useFocusEffect: (callback: () => void) => callback(),

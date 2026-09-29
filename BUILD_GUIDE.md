@@ -17,14 +17,14 @@
 
 3. **Configured Build Scripts**
    - Updated `package.json` with patch automation
-   - Added `postinstall` script to apply patches after `npm install`
+   - Added `postinstall` script to apply patches after `pnpm install`
 
 ## 🚀 Building the App
 
 ### For Android
 
 ```bash
-npm run android
+pnpm run android
 ```
 
 This will:
@@ -66,12 +66,12 @@ Run:
 echo "sdk.dir=$HOME/Library/Android/sdk" > android/local.properties
 ```
 
-### Bluetooth Library Issues After npm install
+### Bluetooth Library Issues After pnpm install
 
 Run:
 
 ```bash
-npm run android
+pnpm run android
 ```
 
 ### Permission Errors
@@ -113,10 +113,10 @@ Should show your device. If not:
 
 ## 🔄 After Clean Install
 
-If you run `npm install` or `npm ci`:
+If you run `pnpm install` or `pnpm install --frozen-lockfile`:
 
 1. The `postinstall` script will automatically patch the library
-2. Or run `npm run android` to rebuild the native app
+2. Or run `pnpm run android` to rebuild the native app
 
 ## 📝 Notes
 
@@ -130,13 +130,13 @@ If you run `npm install` or `npm ci`:
 
 ```bash
 # Build and run on Android
-npm run android
+pnpm run android
 
 # Start development server only
-npm start
+pnpm start
 
 # Apply printer library patch
-npm run android
+pnpm run android
 
 # Check connected devices
 adb devices

@@ -1,4 +1,10 @@
-let mockAuthUser = {
+let mockAuthUser: {
+  agentCode: number;
+  bankCode: string;
+  lastDepositDate: string;
+  graceDays: number;
+  limitAmount?: number | null;
+} = {
   agentCode: 1,
   bankCode: 'B',
   lastDepositDate: '2099-01-01',
@@ -8,6 +14,7 @@ let mockAuthUser = {
 jest.mock('../providers/AuthProvider', () => ({
   useAuth: () => ({
     user: mockAuthUser,
+    accounts: [],
     login: jest.fn(),
     logout: jest.fn(),
     setupPin: jest.fn(),
@@ -29,7 +36,8 @@ jest.mock('../store/actions', () => ({
 }));
 jest.mock('../components/PrinterManager', () => {
   const { Text } = require('react-native');
-  return () => <Text>Printer Manager</Text>;
+  const PrinterManager = () => <Text>Printer Manager</Text>;
+  return PrinterManager;
 });
 jest.mock('expo-crypto', () => ({ randomUUID: () => 'transaction-id' }));
 jest.mock('../contexts/PrinterContext', () => ({
@@ -110,7 +118,7 @@ test('renders customer search and empty state after initial loading', () => {
 });
 
 test('renders dashboard sync status labels', () => {
-  const basePayload = { userId: 1, agentCode: 2, bankCode: 'B', collectedAmount: 10, schemename: 'P', collectiontype: 'cash', customerName: 'Customer', accountNumber: 3 };
+  const basePayload = { userId: 1, agentCode: 2, bankCode: 'B', collectedAmount: 10, schemename: 'P', schemeId: '38', collectiontype: 'cash', customerName: 'Customer', accountNumber: 3 };
   store$.outbox.set(Object.fromEntries(
     (['synced', 'pending', 'syncing', 'failed'] as const).map((status, index) => [
       status,
@@ -130,9 +138,9 @@ test('renders dashboard sync status labels', () => {
   expect(screen.getByText('Failed')).toBeTruthy();
 });
 
-test('renders support and logout controls', () => {
+test('renders settings and logout controls', () => {
   const screen = render(<Support />, { wrapper });
-  expect(screen.getByText('Call Us')).toBeTruthy();
+  expect(screen.getByText('Setup Printer')).toBeTruthy();
   expect(screen.getByText('Log out current account')).toBeTruthy();
 });
 
@@ -187,6 +195,7 @@ test('blocks direct access to the deposit form when the daily limit is reached',
         bankCode: 'B',
         collectedAmount: 50000,
         schemename: 'Pigmy Deposit',
+        schemeId: '38',
         collectiontype: 'cash',
         customerName: 'Customer',
         accountNumber: 3,

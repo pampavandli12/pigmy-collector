@@ -1,10 +1,11 @@
-import { cleanupOutbox, processOutbox } from '@/store/syncEngine';
+import { processOutbox } from '@/store/syncEngine';
 import NetInfo from '@react-native-community/netinfo';
 import { useCallback, useEffect, useState } from 'react';
 import { InteractionManager, StyleSheet } from 'react-native';
 import {
   BottomNavigation,
   BottomNavigationRoute,
+  useTheme,
 } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Dashboard from './dashboard';
@@ -26,9 +27,9 @@ const routes: BottomNavigationRoute[] = [
   },
   {
     key: 'help',
-    title: 'Support',
-    focusedIcon: 'help-circle',
-    unfocusedIcon: 'help-circle-outline',
+    title: 'Settings',
+    focusedIcon: 'cog',
+    unfocusedIcon: 'cog-outline',
   },
 ];
 
@@ -40,19 +41,41 @@ const renderScene = BottomNavigation.SceneMap({
 
 const barStyle = {
   backgroundColor: '#fff',
-  borderTopWidth: 1,
-  borderTopColor: '#e0e0e0',
+  // Soft top elevation instead of a hard divider line — reads more like MD3.
+  elevation: 8,
+  shadowColor: '#1A2233',
+  shadowOffset: { width: 0, height: -2 },
+  shadowOpacity: 0.06,
+  shadowRadius: 8,
 };
 
 export default function TabsLayout() {
+  const theme = useTheme();
   const [index, setIndex] = useState(0);
   const [preloadUsers, setPreloadUsers] = useState(false);
 
+  // Tint the MD3 active-tab pill to match the app's chip palette
+  // (light blue pill, deep blue icon/label) so the bar reads as one system.
+  const navTheme = {
+    ...theme,
+    colors: {
+      ...theme.colors,
+      secondaryContainer: '#EAF2FC',
+      onSecondaryContainer: '#2C5A8C',
+    },
+  };
+
   useEffect(() => {
+    // Drain once on mount: this also recovers any item left `syncing` by a prior
+    // app kill (recovery runs inside the pass even while offline).
+    void processOutbox();
+
     const unsubscribe = NetInfo.addEventListener((state) => {
       if (state.isConnected) {
-        // Retry only existing queue
-        void processOutbox().finally(cleanupOutbox);
+        // Retry the existing queue when connectivity returns. Cleanup runs inside
+        // the pass; processOutbox handles its own errors, so no unhandled
+        // rejection escapes here.
+        void processOutbox();
       }
     });
 
@@ -80,8 +103,9 @@ export default function TabsLayout() {
         renderScene={renderScene}
         getLazy={getLazy}
         barStyle={barStyle}
-        activeColor='#4A90E2'
-        inactiveColor='#999'
+        theme={navTheme}
+        activeColor='#2C5A8C'
+        inactiveColor='#8A96A6'
         labeled={true}
       />
     </SafeAreaView>

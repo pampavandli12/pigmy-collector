@@ -3,6 +3,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import ExpoThermalPrinter from "../modules/expo-thermal-printer/src/ExpoThermalPrinterModule";
@@ -43,6 +44,19 @@ export const PrinterProvider: React.FC<{ children: React.ReactNode }> = ({
   const [availableDevices, setAvailableDevices] = useState<PrinterDevice[]>([]);
   const [isScanning, setIsScanning] = useState(false);
 
+  // Safety net: startScan() resolves immediately and relies on a native
+  // "scanFinished" event to clear the spinner. If that event never fires (BT
+  // turned off mid-scan, adapter error), this timeout ends the scan so the UI
+  // isn't stuck disabled forever.
+  const SCAN_TIMEOUT_MS = 20000;
+  const scanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearScanTimeout = useCallback(() => {
+    if (scanTimeoutRef.current) {
+      clearTimeout(scanTimeoutRef.current);
+      scanTimeoutRef.current = null;
+    }
+  }, []);
+
   const upsertDevice = useCallback((device: PrinterDevice) => {
     setAvailableDevices((current) => {
       const index = current.findIndex((item) => item.address === device.address);
@@ -60,6 +74,7 @@ export const PrinterProvider: React.FC<{ children: React.ReactNode }> = ({
       setIsScanning(true);
     });
     const scanFinished = ExpoThermalPrinter.addListener("scanFinished", (payload) => {
+      clearScanTimeout();
       if (payload.devices?.length) {
         setAvailableDevices(payload.devices);
       }
@@ -87,6 +102,7 @@ export const PrinterProvider: React.FC<{ children: React.ReactNode }> = ({
     });
 
     return () => {
+      clearScanTimeout();
       deviceFound.remove();
       scanStarted.remove();
       scanFinished.remove();
@@ -95,7 +111,7 @@ export const PrinterProvider: React.FC<{ children: React.ReactNode }> = ({
       disconnected.remove();
       connectionLost.remove();
     };
-  }, [upsertDevice]);
+  }, [upsertDevice, clearScanTimeout]);
 
   useEffect(() => {
     BluetoothPrinterService.isConnected()
@@ -128,6 +144,7 @@ export const PrinterProvider: React.FC<{ children: React.ReactNode }> = ({
         showSnackbar("Bluetooth permission is required to find printers.", {
           type: "error",
         });
+        clearScanTimeout();
         setIsScanning(false);
         return;
       }
@@ -135,11 +152,18 @@ export const PrinterProvider: React.FC<{ children: React.ReactNode }> = ({
       const pairedDevices = await BluetoothPrinterService.scanPairedDevices();
       setAvailableDevices(pairedDevices);
       await BluetoothPrinterService.startScan();
+
+      clearScanTimeout();
+      scanTimeoutRef.current = setTimeout(() => {
+        scanTimeoutRef.current = null;
+        setIsScanning(false);
+      }, SCAN_TIMEOUT_MS);
     } catch {
       showSnackbar("Unable to scan for printers.", { type: "error" });
+      clearScanTimeout();
       setIsScanning(false);
     }
-  }, [requestPermissions]);
+  }, [requestPermissions, clearScanTimeout]);
 
   const pairPrinter = useCallback(async (address: string): Promise<boolean> => {
     try {
