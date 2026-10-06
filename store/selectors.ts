@@ -40,6 +40,7 @@ export const todaysTransactions$ = computed(() => {
       createdAt: item.createdAt,
       status: item.status,
       error: item.error,
+      permanent: item.permanent,
     }));
 });
 /**
@@ -47,11 +48,19 @@ export const todaysTransactions$ = computed(() => {
  */
 /**
  * Today's Collection Amount
+ *
+ * Feeds the daily collection-limit check (utils/collectionLimit.ts), so a
+ * permanently-failed deposit (4xx rejection / unsupported bank type) — which
+ * will never actually be collected — must NOT count against it, even though it
+ * still shows up in todaysTransactions$'s history for visibility.
  */
 export const todaysCollectionAmount$ = computed(() => {
   const transactions = todaysTransactions$.get();
 
   return transactions.reduce((total, item) => {
+    if (item.status === 'failed' && item.permanent) {
+      return total;
+    }
     return total + Number(item.collectedAmount || 0);
   }, 0);
 });

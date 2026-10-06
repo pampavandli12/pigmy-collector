@@ -1,5 +1,6 @@
 import { collectionSummarySchema, Customer, customerSchema, SyncableTransactionPayload } from '@/types/user';
 import { API_ENDPOINTS } from '@/utils/constants';
+import { showSnackbar } from '@/utils/snackbar';
 import { getBankAdapter } from './banks/registry';
 import { api } from './axios';
 
@@ -34,6 +35,12 @@ export const fetchCustomers = async ({
 
   if (skipped > 0) {
     console.warn(`Skipped ${skipped} malformed customer record(s) from the server.`);
+    // Silently dropping records left the agent with no way to know a customer
+    // was missing from their list; surface a visible (if unobtrusive) signal.
+    showSnackbar(
+      `${skipped} customer record${skipped === 1 ? '' : 's'} could not be loaded.`,
+      { type: 'error' },
+    );
   }
 
   return customers;

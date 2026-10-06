@@ -2,6 +2,7 @@ import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 import {
   PIN_ATTEMPT_SECURE_STORE_KEY,
+  PIN_SALT_SECURE_STORE_KEY,
   PIN_SECURE_STORE_KEY,
 } from '@/utils/constants';
 
@@ -29,8 +30,26 @@ export function resetPinAttempts() {
   memory = { failures: 0 };
 }
 
-export async function hashPin(pin: string) {
-  return Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, pin);
+// A 6-digit PIN is only a 10^6 space, so an unsalted hash is trivially
+// reversible via a precomputed table if the stored value is ever extracted.
+// `salt` defaults to '' so this stays the plain, backward-compatible digest
+// for verifying/upgrading pre-existing unsalted hashes (see storedPinMatches).
+export async function hashPin(pin: string, salt = '') {
+  return Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, salt + pin);
+}
+
+async function generateSalt(): Promise<string> {
+  const bytes = await Crypto.getRandomBytesAsync(16);
+  return Array.from(bytes)
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+export async function storePin(pin: string): Promise<void> {
+  const salt = await generateSalt();
+  const hash = await hashPin(pin, salt);
+  await SecureStore.setItemAsync(PIN_SALT_SECURE_STORE_KEY, salt);
+  await SecureStore.setItemAsync(PIN_SECURE_STORE_KEY, hash);
 }
 
 export function isUsableStoredPin(storedPin: string | null) {
@@ -42,10 +61,18 @@ export function isUsableStoredPin(storedPin: string | null) {
 
 export async function storedPinMatches(storedPin: string | null, pin: string) {
   if (!storedPin) return false;
-  const hashed = await hashPin(pin);
-  if (storedPin === hashed) return true;
-  if (storedPin === pin) {
-    await SecureStore.setItemAsync(PIN_SECURE_STORE_KEY, hashed);
+
+  const salt = await SecureStore.getItemAsync(PIN_SALT_SECURE_STORE_KEY);
+  if (salt) {
+    return storedPin === (await hashPin(pin, salt));
+  }
+
+  // No salt on record: this is a pre-upgrade unsalted hash, or (older still) a
+  // plaintext-stored PIN. Verify against both, then upgrade to a fresh salted
+  // hash on success so the weaker forms are never checked again.
+  const unsaltedHash = await hashPin(pin);
+  if (storedPin === unsaltedHash || storedPin === pin) {
+    await storePin(pin);
     return true;
   }
   return false;

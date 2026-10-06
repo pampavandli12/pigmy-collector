@@ -6,7 +6,7 @@ import { AuthProvider, useAuth } from '../providers/AuthProvider';
 import { authenticateAgent } from '../services/authenticate';
 import { saveAndActivateAccount } from '../services/authStorage';
 import { authUserSchema } from '../types/auth';
-import { hashPin, resetPinAttempts } from '../utils/appPin';
+import { resetPinAttempts } from '../utils/appPin';
 
 jest.mock('../services/authenticate', () => ({
   authenticateAgent: jest.fn(),
@@ -58,7 +58,9 @@ test('validates complete authentication users', () => {
 
 test('restores a valid stored user in the locked state', async () => {
   (SecureStore.getItemAsync as jest.Mock).mockImplementation((key: string) =>
-    Promise.resolve(key === 'userInfo' ? JSON.stringify(user) : '123456'),
+    Promise.resolve(
+      key === 'userInfo' ? JSON.stringify(user) : key === 'appPin' ? '123456' : null,
+    ),
   );
   const wrapper = ({ children }: { children: React.ReactNode }) => (
     <AuthProvider>{children}</AuthProvider>
@@ -78,7 +80,9 @@ test('logs out revoked agents when the lock screen loads', async () => {
     graceDays: 0,
   });
   (SecureStore.getItemAsync as jest.Mock).mockImplementation((key: string) =>
-    Promise.resolve(key === 'userInfo' ? JSON.stringify(user) : '123456'),
+    Promise.resolve(
+      key === 'userInfo' ? JSON.stringify(user) : key === 'appPin' ? '123456' : null,
+    ),
   );
   const wrapper = ({ children }: { children: React.ReactNode }) => (
     <AuthProvider>{children}</AuthProvider>
@@ -102,9 +106,15 @@ test('sets up a PIN and keeps it when logging out', async () => {
   expect(SecureStore.setItemAsync).toHaveBeenCalledWith('userInfo', JSON.stringify(user));
   expect(result.current.authStatus).toBe('pinSetupRequired');
   await act(async () => result.current.setupPin('123456'));
+  // The PIN is stored as a per-install-salted hash (not the plain unsalted
+  // digest) — assert the storage format rather than a fixed hash value.
+  expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
+    'appPinSalt',
+    expect.stringMatching(/^[0-9a-f]{32}$/),
+  );
   expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
     'appPin',
-    await hashPin('123456'),
+    expect.stringMatching(/^[0-9a-f]{64}$/),
   );
   expect(result.current.authStatus).toBe('unlocked');
   await act(async () => result.current.logout());
@@ -114,7 +124,9 @@ test('sets up a PIN and keeps it when logging out', async () => {
 
 test('unlocks only when the stored PIN matches', async () => {
   (SecureStore.getItemAsync as jest.Mock).mockImplementation((key: string) =>
-    Promise.resolve(key === 'userInfo' ? JSON.stringify(user) : '123456'),
+    Promise.resolve(
+      key === 'userInfo' ? JSON.stringify(user) : key === 'appPin' ? '123456' : null,
+    ),
   );
   const wrapper = ({ children }: { children: React.ReactNode }) => (
     <AuthProvider>{children}</AuthProvider>
@@ -131,7 +143,9 @@ test('unlocks only when the stored PIN matches', async () => {
 
 test('locks the PIN after repeated incorrect attempts', async () => {
   (SecureStore.getItemAsync as jest.Mock).mockImplementation((key: string) =>
-    Promise.resolve(key === 'userInfo' ? JSON.stringify(user) : '123456'),
+    Promise.resolve(
+      key === 'userInfo' ? JSON.stringify(user) : key === 'appPin' ? '123456' : null,
+    ),
   );
   const wrapper = ({ children }: { children: React.ReactNode }) => (
     <AuthProvider>{children}</AuthProvider>
@@ -256,7 +270,9 @@ test('locks only after a real absence, not a transient background', async () => 
       };
     });
   (SecureStore.getItemAsync as jest.Mock).mockImplementation((key: string) =>
-    Promise.resolve(key === 'userInfo' ? JSON.stringify(user) : '123456'),
+    Promise.resolve(
+      key === 'userInfo' ? JSON.stringify(user) : key === 'appPin' ? '123456' : null,
+    ),
   );
   const wrapper = ({ children }: { children: React.ReactNode }) => (
     <AuthProvider>{children}</AuthProvider>
@@ -301,6 +317,58 @@ test('locks only after a real absence, not a transient background', async () => 
     listeners.forEach((listener) => listener('active'));
   });
   await waitFor(() => expect(result.current.authStatus).toBe('locked'));
+
+  nowSpy.mockRestore();
+  subscription.mockRestore();
+});
+
+test('re-verifying from the lock screen never passes through the loading state', async () => {
+  const listeners = new Set<(state: string) => void>();
+  const subscription = jest
+    .spyOn(AppState, 'addEventListener')
+    .mockImplementation((_type, listener) => {
+      const typedListener = listener as (state: string) => void;
+      listeners.add(typedListener);
+      return {
+        remove: () => {
+          listeners.delete(typedListener);
+        },
+      };
+    });
+  (SecureStore.getItemAsync as jest.Mock).mockImplementation((key: string) =>
+    Promise.resolve(
+      key === 'userInfo' ? JSON.stringify(user) : key === 'appPin' ? '123456' : null,
+    ),
+  );
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <AuthProvider>{children}</AuthProvider>
+  );
+  const { result } = renderHook(() => useAuth(), { wrapper });
+
+  await waitFor(() => expect(result.current.authStatus).toBe('locked'));
+
+  const statusesSeen: string[] = [result.current.authStatus];
+  const nowSpy = jest.spyOn(Date, 'now');
+
+  // Even a real absence (past the grace window) while already on the lock
+  // screen must re-verify in place — `authStatus` must stay 'locked'
+  // throughout, never bouncing through 'loading' (which would unmount the
+  // mounted PIN screen and any digits the agent had already typed).
+  nowSpy.mockReturnValue(1_000);
+  await act(async () => {
+    listeners.forEach((listener) => listener('background'));
+  });
+  statusesSeen.push(result.current.authStatus);
+
+  nowSpy.mockReturnValue(60_000);
+  await act(async () => {
+    listeners.forEach((listener) => listener('active'));
+  });
+  statusesSeen.push(result.current.authStatus);
+
+  await waitFor(() => expect(mockedAuthenticateAgent).toHaveBeenCalledTimes(2));
+  expect(result.current.authStatus).toBe('locked');
+  expect(statusesSeen.every((status) => status === 'locked')).toBe(true);
 
   nowSpy.mockRestore();
   subscription.mockRestore();

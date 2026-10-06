@@ -22,6 +22,7 @@ import {
   evaluateGracePeriod,
   GRACE_PERIOD_EXCEEDED_MESSAGE,
 } from '@/utils/gracePeriod';
+import { parseDepositAmount } from '@/utils/depositAmount';
 import { getErrorMessage } from '@/utils/errors';
 import { showSnackbar } from '@/utils/snackbar';
 import { useSelector } from '@legendapp/state/react';
@@ -122,8 +123,8 @@ export default function UserDetail() {
         return;
       }
 
-      const numericAmount = Number(amount);
-      if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      const numericAmount = parseDepositAmount(amount);
+      if (numericAmount === null) {
         showSnackbar(INVALID_DEPOSIT_MESSAGE, { type: 'error' });
         release();
         return;

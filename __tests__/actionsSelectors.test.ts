@@ -43,6 +43,42 @@ test('adds a transaction only once and updates selectors', () => {
   expect(totalCustomerCount$.peek()).toBe(0);
 });
 
+test('excludes a permanently-failed deposit from the daily collection amount but keeps it in history', () => {
+  store$.outbox.old.set({
+    payload: { transactionId: 'ok', userId: 1, agentCode: 2, bankCode: 'B', collectedAmount: 100, schemename: 'P', schemeId: '38', collectiontype: 'cash', customerName: 'A', accountNumber: 3 },
+    status: 'synced',
+    retryCount: 0,
+    createdAt: Date.now(),
+  });
+  store$.outbox.rejected.set({
+    payload: { transactionId: 'rejected', userId: 1, agentCode: 2, bankCode: 'B', collectedAmount: 250, schemename: 'P', schemeId: '38', collectiontype: 'cash', customerName: 'A', accountNumber: 3 },
+    status: 'failed',
+    permanent: true,
+    retryCount: 1,
+    createdAt: Date.now(),
+  });
+
+  // Visible in the transaction history...
+  expect(todaysTransactionCount$.peek()).toBe(2);
+  // ...but the rejected amount must not count against the daily limit.
+  expect(todaysCollectionAmount$.peek()).toBe(100);
+});
+
+test('excludes a permanently-failed deposit from unsynced balance totals on refresh', async () => {
+  store$.outbox.rejected.set({
+    payload: { transactionId: 'rejected', userId: 1, agentCode: 2, bankCode: 'B', collectedAmount: 250, schemename: 'P', schemeId: '38', collectiontype: 'cash', customerName: 'A', accountNumber: 10 },
+    status: 'failed',
+    permanent: true,
+    retryCount: 1,
+    createdAt: Date.now(),
+  });
+  (fetchCustomers as jest.Mock).mockResolvedValue([
+    { accountNumber: 10, customerName: 'A', currentBalance: 1000, lastDepositDate: '', schemeId: 'P', agentCode: 1, bankCode: 'B', mobilenumber: '9', userId: 2 },
+  ]);
+  await actions.syncCustomers(1, 'B');
+  expect(store$.customers[10].currentBalance.peek()).toBe(1000);
+});
+
 test('keeps previous-day transactions out of today selectors', () => {
   const old = new Date();
   old.setDate(old.getDate() - 1);

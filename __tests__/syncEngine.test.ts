@@ -24,6 +24,7 @@ beforeEach(() => {
   // Clear any backoff retry timer armed by a previous test's failed item.
   stopOutboxSync();
   store$.outbox.set({});
+  store$.customers.set({});
 });
 
 afterEach(() => {
@@ -274,6 +275,51 @@ test('holds a client rejection until it is manually retried', async () => {
     status: 'failed',
     retryHeld: true,
   });
+});
+
+test('reverts the customer balance once a deposit permanently fails, but not on a transient failure', async () => {
+  (NetInfo.fetch as jest.Mock).mockResolvedValue({ isConnected: true });
+  store$.customers[payload.accountNumber].set({
+    accountNumber: payload.accountNumber,
+    customerName: 'Customer',
+    currentBalance: 500,
+    lastDepositDate: '',
+    schemeId: '38',
+    agentCode: 2,
+    bankCode: 'B',
+    mobilenumber: '9',
+    userId: 1,
+  });
+
+  // A transient (non-4xx) failure must NOT touch the balance — the deposit may
+  // still succeed on retry.
+  (createTransaction as jest.Mock).mockRejectedValueOnce(new Error('Server unavailable'));
+  store$.outbox['tx-1'].set({
+    payload,
+    status: 'pending',
+    retryCount: 0,
+    createdAt: Date.now(),
+  });
+  await processOutbox();
+  expect(store$.customers[payload.accountNumber].currentBalance.peek()).toBe(500);
+
+  // A definite client rejection (4xx) permanently fails — the balance must be
+  // reverted back out since this amount was never actually collected.
+  const rejection = new Error('Rejected');
+  Object.assign(rejection, { response: { status: 400 } });
+  (createTransaction as jest.Mock).mockRejectedValueOnce(rejection);
+  store$.outbox['tx-1'].assign({
+    status: 'pending',
+    nextRetryAt: undefined,
+  });
+  await processOutbox();
+
+  expect(store$.outbox['tx-1'].peek()).toMatchObject({
+    status: 'failed',
+    permanent: true,
+    balanceReverted: true,
+  });
+  expect(store$.customers[payload.accountNumber].currentBalance.peek()).toBe(400);
 });
 
 test('schedules a backoff retry that drains the queue when it becomes due', async () => {

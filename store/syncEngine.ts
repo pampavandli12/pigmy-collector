@@ -5,6 +5,7 @@ import { OutboxItem } from '@/types/user';
 import { getErrorMessage } from '@/utils/errors';
 import { showSnackbar } from '@/utils/snackbar';
 
+import { revertCustomerBalanceForFailedTransaction } from './customerBalance';
 import {
   buildSyncFailure,
   canAutoRetry,
@@ -102,6 +103,16 @@ async function runOutboxPass() {
           updateAgentOutboxItem(syncAccountId, txId, failure);
         }
         break;
+      }
+
+      // A permanent failure (4xx rejection / unsupported bank type) will never
+      // sync — undo the optimistic balance addition made when it was queued
+      // (store/actions.ts), or the customer's shown balance stays inflated by
+      // an amount that was never actually collected. Guarded by
+      // `balanceReverted` so this can't double-subtract if ever re-processed.
+      if (failure.permanent && !item.balanceReverted) {
+        revertCustomerBalanceForFailedTransaction(item.payload, item.createdAt);
+        failure.balanceReverted = true;
       }
 
       store$.outbox[txId].assign(failure);

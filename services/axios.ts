@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { InternalAxiosRequestConfig } from 'axios';
 import { isPublicAuthRoute } from '../utils/apiRoutes';
 import { API_BASE_URL } from '../utils/constants';
 import { handleAuthResponseError } from './authRefresh';
@@ -20,22 +20,38 @@ export const api = axios.create({
   },
 });
 
+type AugmentedRequestConfig = InternalAxiosRequestConfig & {
+  _agentAccountId?: string;
+  _authHeadersResolved?: boolean;
+};
+
 // Interceptor for adding auth token and logging requests/responses
 api.interceptors.request.use(
   async (config) => {
     config.headers['Content-Type'] = 'application/json';
+    const augmented = config as AugmentedRequestConfig;
 
     if (isPublicAuthRoute(config.url)) {
       applyAuthHeaders(config.headers, null);
-      delete (config as typeof config & { _agentAccountId?: string })
-        ._agentAccountId;
+      delete augmented._agentAccountId;
+      augmented._authHeadersResolved = true;
+      return config;
+    }
+
+    // A request replayed after a token refresh (services/authRefresh.ts) already
+    // carries the account context and freshly-refreshed Authorization header it
+    // was issued under. Re-deriving from "whichever account is active right now"
+    // on the replay pass would silently re-tag it with a different account's
+    // token/bankType if the active account changed mid-refresh. Only resolve
+    // auth headers once per request.
+    if (augmented._authHeadersResolved) {
       return config;
     }
 
     const auth = await getStoredAuthContext();
     applyAuthHeaders(config.headers, auth);
-    (config as typeof config & { _agentAccountId?: string })._agentAccountId =
-      auth?.accountId;
+    augmented._agentAccountId = auth?.accountId;
+    augmented._authHeadersResolved = true;
     return config;
   },
   (error) => {

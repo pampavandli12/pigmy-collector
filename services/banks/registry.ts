@@ -32,6 +32,11 @@ export function getRegisteredBankAdapter(
 export function getBankAdapter(
   payload: Pick<SyncableTransactionPayload, 'bankType'>,
 ): BankTransactionAdapter {
+  // Deliberate back-compat default, not an oversight: transactions queued
+  // before `bankType` existed (or otherwise missing it) route to banksoft —
+  // see __tests__/services.test.ts's "posts older transactions without a bank
+  // type to the banksoft endpoint". An explicitly-set but unrecognized
+  // bankType is still rejected below.
   if (payload.bankType === undefined) {
     return adaptersByType.get(BANKSOFT) ?? banksoftAdapter;
   }

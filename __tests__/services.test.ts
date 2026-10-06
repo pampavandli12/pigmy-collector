@@ -1,6 +1,7 @@
 jest.mock('../services/axios', () => ({
   api: { get: jest.fn(), post: jest.fn() },
 }));
+jest.mock('../utils/snackbar', () => ({ showSnackbar: jest.fn() }));
 
 import { api } from '../services/axios';
 import { userLogin } from '../services/login';
@@ -83,6 +84,55 @@ test('skips malformed customer records instead of failing the whole list', async
   await expect(
     fetchCustomers({ agentCode: 7, bankCode: 'B1' }),
   ).resolves.toEqual([validCustomer]);
+});
+
+test('coerces a string accountNumber from the server instead of dropping the record', async () => {
+  // The backend sends accountNumber as a numeric string (e.g. "101"), not a number.
+  const customerWithStringAccountNumber = {
+    accountNumber: '104',
+    customerName: 'PEERSAB N',
+    currentBalance: 200,
+    lastDepositDate: '23.02.23',
+    schemeId: '017D',
+    agentCode: 11,
+    bankCode: 'AGT123',
+    mobilenumber: '',
+    userId: 2155,
+  };
+  mockedApi.get.mockResolvedValueOnce({ data: [customerWithStringAccountNumber] });
+  await expect(
+    fetchCustomers({ agentCode: 11, bankCode: 'AGT123' }),
+  ).resolves.toEqual([{ ...customerWithStringAccountNumber, accountNumber: 104 }]);
+});
+
+test('accepts a null mobilenumber instead of dropping the whole customer record', async () => {
+  const customerWithNoPhone = {
+    accountNumber: 3,
+    customerName: 'No Phone Customer',
+    currentBalance: 50,
+    lastDepositDate: '2026-08-01',
+    schemeId: 'S1',
+    agentCode: 7,
+    bankCode: 'B1',
+    mobilenumber: null,
+    userId: 43,
+  };
+  mockedApi.get.mockResolvedValueOnce({ data: [customerWithNoPhone] });
+  await expect(
+    fetchCustomers({ agentCode: 7, bankCode: 'B1' }),
+  ).resolves.toEqual([customerWithNoPhone]);
+});
+
+test('shows a visible snackbar when customer records are skipped', async () => {
+  const { showSnackbar } = jest.requireMock('../utils/snackbar') as {
+    showSnackbar: jest.Mock;
+  };
+  mockedApi.get.mockResolvedValueOnce({ data: [{ accountNumber: 1 }] });
+  await fetchCustomers({ agentCode: 7, bankCode: 'B1' });
+  expect(showSnackbar).toHaveBeenCalledWith(
+    '1 customer record could not be loaded.',
+    { type: 'error' },
+  );
 });
 
 test('fetches collection summary with agent, bank, and grace day parameters', async () => {

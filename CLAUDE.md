@@ -8,14 +8,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-- `npm start` — Metro / Expo dev server.
-- `npm run android` / `npm run ios` — native dev builds. **Expo Go will not work** because of the custom `expo-thermal-printer` native module; use a dev client (`expo-dev-client`) or a native build.
-- `npm run lint` — ESLint (expo config). Run before handoff.
-- `npm run typecheck` — `tsc --noEmit`. Strict TypeScript; the `@/*` alias maps to the repo root.
-- `npm test` — Jest (`jest-expo`, run in band).
+This repo uses **pnpm** (`packageManager: pnpm@12.6.0` in package.json), not npm/yarn.
+
+- `pnpm start` — Metro / Expo dev server.
+- `pnpm run android` / `pnpm run ios` — native dev builds. **Expo Go will not work** because of the custom `expo-thermal-printer` native module; use a dev client (`expo-dev-client`) or a native build.
+- `pnpm run lint` — ESLint (expo config). Run before handoff.
+- `pnpm run typecheck` — `tsc --noEmit`. Strict TypeScript; the `@/*` alias maps to the repo root.
+- `pnpm test` — Jest (`jest-expo`, run in band).
 - Single file: `npx jest __tests__/syncEngine.test.ts`. Single test: add `-t "name substring"`.
-- `npm run test:coverage` — coverage (collected from `app`, `components`, `contexts`, `hooks`, `providers`, `services`, `store`, `utils`).
-- `npm install` runs `patch-package` via `postinstall`; `patches/` overrides must survive dependency bumps.
+- `pnpm run test:coverage` — coverage (collected from `app`, `components`, `contexts`, `hooks`, `providers`, `services`, `store`, `utils`).
+- `pnpm install` runs `patch-package` via `postinstall`; `patches/` overrides must survive dependency bumps.
 
 `jest.setup.ts` mocks native modules (MMKV, SecureStore, NetInfo, thermal printer, etc.); when a test touches a new native dependency, add its mock there.
 
@@ -44,7 +46,3 @@ Beyond the outbox model in AGENTS.md, `store/syncCoordinator.ts` guards concurre
 ## Config & constants
 
 Endpoints, SecureStore keys, and the MMKV encryption key live in `utils/constants.ts` (routes also in `utils/apiRoutes.ts`). API base URL comes from `EXPO_PUBLIC_API_BASE_URL` via `resolveApiBaseUrl`: dev falls back to `10.0.2.2:1010` (Android emulator) / `localhost:1010`, and production **requires** an `https://` URL (throws otherwise).
-
-## Note
-
-`~/.codex/config.toml` exists on this machine. To import user-level items (MCP servers, slash commands, subagents, skills, instructions) into Claude Code, reply `/import` to see what's importable, then `/import --yes=<digest>` to apply.

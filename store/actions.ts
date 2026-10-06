@@ -3,37 +3,26 @@ import { isRegisteredBankType } from '@/services/banks/registry';
 import { fetchCustomers } from '@/services/user';
 import { getActiveAgentId, store$ } from './store';
 
-import { Customer, OutboxItem, SyncableTransactionPayload, transactionPayloadSchema } from '@/types/user';
+import { Customer, OutboxItem, transactionPayloadSchema } from '@/types/user';
 import { isToday } from '@/utils/isToday';
 import { showSnackbar } from '@/utils/snackbar';
+import { updateCustomerBalanceForToday } from './customerBalance';
 import { cleanupOutbox, processOutbox } from './syncEngine';
-
-function updateCustomerBalanceForToday(
-  payload: SyncableTransactionPayload,
-  createdAt: number,
-) {
-  if (!isToday(createdAt)) {
-    return;
-  }
-
-  const customer$ = store$.customers[payload.accountNumber];
-  const customer = customer$.peek();
-
-  if (!customer) {
-    return;
-  }
-
-  customer$.currentBalance.set(
-    Number(customer.currentBalance || 0) + Number(payload.collectedAmount || 0),
-  );
-}
 
 function getTodaysUnsyncedTotalsByAccount() {
   const outbox = store$.outbox.peek();
 
   return Object.values(outbox).reduce(
     (acc, item) => {
-      if (!item || item.status === 'synced' || !isToday(item.createdAt)) {
+      // A permanently-failed item (4xx rejection / unsupported bank type) will
+      // never sync; its optimistic balance addition has already been reverted
+      // (store/syncEngine.ts) and must NOT be added back in here.
+      if (
+        !item ||
+        item.status === 'synced' ||
+        (item.status === 'failed' && item.permanent) ||
+        !isToday(item.createdAt)
+      ) {
         return acc;
       }
 

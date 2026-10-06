@@ -45,5 +45,6 @@ export const API_ENDPOINTS = {
 export const SECURE_STORE_KEY = 'userInfo';
 export const AGENT_ACCOUNTS_SECURE_STORE_KEY = 'agentAccounts';
 export const PIN_SECURE_STORE_KEY = 'appPin';
+export const PIN_SALT_SECURE_STORE_KEY = 'appPinSalt';
 export const PIN_ATTEMPT_SECURE_STORE_KEY = 'appPinAttempts';
 export const MMKV_ENCRYPTION_KEY = 'mmkvEncryptionKey';

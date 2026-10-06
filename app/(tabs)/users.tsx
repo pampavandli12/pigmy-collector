@@ -115,7 +115,10 @@ export default function Users() {
           name: customer.customerName.trim(),
           balance: customer.currentBalance.toString(),
           account: customer.accountNumber.toString(),
-          mobilenumber: customer.mobilenumber,
+          // '' is this app's established "no phone on file" sentinel
+          // (hasUsablePhoneNumber/TransactionSuccess's default already treat it
+          // that way) — route params must be strings, so normalize null here.
+          mobilenumber: customer.mobilenumber ?? '',
         },
       });
     },

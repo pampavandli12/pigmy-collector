@@ -30,7 +30,8 @@ jest.mock('../utils/whatsappReceipt', () => ({
   getWhatsAppReceiptErrorMessage: jest
     .fn()
     .mockReturnValue('Unable to create or share the receipt on WhatsApp.'),
-  hasUsablePhoneNumber: (phone: string) => /^\d{10,15}$/.test(phone),
+  hasUsablePhoneNumber: (phone: string) =>
+    /^\d{10,15}$/.test(String(phone ?? '').replace(/\D/g, '')),
   isShareCancellationError: jest.fn().mockReturnValue(false),
   shareReceiptToWhatsApp: jest.fn().mockResolvedValue(undefined),
   WhatsAppUnavailableError: class WhatsAppUnavailableError extends Error {},
@@ -223,6 +224,36 @@ test('opens SMS composer with bank name and post-transaction balance', async () 
   expect(smsBody).toContain('₹100');
   expect(smsBody).toContain('Total Balance: ₹1,000.00');
   expect(smsBody).toContain('Account No: 60001');
+});
+
+test('strips punctuation from the phone number before sending SMS', async () => {
+  const isAvailableAsync = SMS.isAvailableAsync as jest.Mock;
+  const sendSMSAsync = SMS.sendSMSAsync as jest.Mock;
+  sendSMSAsync.mockClear();
+  isAvailableAsync.mockResolvedValueOnce(true);
+
+  const screen = render(
+    <TransactionSuccess
+      customerName='Customer'
+      customerId='2053'
+      accountNumber='60001'
+      amount='₹100'
+      openingBalance={900}
+      totalBalance={1000}
+      scheme='Pigmy Deposit'
+      date='July 24, 2026'
+      mobilenumber='9123-456 780'
+    />,
+    { wrapper },
+  );
+
+  fireEvent.press(screen.getByText('Send SMS'));
+
+  await waitFor(() => expect(sendSMSAsync).toHaveBeenCalledTimes(1));
+  expect(sendSMSAsync).toHaveBeenCalledWith(
+    ['9123456780'],
+    expect.any(String),
+  );
 });
 
 test('prints bank and agent details without the customer phone number', async () => {

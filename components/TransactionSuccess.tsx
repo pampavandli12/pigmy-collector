@@ -82,11 +82,21 @@ export const TransactionSuccess = ({
   const onSendSms = async () => {
     if (!hasPhoneNumber) return;
 
+    // Strip formatting (spaces/dashes/parens) before handing the number to the
+    // native SMS composer — a punctuated string like "091-234 567890" is
+    // "usable" per hasUsablePhoneNumber but can fail to route correctly on some
+    // devices/carriers. Deliberately NOT reusing normalizeWhatsAppNumber's full
+    // reformatting here: it prepends a country code, which would change the
+    // digit count of an already-well-formed domestic number and risks breaking
+    // SMS sends that work fine today — only the punctuation is the problem.
+    const digitsOnlyNumber = mobilenumber.replace(/\D/g, '');
+    if (!digitsOnlyNumber) return;
+
     try {
       const isAvailable = await SMS.isAvailableAsync();
       if (isAvailable) {
         await SMS.sendSMSAsync(
-          [mobilenumber],
+          [digitsOnlyNumber],
           `Dear ${customerName}, ${amount} has been collected successfully towards ${scheme} on ${date}. Account No: ${accountNumber}. Total Balance: ${formatIndianCurrency(totalBalance)}. Thank you for banking with ${agentInfo?.bankName ?? 'us'}.`,
         );
       } else {

@@ -70,8 +70,14 @@ function getRefreshPromise(
 ) {
   const existing = refreshPromises.get(accountId);
   if (existing) return existing;
-  const promise = refreshSession(accountId, dependencies).finally(() => {
-    refreshPromises.delete(accountId);
+  const promise: Promise<Awaited<ReturnType<typeof refreshSession>>> = refreshSession(accountId, dependencies).finally(() => {
+    // Only clear the entry if it's still THIS promise. resetRefreshState()
+    // (switchAccount/logout) can clear the map while this promise is still
+    // in-flight; if a newer refresh for the same accountId was started in the
+    // meantime, this stale cleanup must not delete its entry out from under it.
+    if (refreshPromises.get(accountId) === promise) {
+      refreshPromises.delete(accountId);
+    }
   });
   refreshPromises.set(accountId, promise);
   return promise;
@@ -113,8 +119,13 @@ export async function handleAuthResponseError<T>(
   if (!accountId) return Promise.reject(error);
 
   // The Pigmy API returns 403 (not only 401) when an access token has expired, so
-  // both statuses get one refresh attempt. Once we've already refreshed and
-  // replayed this request:
+  // both statuses get one refresh attempt. Known tradeoff: the API also uses 403
+  // for pure business/permission denials that have nothing to do with token
+  // expiry, and this code cannot tell the two apart on the FIRST 403 (only the
+  // backend knows which one it meant) — so a business-rule 403 still costs one
+  // extra refresh round trip before falling through unchanged below. Revisit if
+  // the backend ever adds a distinguishing error code/body to first-403 responses.
+  // Once we've already refreshed and replayed this request:
   //  - a repeat 401 means even the refreshed token is unauthenticated → the
   //    credentials are no longer valid (e.g. an admin reset the account) → end
   //    the session.

@@ -25,10 +25,10 @@ import {
 import {
   assertPinAvailable,
   clearPinAttempts,
-  hashPin,
   isUsableStoredPin,
   recordFailedPinAttempt,
   storedPinMatches,
+  storePin,
 } from '@/utils/appPin';
 import { PIN_SECURE_STORE_KEY } from '@/utils/constants';
 import { showSnackbar } from '@/utils/snackbar';
@@ -260,11 +260,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         nextState === 'background' &&
         hasPinRef.current &&
         userRef.current &&
-        authStatusRef.current === 'unlocked'
+        (authStatusRef.current === 'unlocked' || authStatusRef.current === 'locked')
       ) {
-        // Defer the decision to lock until we come back: record when we left.
-        // A transient background (e.g. a Bluetooth/permission system dialog)
-        // returns within AUTO_LOCK_GRACE_MS and must not force a PIN re-entry.
+        // Defer the decision to (re-)lock until we come back: record when we
+        // left, whether we were unlocked or already on the lock screen. A
+        // transient background (e.g. a Bluetooth/permission system dialog, a
+        // notification pulldown) returns within AUTO_LOCK_GRACE_MS and must not
+        // force a re-verification that could interrupt in-progress PIN entry.
         backgroundedAtRef.current = Date.now();
         return;
       }
@@ -276,19 +278,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       const backgroundedAt = backgroundedAtRef.current;
       backgroundedAtRef.current = null;
 
-      const lockAfterAbsence =
-        authStatusRef.current === 'unlocked' &&
+      const wasRealAbsence =
         backgroundedAt !== null &&
         Date.now() - backgroundedAt >= AUTO_LOCK_GRACE_MS;
 
-      // Nothing to do for a brief return while unlocked; only lock after a real
-      // absence, or re-verify when we were already locked.
-      if (!lockAfterAbsence && authStatusRef.current !== 'locked') {
+      // A brief blip (whether we were unlocked or already locked) leaves
+      // everything — including any digits already typed on the PIN screen —
+      // exactly as it was.
+      if (!wasRealAbsence) {
         return;
       }
 
+      if (authStatusRef.current === 'unlocked') {
+        // A real absence while unlocked re-locks immediately. This only swaps
+        // the protected route to the PIN screen (app/_layout.tsx's
+        // Stack.Protected) — it must NOT go through `authStatus === 'loading'`,
+        // which unmounts the entire app tree instead of just navigating within
+        // it (see the `authStatus === 'loading'` render below).
+        authStatusRef.current = 'locked';
+        setAuthStatus('locked');
+      }
+      // Otherwise we were already locked: re-verify below without touching
+      // `authStatus`, so the mounted PIN screen is never unmounted/remounted.
+
       const activeUser = userRef.current;
-      setAuthStatus('loading');
       void verifyAgentOnLockScreen(activeUser).then((status) => {
         // Skip re-locking if verification deactivated the account (revoked or
         // admin-reset) and there is no longer an active user; deactivateAccount
@@ -356,7 +369,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     if (!/^\d{6}$/.test(pin)) {
       throw new Error('PIN must contain exactly six digits.');
     }
-    await SecureStore.setItemAsync(PIN_SECURE_STORE_KEY, await hashPin(pin));
+    await storePin(pin);
     hasPinRef.current = true;
     setHasPin(true);
     setAuthStatus('unlocked');
@@ -417,6 +430,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     [accounts, authStatus, getToken, getUser, login, logout, reauthenticateAccount, sessionNotice, setupPin, switchAccount, unlockWithPin, user],
   );
 
+  // Only the initial boot-time load (loadAuthState above) sets 'loading'; the
+  // AppState re-lock listener never does, specifically so returning from a
+  // background/foreground transition re-verifies without unmounting the whole
+  // app tree (and any mounted PIN entry) behind this spinner.
   if (authStatus === 'loading') {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>

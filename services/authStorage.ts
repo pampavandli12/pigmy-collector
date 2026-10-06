@@ -284,22 +284,27 @@ async function readActiveUser(): Promise<AuthUser | null> {
 }
 
 export async function getStoredUser(): Promise<AuthUser | null> {
-  const user = await readActiveUser();
-  if (!user) return null;
-  const accounts = await readStoredAccounts();
-  const id = getAgentAccountId(user);
-  const existing = accounts[id];
-  if (!existing || !toAuthUser(existing)) {
-    accounts[id] = {
-      profile: toProfile(user),
-      accessToken: user.accessToken,
-      refreshToken: user.refreshToken,
-      status: 'available',
-      lastUsedAt: existing?.lastUsedAt || Date.now(),
-    };
-    await writeStoredAccounts(accounts);
-  }
-  return user;
+  // Runs on essentially every request (via getStoredAuthContext). Its write
+  // branch must share the same serialization as every other mutator here, or a
+  // concurrent updateStoredTokensForAccount write can be silently clobbered.
+  return serializeAccountWrite(async () => {
+    const user = await readActiveUser();
+    if (!user) return null;
+    const accounts = await readStoredAccounts();
+    const id = getAgentAccountId(user);
+    const existing = accounts[id];
+    if (!existing || !toAuthUser(existing)) {
+      accounts[id] = {
+        profile: toProfile(user),
+        accessToken: user.accessToken,
+        refreshToken: user.refreshToken,
+        status: 'available',
+        lastUsedAt: existing?.lastUsedAt || Date.now(),
+      };
+      await writeStoredAccounts(accounts);
+    }
+    return user;
+  });
 }
 
 export async function getStoredAuthContext() {

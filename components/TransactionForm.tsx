@@ -1,4 +1,5 @@
 import { useAuth } from '@/providers/AuthProvider';
+import { parseDepositAmount } from '@/utils/depositAmount';
 import { Picker } from '@react-native-picker/picker';
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
@@ -28,20 +29,6 @@ interface TransactionFormProps {
   date: string;
   handleConfirm: () => void;
   isTransactionLoading: boolean;
-}
-
-function parseDepositAmount(value: string) {
-  const trimmed = String(value ?? '').trim();
-  if (!trimmed) {
-    return null;
-  }
-
-  const numericAmount = Number(trimmed);
-  if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
-    return null;
-  }
-
-  return numericAmount;
 }
 
 export const TransactionForm = ({
@@ -218,7 +205,7 @@ export const TransactionForm = ({
         <Button
           mode='contained'
           onPress={handleConfirm}
-          disabled={disableConfirm}
+          disabled={disableConfirm || isTransactionLoading}
           style={styles.confirmButton}
           loading={isTransactionLoading}
           labelStyle={styles.confirmButtonText}

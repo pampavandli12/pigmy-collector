@@ -9,7 +9,9 @@ export interface Customer {
 
   agentCode: number;
   bankCode: string;
-  mobilenumber: string;
+  // Nullable: a customer with no phone on file must not disqualify the whole
+  // record from customerSchema (see services/user.ts's per-record parsing).
+  mobilenumber: string | null;
   userId: number;
 }
 
@@ -50,6 +52,12 @@ export interface OutboxItem {
   // that will never succeed on retry — distinct from a transient failure that
   // merely exhausted its automatic attempts. A manual "retry failed" skips these.
   permanent?: boolean;
+
+  // True once the balance this transaction added at queue time has been
+  // subtracted back out after a `permanent` failure. Guards
+  // revertCustomerBalanceForFailedTransaction against double-reverting if a
+  // permanent item is ever re-processed.
+  balanceReverted?: boolean;
 }
 
 export const INVALID_DEPOSIT_MESSAGE = 'Enter an amount greater than zero.';
@@ -57,14 +65,19 @@ export const UNABLE_TO_SAVE_DEPOSIT_MESSAGE = 'Unable to save this deposit.';
 export const SCHEME_REQUIRED_MESSAGE = 'Select a scheme.';
 
 export const customerSchema = z.object({
-  accountNumber: z.number().int(),
+  // The server sends this as a numeric string (e.g. "101"), not a number.
+  accountNumber: z.coerce.number().int(),
   customerName: z.string().min(1),
   currentBalance: z.number().finite(),
   lastDepositDate: z.string(),
   schemeId: z.string(),
   agentCode: z.number().int(),
   bankCode: z.string().min(1),
-  mobilenumber: z.string(),
+  // A customer with no phone on file legitimately has a missing/null value
+  // here; requiring it would drop the entire record (see services/user.ts).
+  // hasUsablePhoneNumber/normalizeWhatsAppNumber already gate SMS/WhatsApp use
+  // at the point of use, so no format validation belongs here.
+  mobilenumber: z.string().nullable(),
   userId: z.number().int(),
 });
 

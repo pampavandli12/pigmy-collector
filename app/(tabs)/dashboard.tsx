@@ -1,42 +1,42 @@
-import { AgentAccountSwitcher } from '@/components/AgentAccountSwitcher';
-import { useAuth } from '@/providers/AuthProvider';
-import { fetchCollections } from '@/services/user';
-import { todaysTransactions$, totalCustomerCount$ } from '@/store/selectors';
-import { CollectionSummary, SyncStatus } from '@/types/user';
-import { showSnackbar } from '@/utils/snackbar';
-import { useSelector } from '@legendapp/state/react';
-import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import { Avatar, Card, Icon, Text } from 'react-native-paper';
+import { AgentAccountSwitcher } from "@/components/AgentAccountSwitcher";
+import { useAuth } from "@/providers/AuthProvider";
+import { fetchCollections } from "@/services/user";
+import { todaysTransactions$, totalCustomerCount$ } from "@/store/selectors";
+import { CollectionSummary, SyncStatus } from "@/types/user";
+import { showSnackbar } from "@/utils/snackbar";
+import { useSelector } from "@legendapp/state/react";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
+import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Avatar, Card, Icon, Text } from "react-native-paper";
 
 const syncStatusPresentation: Record<
   SyncStatus,
   { label: string; icon: string; color: string; backgroundColor: string }
 > = {
   synced: {
-    label: 'Synced',
-    icon: 'check-circle',
-    color: '#2E7D32',
-    backgroundColor: '#E8F5E9',
+    label: "Synced",
+    icon: "check-circle",
+    color: "#2E7D32",
+    backgroundColor: "#E8F5E9",
   },
   pending: {
-    label: 'Pending',
-    icon: 'clock-outline',
-    color: '#9A6700',
-    backgroundColor: '#FFF8E1',
+    label: "Pending",
+    icon: "clock-outline",
+    color: "#9A6700",
+    backgroundColor: "#FFF8E1",
   },
   syncing: {
-    label: 'Syncing',
-    icon: 'sync',
-    color: '#1565C0',
-    backgroundColor: '#E3F2FD',
+    label: "Syncing",
+    icon: "sync",
+    color: "#1565C0",
+    backgroundColor: "#E3F2FD",
   },
   failed: {
-    label: 'Failed',
-    icon: 'alert-circle',
-    color: '#C62828',
-    backgroundColor: '#FFEBEE',
+    label: "Failed",
+    icon: "alert-circle",
+    color: "#C62828",
+    backgroundColor: "#FFEBEE",
   },
 };
 
@@ -46,7 +46,7 @@ const emptySummary: CollectionSummary = {
 };
 
 function formatCollectionAmount(amount: number) {
-  return amount.toLocaleString('en-IN', {
+  return amount.toLocaleString("en-IN", {
     maximumFractionDigits: 2,
   });
 }
@@ -74,7 +74,7 @@ export default function Dashboard() {
       });
       setCollectionSummary(summary);
     } catch {
-      showSnackbar('Unable to refresh collection summary.', { type: 'error' });
+      showSnackbar("Unable to refresh collection summary.", { type: "error" });
     }
   }, [user]);
 
@@ -106,12 +106,12 @@ export default function Dashboard() {
         <Card style={styles.collectionCard}>
           <Card.Content>
             <View style={styles.collectionHeader}>
-              <Icon source='wallet' size={24} color='#fff' />
-              <Text variant='titleMedium' style={styles.collectionLabel}>
-                Today&apos;s Collection
+              <Icon source="wallet" size={24} color="#fff" />
+              <Text variant="titleMedium" style={styles.collectionLabel}>
+                Total Collection
               </Text>
             </View>
-            <Text variant='displaySmall' style={styles.collectionAmount}>
+            <Text variant="displaySmall" style={styles.collectionAmount}>
               ₹{formatCollectionAmount(collectionSummary.totalAmountCollected)}
             </Text>
           </Card.Content>
@@ -121,19 +121,19 @@ export default function Dashboard() {
           <Card style={styles.statCard}>
             <Card.Content style={styles.statContent}>
               <View style={styles.transactionContent}>
-                <Text variant='titleLarge' style={styles.statValue}>
+                <Text variant="titleLarge" style={styles.statValue}>
                   {collectionSummary.totalTransactions}
                 </Text>
-                <Text variant='bodySmall' style={styles.statLabel}>
-                  Today&apos;s Transactions
+                <Text variant="bodySmall" style={styles.statLabel}>
+                  Todtal Transactions
                 </Text>
               </View>
 
               <View style={styles.customerContent}>
-                <Text variant='titleLarge' style={styles.statValue}>
+                <Text variant="titleLarge" style={styles.statValue}>
                   {totalCustomerCount}
                 </Text>
-                <Text variant='bodySmall' style={styles.statLabel}>
+                <Text variant="bodySmall" style={styles.statLabel}>
                   Total Customers
                 </Text>
               </View>
@@ -142,7 +142,7 @@ export default function Dashboard() {
         </View>
 
         <View style={styles.transactionsHeader}>
-          <Text variant='titleLarge' style={styles.transactionsTitle}>
+          <Text variant="titleLarge" style={styles.transactionsTitle}>
             Recent Transactions
           </Text>
         </View>
@@ -162,18 +162,18 @@ export default function Dashboard() {
                   style={styles.transactionAvatar}
                 />
                 <View style={styles.transactionInfo}>
-                  <Text variant='titleMedium' style={styles.transactionName}>
+                  <Text variant="titleMedium" style={styles.transactionName}>
                     {transaction.customerName}
                   </Text>
-                  <Text variant='bodySmall' style={styles.transactionDate}>
+                  <Text variant="bodySmall" style={styles.transactionDate}>
                     {new Date(transaction.createdAt).toLocaleDateString()}
                   </Text>
                 </View>
                 <View style={styles.transactionRight}>
-                  <Text variant='titleMedium' style={styles.transactionAmount}>
+                  <Text variant="titleMedium" style={styles.transactionAmount}>
                     +{transaction.collectedAmount.toFixed(2)}
                   </Text>
-                  <Text variant='bodySmall' style={styles.collectionType}>
+                  <Text variant="bodySmall" style={styles.collectionType}>
                     {transaction.collectiontype}
                   </Text>
                   <View
@@ -186,8 +186,11 @@ export default function Dashboard() {
                   >
                     <Icon source={status.icon} size={14} color={status.color} />
                     <Text
-                      variant='labelSmall'
-                      style={[styles.transactionStatus, { color: status.color }]}
+                      variant="labelSmall"
+                      style={[
+                        styles.transactionStatus,
+                        { color: status.color },
+                      ]}
                     >
                       {status.label}
                     </Text>
@@ -197,8 +200,8 @@ export default function Dashboard() {
             );
           })}
           {transactions.length === 0 && (
-            <View style={{ alignItems: 'center', marginTop: 32 }}>
-              <Text variant='bodyMedium' style={{ color: '#666' }}>
+            <View style={{ alignItems: "center", marginTop: 32 }}>
+              <Text variant="bodyMedium" style={{ color: "#666" }}>
                 No transactions yet
               </Text>
             </View>
@@ -212,121 +215,121 @@ export default function Dashboard() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: "#F5F5F5",
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: "#F5F5F5",
   },
   headerTitle: {
-    fontWeight: '700',
-    color: '#000',
+    fontWeight: "700",
+    color: "#000",
   },
   content: {
     flex: 1,
     paddingHorizontal: 16,
   },
   collectionCard: {
-    backgroundColor: '#4A90E2',
+    backgroundColor: "#4A90E2",
     borderRadius: 16,
     marginTop: 16,
     marginBottom: 16,
     elevation: 2,
   },
   collectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 8,
   },
   collectionLabel: {
-    color: '#fff',
+    color: "#fff",
     marginLeft: 8,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   collectionAmount: {
-    color: '#fff',
-    fontWeight: '700',
+    color: "#fff",
+    fontWeight: "700",
     marginBottom: 12,
   },
   statsRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
     marginBottom: 16,
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 12,
     elevation: 1,
   },
   statContent: {
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    display: 'flex',
-    flexDirection: 'row',
+    alignItems: "center",
+    justifyContent: "space-between",
+    display: "flex",
+    flexDirection: "row",
     gap: 8,
   },
   statIconContainer: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#FFF3E0',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#FFF3E0",
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 12,
   },
   statIconContainerGreen: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#E8F5E9',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#E8F5E9",
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 12,
   },
   statValue: {
-    fontWeight: '700',
-    color: '#000',
+    fontWeight: "700",
+    color: "#000",
     marginBottom: 4,
   },
   statLabel: {
-    color: '#666',
+    color: "#666",
     fontSize: 14,
   },
   actionButtonsRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 16,
     marginBottom: 24,
   },
   actionButtonContent: {
-    flexDirection: 'row-reverse',
+    flexDirection: "row-reverse",
   },
   actionButtonLabel: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   transactionsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 16,
   },
   transactionsTitle: {
-    fontWeight: '700',
-    color: '#000',
+    fontWeight: "700",
+    color: "#000",
   },
   transactionsList: {
     gap: 12,
     marginBottom: 24,
   },
   transactionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
     padding: 16,
     borderRadius: 12,
     elevation: 1,
@@ -341,45 +344,45 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   transactionName: {
-    fontWeight: '600',
-    color: '#000',
+    fontWeight: "600",
+    color: "#000",
     marginBottom: 4,
   },
   transactionDate: {
-    color: '#666',
+    color: "#666",
   },
   transactionRight: {
-    alignItems: 'flex-end',
+    alignItems: "flex-end",
   },
   transactionAmount: {
-    fontWeight: '700',
-    color: '#4A90E2',
+    fontWeight: "700",
+    color: "#4A90E2",
     marginBottom: 4,
   },
   transactionStatus: {
-    fontWeight: '500',
+    fontWeight: "500",
     marginLeft: 4,
   },
   collectionType: {
-    color: '#666',
+    color: "#666",
     marginBottom: 4,
   },
   syncBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
   transactionContent: {
     flex: 1,
-    alignItems: 'center',
+    alignItems: "center",
     padding: 12,
     borderRadius: 8,
   },
   customerContent: {
     flex: 1,
-    alignItems: 'center',
+    alignItems: "center",
     padding: 12,
     borderRadius: 8,
   },
