@@ -30,7 +30,8 @@ jest.mock('../utils/whatsappReceipt', () => ({
   getWhatsAppReceiptErrorMessage: jest
     .fn()
     .mockReturnValue('Unable to create or share the receipt on WhatsApp.'),
-  hasUsablePhoneNumber: (phone: string) => /^\d{10,15}$/.test(phone),
+  hasUsablePhoneNumber: (phone: string) =>
+    /^\d{10,15}$/.test(String(phone ?? '').replace(/\D/g, '')),
   isShareCancellationError: jest.fn().mockReturnValue(false),
   shareReceiptToWhatsApp: jest.fn().mockResolvedValue(undefined),
   WhatsAppUnavailableError: class WhatsAppUnavailableError extends Error {},
@@ -44,6 +45,8 @@ jest.mock('../providers/AuthProvider', () => ({
       bankName: 'Pigmy Bank',
       accessToken: 'token',
       phoneNumber: '9876543210',
+      bankType: 'peocit',
+      schemes: [{ schemeId: '38', schemeName: 'Pigmy Deposit' }],
     },
   }),
 }));
@@ -51,7 +54,7 @@ jest.mock('../providers/AuthProvider', () => ({
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import * as SMS from 'expo-sms';
 import { useState } from 'react';
-import { PaperProvider } from 'react-native-paper';
+import { HelperText, PaperProvider } from 'react-native-paper';
 import { AppSnackbar } from '../components/AppSnackbar';
 import PrinterManager from '../components/PrinterManager';
 import { TransactionForm } from '../components/TransactionForm';
@@ -128,6 +131,32 @@ test.each(['100', '200', '500'])(
   },
 );
 
+test('keeps confirm disabled for zero and accepts equivalent positive amounts', () => {
+  const screen = render(<QuickAmountForm />, { wrapper });
+  const confirm = () => screen.getByRole('button', { name: 'Confirm + Save' });
+  const mismatchVisible = () =>
+    screen
+      .UNSAFE_getAllByType(HelperText)
+      .every((helper) => helper.props.visible === true);
+
+  fireEvent.changeText(screen.getByLabelText('Amount'), '100');
+  expect(confirm().props.accessibilityState.disabled).toBe(true);
+  expect(mismatchVisible()).toBe(false);
+
+  fireEvent.changeText(screen.getByLabelText('Amount'), '0');
+  fireEvent.changeText(screen.getByLabelText('Reconfirm Amount'), '0.00');
+  expect(confirm().props.accessibilityState.disabled).toBe(true);
+
+  fireEvent.changeText(screen.getByLabelText('Amount'), '100');
+  fireEvent.changeText(screen.getByLabelText('Reconfirm Amount'), '100.0');
+  expect(confirm().props.accessibilityState.disabled).toBe(false);
+  expect(mismatchVisible()).toBe(false);
+
+  fireEvent.changeText(screen.getByLabelText('Reconfirm Amount'), '50');
+  expect(confirm().props.accessibilityState.disabled).toBe(true);
+  expect(mismatchVisible()).toBe(true);
+});
+
 test('manual amount edits preserve mismatch validation', () => {
   const screen = render(<QuickAmountForm />, { wrapper });
 
@@ -195,6 +224,36 @@ test('opens SMS composer with bank name and post-transaction balance', async () 
   expect(smsBody).toContain('₹100');
   expect(smsBody).toContain('Total Balance: ₹1,000.00');
   expect(smsBody).toContain('Account No: 60001');
+});
+
+test('strips punctuation from the phone number before sending SMS', async () => {
+  const isAvailableAsync = SMS.isAvailableAsync as jest.Mock;
+  const sendSMSAsync = SMS.sendSMSAsync as jest.Mock;
+  sendSMSAsync.mockClear();
+  isAvailableAsync.mockResolvedValueOnce(true);
+
+  const screen = render(
+    <TransactionSuccess
+      customerName='Customer'
+      customerId='2053'
+      accountNumber='60001'
+      amount='₹100'
+      openingBalance={900}
+      totalBalance={1000}
+      scheme='Pigmy Deposit'
+      date='July 24, 2026'
+      mobilenumber='9123-456 780'
+    />,
+    { wrapper },
+  );
+
+  fireEvent.press(screen.getByText('Send SMS'));
+
+  await waitFor(() => expect(sendSMSAsync).toHaveBeenCalledTimes(1));
+  expect(sendSMSAsync).toHaveBeenCalledWith(
+    ['9123456780'],
+    expect.any(String),
+  );
 });
 
 test('prints bank and agent details without the customer phone number', async () => {

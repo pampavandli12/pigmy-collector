@@ -11,6 +11,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { MD3LightTheme, PaperProvider } from 'react-native-paper';
 import { AppSnackbar } from '../components/AppSnackbar';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import { PrinterProvider } from '../contexts/PrinterContext';
 
 // Keep the splash screen visible while we fetch resources
@@ -117,12 +118,14 @@ export default function RootLayout() {
 
   return (
     <PaperProvider theme={theme}>
-      <PrinterProvider>
-        <AuthProvider>
-          <InitialLayout />
-          <SessionFallbackDialog />
-        </AuthProvider>
-      </PrinterProvider>
+      <ErrorBoundary>
+        <PrinterProvider>
+          <AuthProvider>
+            <InitialLayout />
+            <SessionFallbackDialog />
+          </AuthProvider>
+        </PrinterProvider>
+      </ErrorBoundary>
       <AppSnackbar />
     </PaperProvider>
   );

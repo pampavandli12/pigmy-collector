@@ -1,5 +1,6 @@
 import { PinScreenLayout } from '@/components/PinScreenLayout';
 import { useAuth } from '@/providers/AuthProvider';
+import { PinLockoutError } from '@/utils/appPin';
 import { showSnackbar } from '@/utils/snackbar';
 import { useState } from 'react';
 import { StyleSheet } from 'react-native';
@@ -27,7 +28,12 @@ export default function PinUnlock() {
         setPin('');
         setError('Incorrect PIN. Please try again.');
       }
-    } catch {
+    } catch (error) {
+      setPin('');
+      if (error instanceof PinLockoutError) {
+        setError(error.message);
+        return;
+      }
       showSnackbar('Unable to verify your PIN. Please try again.', {
         type: 'error',
       });

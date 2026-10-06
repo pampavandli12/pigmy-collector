@@ -67,7 +67,10 @@ export function hasUsablePhoneNumber(phone: unknown): boolean {
 export function isShareCancellationError(error: unknown): boolean {
   const message =
     error instanceof Error ? error.message : String(error ?? '');
-  return /cancel|dismiss/i.test(message);
+  // react-native-share reports an iOS share-sheet cancel as "User did not share"
+  // (no "cancel"/"dismiss" token), so match that phrasing too — a user cancel must
+  // not surface as a scary error.
+  return /cancel|dismiss|did not share|user cancelled/i.test(message);
 }
 
 export async function shareReceiptToWhatsApp({

@@ -93,10 +93,10 @@ After setup, rebuild the app for changes to take effect:
 
 ```bash
 # For Android
-npx expo run:android --device
+pnpm exec expo run:android --device
 
 # Or for development build
-npm start
+pnpm start
 ```
 
 ## Next Steps

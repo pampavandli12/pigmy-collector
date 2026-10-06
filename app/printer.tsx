@@ -9,7 +9,9 @@ export default function PrinterScreen() {
   const redirectBack = params.redirectBack === "true";
 
   const handleConnectSuccess = () => {
-    if (redirectBack) {
+    // Guard against a stale navigator: if the app re-locked (or the stack
+    // otherwise changed) while connecting, GO_BACK has nothing to handle it.
+    if (redirectBack && router.canGoBack()) {
       router.back();
     }
   };

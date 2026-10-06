@@ -21,6 +21,8 @@ function agent(agentCode: number, agentName: string): AuthUser {
     graceDays: null,
     accessToken: `access-${agentCode}`,
     refreshToken: `refresh-${agentCode}`,
+    bankType: 'peocit',
+    schemes: [{ schemeId: '38', schemeName: 'Pigmy Deposit' }],
   };
 }
 

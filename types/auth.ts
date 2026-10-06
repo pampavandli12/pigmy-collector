@@ -1,5 +1,25 @@
 import { z } from 'zod';
 
+export const agentSchemeSchema = z
+  .object({
+    schemeId: z.string().min(1),
+    schemeName: z.string().min(1),
+  })
+  .strict();
+
+export type AgentScheme = z.infer<typeof agentSchemeSchema>;
+
+const loginSchemeSchema = z
+  .object({
+    schemeID: z.string().min(1),
+    schemeName: z.string().min(1),
+  })
+  .strict()
+  .transform(({ schemeID, schemeName }) => ({
+    schemeId: schemeID,
+    schemeName,
+  }));
+
 export const authUserSchema = z
   .object({
     agentCode: z.number().int(),
@@ -12,6 +32,8 @@ export const authUserSchema = z
     graceDays: z.number().int().nonnegative().nullable(),
     accessToken: z.string().min(1),
     refreshToken: z.string().min(1).nullable(),
+    bankType: z.string(),
+    schemes: z.array(agentSchemeSchema),
   })
   .strict();
 
@@ -41,15 +63,19 @@ export type TokenRefreshResponse = z.infer<typeof tokenRefreshResponseSchema>;
 
 export const authenticateMeResponseSchema = z
   .object({
-    limitAmount: z.number().nonnegative(),
+    limitAmount: z.number().nonnegative().nullable(),
     isAgentRevoked: z.boolean(),
-    lastDepositDate: z.string().min(1),
-    graceDays: z.number().int().nonnegative(),
+    lastDepositDate: z.string().min(1).nullable(),
+    graceDays: z.number().int().nonnegative().nullable(),
   })
   .strict();
 
 export type AuthenticateMeResponse = z.infer<typeof authenticateMeResponseSchema>;
 
+// lastDepositDate/limitAmount/graceDays are nullable here to match
+// authUserSchema: a brand-new agent with no deposit history gets null for all
+// three from the backend, and this schema must accept that shape or every such
+// agent's login throws and surfaces as a misleading "check your credentials".
 export const loginResponseSchema = z
   .object({
     agentName: z.string().min(1),
@@ -57,11 +83,13 @@ export const loginResponseSchema = z
     bankCode: z.string().min(1),
     bankName: z.string().min(4),
     phoneNumber: z.string().min(1),
-    lastDepositDate: z.string().min(1),
-    limitAmount: z.number().nonnegative(),
-    graceDays: z.number().int().nonnegative(),
+    lastDepositDate: z.string().min(1).nullable(),
+    limitAmount: z.number().nonnegative().nullable(),
+    graceDays: z.number().int().nonnegative().nullable(),
     refreshToken: z.string().min(1),
     accessToken: z.string().min(1),
+    bankType: z.string().min(1),
+    schemes: z.array(loginSchemeSchema),
   })
   .strict();
 
@@ -83,5 +111,7 @@ export const legacyAuthUserSchema = z
       graceDays: null,
       accessToken: token,
       refreshToken: null,
+      bankType: '',
+      schemes: [],
     }),
   );

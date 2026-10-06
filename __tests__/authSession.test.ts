@@ -29,6 +29,7 @@ test('notifies the provider when refreshed user data is available', () => {
     agentCode: 1, agentName: 'Agent', bankCode: 'B', bankName: 'Bank Name',
     phoneNumber: '9876543210', lastDepositDate: null, limitAmount: null,
     graceDays: null, accessToken: 'new-access', refreshToken: 'new-refresh',
+    bankType: 'peocit', schemes: [],
   };
   setAuthUserUpdatedHandler(handler);
   notifyAuthUserUpdated('B:1', user);

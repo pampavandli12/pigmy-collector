@@ -20,6 +20,7 @@ test('refreshes tokens with a POST JSON body', async () => {
     { refreshToken: 'old-refresh', mobileNumber: '9876543210' },
     {
       headers: { 'Content-Type': 'application/json' },
+      timeout: 20000,
     },
   );
 });
