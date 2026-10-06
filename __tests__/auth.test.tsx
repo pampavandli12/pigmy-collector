@@ -2,9 +2,10 @@ import * as SecureStore from 'expo-secure-store';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import React from 'react';
 import { AppState } from 'react-native';
-import { AuthProvider, useAuth } from '../providers/AuthProvider';
+import { AuthProvider, SessionEndedError, useAuth } from '../providers/AuthProvider';
 import { authenticateAgent } from '../services/authenticate';
-import { saveAndActivateAccount } from '../services/authStorage';
+import { notifyUnauthorized } from '../services/authSession';
+import { getAgentAccountId, saveAndActivateAccount } from '../services/authStorage';
 import { authUserSchema } from '../types/auth';
 import { resetPinAttempts } from '../utils/appPin';
 
@@ -139,6 +140,88 @@ test('unlocks only when the stored PIN matches', async () => {
     await expect(result.current.unlockWithPin('123456')).resolves.toBe(true);
   });
   expect(result.current.authStatus).toBe('unlocked');
+});
+
+test('unlockWithPin ends the session when the agent is revoked at the moment of unlock', async () => {
+  (SecureStore.getItemAsync as jest.Mock).mockImplementation((key: string) =>
+    Promise.resolve(
+      key === 'userInfo' ? JSON.stringify(user) : key === 'appPin' ? '123456' : null,
+    ),
+  );
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <AuthProvider>{children}</AuthProvider>
+  );
+  const { result } = renderHook(() => useAuth(), { wrapper });
+  await waitFor(() => expect(result.current.authStatus).toBe('locked'));
+
+  // The boot-time check above already consumed the default (not revoked)
+  // response; the admin reset is only reflected on this next call, at the
+  // moment the agent actually submits their PIN.
+  mockedAuthenticateAgent.mockResolvedValueOnce({
+    limitAmount: 50000,
+    isAgentRevoked: true,
+    lastDepositDate: '2026-06-19',
+    graceDays: 0,
+  });
+
+  await act(async () => {
+    await expect(result.current.unlockWithPin('123456')).rejects.toThrow(
+      SessionEndedError,
+    );
+  });
+  expect(result.current.authStatus).toBe('unauthenticated');
+  expect(result.current.user).toBeNull();
+  expect(result.current.sessionNotice).toMatchObject({ reason: 'revoked' });
+});
+
+test('unlockWithPin ends the session when it was deactivated mid-verification (e.g. a refresh failure)', async () => {
+  (SecureStore.getItemAsync as jest.Mock).mockImplementation((key: string) =>
+    Promise.resolve(
+      key === 'userInfo' ? JSON.stringify(user) : key === 'appPin' ? '123456' : null,
+    ),
+  );
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <AuthProvider>{children}</AuthProvider>
+  );
+  const { result } = renderHook(() => useAuth(), { wrapper });
+  await waitFor(() => expect(result.current.authStatus).toBe('locked'));
+
+  // Simulate the axios interceptor's handleAuthResponseError already having
+  // ended the session (non-transient refresh failure / repeat 401) as a side
+  // effect, before the original AUTHENTICATE_ME call rejects back up.
+  mockedAuthenticateAgent.mockImplementationOnce(async () => {
+    await notifyUnauthorized(getAgentAccountId(user));
+    throw new Error('Request failed with status code 401');
+  });
+
+  await act(async () => {
+    await expect(result.current.unlockWithPin('123456')).rejects.toThrow(
+      SessionEndedError,
+    );
+  });
+  expect(result.current.authStatus).toBe('unauthenticated');
+  expect(result.current.user).toBeNull();
+});
+
+test('unlockWithPin still unlocks when verification fails for a transient reason (offline)', async () => {
+  (SecureStore.getItemAsync as jest.Mock).mockImplementation((key: string) =>
+    Promise.resolve(
+      key === 'userInfo' ? JSON.stringify(user) : key === 'appPin' ? '123456' : null,
+    ),
+  );
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <AuthProvider>{children}</AuthProvider>
+  );
+  const { result } = renderHook(() => useAuth(), { wrapper });
+  await waitFor(() => expect(result.current.authStatus).toBe('locked'));
+
+  mockedAuthenticateAgent.mockRejectedValueOnce(new Error('Network Error'));
+
+  await act(async () => {
+    await expect(result.current.unlockWithPin('123456')).resolves.toBe(true);
+  });
+  expect(result.current.authStatus).toBe('unlocked');
+  expect(result.current.user).not.toBeNull();
 });
 
 test('locks the PIN after repeated incorrect attempts', async () => {

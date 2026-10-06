@@ -1,9 +1,9 @@
-import axios, { InternalAxiosRequestConfig } from 'axios';
-import { isPublicAuthRoute } from '../utils/apiRoutes';
-import { API_BASE_URL } from '../utils/constants';
-import { handleAuthResponseError } from './authRefresh';
-import { getStoredAuthContext } from './authStorage';
-import { applyAuthHeaders } from './requestAuthHeaders';
+import axios, { InternalAxiosRequestConfig } from "axios";
+import { isPublicAuthRoute } from "../utils/apiRoutes";
+import { API_BASE_URL } from "../utils/constants";
+import { handleAuthResponseError } from "./authRefresh";
+import { getStoredAuthContext } from "./authStorage";
+import { applyAuthHeaders } from "./requestAuthHeaders";
 
 // A finite timeout is essential for a field app on flaky mobile networks:
 // without it a dead/slow connection hangs requests indefinitely, freezing the
@@ -16,7 +16,7 @@ export const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: REQUEST_TIMEOUT_MS,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
 
@@ -28,9 +28,14 @@ type AugmentedRequestConfig = InternalAxiosRequestConfig & {
 // Interceptor for adding auth token and logging requests/responses
 api.interceptors.request.use(
   async (config) => {
-    config.headers['Content-Type'] = 'application/json';
+    config.headers["Content-Type"] = "application/json";
     const augmented = config as AugmentedRequestConfig;
-
+    console.log(
+      "Request:",
+      config.method?.toUpperCase(),
+      config.url,
+      config.params || config.data,
+    );
     if (isPublicAuthRoute(config.url)) {
       applyAuthHeaders(config.headers, null);
       delete augmented._agentAccountId;
