@@ -1,5 +1,5 @@
 import { PinScreenLayout } from '@/components/PinScreenLayout';
-import { useAuth } from '@/providers/AuthProvider';
+import { SessionEndedError, useAuth } from '@/providers/AuthProvider';
 import { PinLockoutError } from '@/utils/appPin';
 import { showSnackbar } from '@/utils/snackbar';
 import { useState } from 'react';
@@ -32,6 +32,11 @@ export default function PinUnlock() {
       setPin('');
       if (error instanceof PinLockoutError) {
         setError(error.message);
+        return;
+      }
+      if (error instanceof SessionEndedError) {
+        // authStatus has already moved on (deactivateAccount ran); the
+        // SessionFallbackDialog explains why, so no local message here.
         return;
       }
       showSnackbar('Unable to verify your PIN. Please try again.', {

@@ -134,7 +134,11 @@ export async function handleAuthResponseError<T>(
   //    logging the agent out mid-session.
   if (originalRequest?._tokenRefreshAttempted) {
     if (status === 401) {
-      await dependencies.endSession(accountId);
+      try {
+        await dependencies.endSession(accountId);
+      } catch (endSessionError) {
+        console.error('Failed to end session after repeat 401:', endSessionError);
+      }
     }
     return Promise.reject(error);
   }
@@ -150,13 +154,21 @@ export async function handleAuthResponseError<T>(
     // means the session cannot continue, so end it (this preserves the
     // admin-reset / revoked-token forced logout).
     if (!isTransientNetworkError(refreshError)) {
-      await dependencies.endSession(accountId);
+      try {
+        await dependencies.endSession(accountId);
+      } catch (endSessionError) {
+        console.error('Failed to end session after refresh failure:', endSessionError);
+      }
     }
     return Promise.reject(error);
   }
 
   if (getAgentAccountId(updatedUser) !== accountId) {
-    await dependencies.endSession(accountId);
+    try {
+      await dependencies.endSession(accountId);
+    } catch (endSessionError) {
+      console.error('Failed to end session after account mismatch:', endSessionError);
+    }
     return Promise.reject(error);
   }
   originalRequest.headers.Authorization = updatedUser.accessToken;

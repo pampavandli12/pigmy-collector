@@ -22,8 +22,10 @@ import { store$ } from '@/store/store';
 import { filteredCustomers$, todaysCollectionAmount$ } from '@/store/selectors';
 
 import { useCustomerVoiceSearch } from '@/hooks/useCustomerVoiceSearch';
+import { useCustomerPhotosBatch } from '@/hooks/useCustomerPhoto';
 import { useAuth } from '@/providers/AuthProvider';
 import { actions } from '@/store/actions';
+import { buildCustomerPhotoKey } from '@/services/customerPhoto';
 import { Customer } from '@/types/user';
 import {
   COLLECTION_LIMIT_EXCEEDED_MESSAGE,
@@ -38,6 +40,12 @@ import { showSnackbar } from '@/utils/snackbar';
 export default function Users() {
   const customers = useSelector(filteredCustomers$);
   const todaysCollected = useSelector(todaysCollectionAmount$);
+  const photosByKey = useCustomerPhotosBatch(
+    customers.map((customer) => ({
+      bankCode: customer.bankCode,
+      accountNumber: customer.accountNumber,
+    })),
+  );
   const syncing = useSelector(store$.isRefreshingCustomers);
   const router = useRouter();
   const { user } = useAuth();
@@ -132,9 +140,20 @@ export default function Users() {
 
   const renderCustomer: ListRenderItem<Customer> = useCallback(
     ({ item }) => (
-      <CustomerListItem customer={item} onPress={handleCustomerPress} />
+      <CustomerListItem
+        customer={item}
+        photoUri={
+          photosByKey[
+            buildCustomerPhotoKey({
+              bankCode: item.bankCode,
+              accountNumber: item.accountNumber,
+            })
+          ] ?? null
+        }
+        onPress={handleCustomerPress}
+      />
     ),
-    [handleCustomerPress],
+    [handleCustomerPress, photosByKey],
   );
 
   return (

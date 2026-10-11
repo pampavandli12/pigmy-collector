@@ -1,7 +1,9 @@
+import { authenticateAgent } from "@/services/authenticate";
+import { resetRefreshState } from "@/services/authRefresh";
 import {
   setAuthUserUpdatedHandler,
   setUnauthorizedHandler,
-} from '@/services/authSession';
+} from "@/services/authSession";
 import {
   activateStoredAccount,
   deactivateStoredAccount,
@@ -10,18 +12,12 @@ import {
   getStoredUser,
   saveAndActivateAccount,
   updateStoredAgentProfile,
-} from '@/services/authStorage';
-import { authenticateAgent } from '@/services/authenticate';
-import { resetRefreshState } from '@/services/authRefresh';
-import { initPersistence } from '@/store/persistence';
-import { activateAgentStore } from '@/store/store';
-import { waitForOutboxIdle } from '@/store/syncCoordinator';
-import { stopOutboxSync } from '@/store/syncEngine';
-import {
-  AgentAccountSummary,
-  AuthUser,
-  authUserSchema,
-} from '@/types/auth';
+} from "@/services/authStorage";
+import { initPersistence } from "@/store/persistence";
+import { activateAgentStore } from "@/store/store";
+import { waitForOutboxIdle } from "@/store/syncCoordinator";
+import { stopOutboxSync } from "@/store/syncEngine";
+import { AgentAccountSummary, AuthUser, authUserSchema } from "@/types/auth";
 import {
   assertPinAvailable,
   clearPinAttempts,
@@ -29,10 +25,10 @@ import {
   recordFailedPinAttempt,
   storedPinMatches,
   storePin,
-} from '@/utils/appPin';
-import { PIN_SECURE_STORE_KEY } from '@/utils/constants';
-import { showSnackbar } from '@/utils/snackbar';
-import * as SecureStore from 'expo-secure-store';
+} from "@/utils/appPin";
+import { PIN_SECURE_STORE_KEY } from "@/utils/constants";
+import { showSnackbar } from "@/utils/snackbar";
+import * as SecureStore from "expo-secure-store";
 import React, {
   createContext,
   useCallback,
@@ -41,16 +37,16 @@ import React, {
   useMemo,
   useRef,
   useState,
-} from 'react';
-import { AppState, View } from 'react-native';
-import { ActivityIndicator, useTheme } from 'react-native-paper';
+} from "react";
+import { AppState, View } from "react-native";
+import { ActivityIndicator, useTheme } from "react-native-paper";
 
 export type AuthStatus =
-  | 'loading'
-  | 'unauthenticated'
-  | 'pinSetupRequired'
-  | 'locked'
-  | 'unlocked';
+  | "loading"
+  | "unauthenticated"
+  | "pinSetupRequired"
+  | "locked"
+  | "unlocked";
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -69,12 +65,31 @@ interface AuthContextType {
   getToken: () => string | null;
   getUser: () => AuthUser | null;
   dismissSessionNotice: () => void;
+  // Suppresses the auto-lock around a trusted, user-initiated system UI
+  // handoff (camera, photo library, etc.) that backgrounds the app for an
+  // unbounded amount of time — see the AppState listener below. Callers must
+  // call endTrustedHandoff() in a `finally` so a thrown/cancelled handoff
+  // never leaves the lock permanently suppressed.
+  beginTrustedHandoff: () => void;
+  endTrustedHandoff: () => void;
 }
 
 export interface SessionNotice {
   expiredAgentName: string;
   replacementAgentName: string | null;
-  reason: 'expired' | 'manual' | 'revoked';
+  reason: "expired" | "manual" | "revoked";
+}
+
+// Thrown by unlockWithPin when the PIN itself was correct but the agent's
+// server-side session has already ended (revoked, or refresh permanently
+// failed) as part of the same unlock attempt. By the time this is thrown,
+// deactivateAccount has already moved authStatus on and set sessionNotice —
+// callers should not treat this as "incorrect PIN".
+export class SessionEndedError extends Error {
+  constructor() {
+    super("Your session has ended. Please log in again.");
+    this.name = "SessionEndedError";
+  }
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -90,14 +105,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [accounts, setAccounts] = useState<AgentAccountSummary[]>([]);
-  const [sessionNotice, setSessionNotice] = useState<SessionNotice | null>(null);
-  const [authStatus, setAuthStatus] = useState<AuthStatus>('loading');
+  const [sessionNotice, setSessionNotice] = useState<SessionNotice | null>(
+    null,
+  );
+  const [authStatus, setAuthStatus] = useState<AuthStatus>("loading");
   const [hasPin, setHasPin] = useState(false);
   const theme = useTheme();
   const authStatusRef = useRef(authStatus);
   const userRef = useRef(user);
   const hasPinRef = useRef(hasPin);
   const backgroundedAtRef = useRef<number | null>(null);
+  // Counter, not a boolean: guards against a stray endTrustedHandoff (e.g. a
+  // double-invoked finally) dropping suppression while another handoff is
+  // still legitimately in flight.
+  const suppressAutoLockRef = useRef(0);
 
   useEffect(() => {
     authStatusRef.current = authStatus;
@@ -114,12 +135,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const deactivateAccount = useCallback(
     async (
       accountId: string,
-      reason: SessionNotice['reason'],
+      reason: SessionNotice["reason"],
       activeUserHint?: AuthUser,
     ) => {
       const result = await deactivateStoredAccount(accountId, activeUserHint);
       setAccounts(await getStoredAccounts());
-      if (!result.wasActive || !result.disabledAccount) return 'ignored' as const;
+      if (!result.wasActive || !result.disabledAccount)
+        return "ignored" as const;
 
       if (result.activeUser) {
         activateAgentStore(result.activeUser);
@@ -128,29 +150,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         // (see verifyAgentOnLockScreen callers) rather than the pre-deactivation
         // React state.
         userRef.current = result.activeUser;
-        const nextStatus = hasPinRef.current ? 'locked' : 'pinSetupRequired';
+        const nextStatus = hasPinRef.current ? "locked" : "pinSetupRequired";
         authStatusRef.current = nextStatus;
         setUser(result.activeUser);
         setAuthStatus(nextStatus);
       } else {
         userRef.current = null;
-        authStatusRef.current = 'unauthenticated';
+        authStatusRef.current = "unauthenticated";
         setUser(null);
-        setAuthStatus('unauthenticated');
+        setAuthStatus("unauthenticated");
       }
       setSessionNotice({
         expiredAgentName: result.disabledAccount.agentName,
         replacementAgentName: result.activeUser?.agentName ?? null,
         reason,
       });
-      return result.activeUser ? ('fallback' as const) : ('signedOut' as const);
+      return result.activeUser ? ("fallback" as const) : ("signedOut" as const);
     },
     [],
   );
 
   const verifyAgentSession = useCallback(
-    async (activeUser: AuthUser): Promise<'active' | 'revoked'> => {
+    async (activeUser: AuthUser): Promise<"active" | "revoked"> => {
       const authStatus = await authenticateAgent(activeUser.phoneNumber);
+      console.log("verifyAgentSession result:", authStatus);
       const accountId = getAgentAccountId(activeUser);
       const updatedUser = await updateStoredAgentProfile(accountId, {
         limitAmount: authStatus.limitAmount,
@@ -163,11 +186,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setAccounts(await getStoredAccounts());
 
       if (authStatus.isAgentRevoked) {
-        const outcome = await deactivateAccount(accountId, 'revoked', updatedUser);
-        return outcome === 'ignored' ? 'active' : 'revoked';
+        const outcome = await deactivateAccount(
+          accountId,
+          "revoked",
+          updatedUser,
+        );
+        return outcome === "ignored" ? "active" : "revoked";
       }
 
-      return 'active';
+      return "active";
     },
     [deactivateAccount],
   );
@@ -177,11 +204,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       try {
         return await verifyAgentSession(activeUser);
       } catch {
+        // The interceptor may have already ended this session (non-transient
+        // refresh failure / repeat 401) as a side effect of this same call —
+        // deactivateAccount would have already run and routed the UI away.
+        // Don't contradict that with a "you can still unlock" toast.
+        const sessionAlreadyEnded =
+          !userRef.current ||
+          getAgentAccountId(userRef.current) !== getAgentAccountId(activeUser);
+        if (sessionAlreadyEnded) {
+          return "revoked" as const;
+        }
         showSnackbar(
-          'Unable to verify agent status. You can still unlock with your PIN.',
-          { type: 'error' },
+          "Unable to verify agent status. You can still unlock with your PIN.",
+          { type: "error" },
         );
-        return 'active' as const;
+        return "active" as const;
       }
     },
     [verifyAgentSession],
@@ -208,9 +245,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         let initialUser = storedUser;
         if (!initialUser) {
           const fallback = storedAccounts
-            .filter((account) => account.status === 'available')
+            .filter((account) => account.status === "available")
             .sort((a, b) => b.lastUsedAt - a.lastUsedAt)[0];
-          if (fallback) initialUser = await activateStoredAccount(fallback.accountId);
+          if (fallback)
+            initialUser = await activateStoredAccount(fallback.accountId);
         }
 
         if (initialUser) {
@@ -226,28 +264,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
             // Don't force the lock screen if verification deactivated the account
             // (revoked, or admin-reset via the interceptor) and left no active
             // user — that would strand a null user behind the PIN gate.
-            if (status !== 'revoked' && userRef.current) {
-              setAuthStatus('locked');
+            if (status !== "revoked" && userRef.current) {
+              setAuthStatus("locked");
             }
             return;
           }
 
-          setAuthStatus('pinSetupRequired');
+          setAuthStatus("pinSetupRequired");
           return;
         }
-        setAuthStatus('unauthenticated');
+        setAuthStatus("unauthenticated");
       } catch (error) {
         // A transient failure here (SecureStore/MMKV/Crypto hiccup) must NOT
         // destroy the stored session — deleting it would sign the agent out for a
         // recoverable glitch. Corrupt/invalid auth is already dropped defensively
         // by readActiveUser(); here we only surface the error and fall back to the
         // login gate, leaving stored credentials intact for the next launch.
-        console.error('Failed to load authentication state:', error);
-        showSnackbar(
-          'Could not restore your session. Please try again.',
-        );
+        console.error("Failed to load authentication state:", error);
+        showSnackbar("Could not restore your session. Please try again.");
         setUser(null);
-        setAuthStatus('unauthenticated');
+        setAuthStatus("unauthenticated");
       }
     };
 
@@ -255,13 +291,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [verifyAgentOnLockScreen]);
 
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', (nextState) => {
+    const subscription = AppState.addEventListener("change", (nextState) => {
       if (
-        nextState === 'background' &&
+        nextState === "background" &&
         hasPinRef.current &&
         userRef.current &&
-        (authStatusRef.current === 'unlocked' || authStatusRef.current === 'locked')
+        (authStatusRef.current === "unlocked" ||
+          authStatusRef.current === "locked")
       ) {
+        // A trusted handoff (camera, photo library) is expected to background
+        // the app for however long the agent takes — unlike the grace window
+        // below, which only covers brief, unbounded-duration-free system
+        // dialogs. Don't even arm the timestamp, so no later 'active' event
+        // can treat this as a real absence.
+        if (suppressAutoLockRef.current > 0) {
+          return;
+        }
         // Defer the decision to (re-)lock until we come back: record when we
         // left, whether we were unlocked or already on the lock screen. A
         // transient background (e.g. a Bluetooth/permission system dialog, a
@@ -271,7 +316,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         return;
       }
 
-      if (nextState !== 'active' || !hasPinRef.current || !userRef.current) {
+      if (nextState !== "active" || !hasPinRef.current || !userRef.current) {
+        return;
+      }
+
+      if (suppressAutoLockRef.current > 0) {
+        // Still inside (or just exited) a trusted handoff — nothing was
+        // armed on the way out, but clear defensively in case of a race.
+        backgroundedAtRef.current = null;
         return;
       }
 
@@ -289,14 +341,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         return;
       }
 
-      if (authStatusRef.current === 'unlocked') {
+      if (authStatusRef.current === "unlocked") {
         // A real absence while unlocked re-locks immediately. This only swaps
         // the protected route to the PIN screen (app/_layout.tsx's
         // Stack.Protected) — it must NOT go through `authStatus === 'loading'`,
         // which unmounts the entire app tree instead of just navigating within
         // it (see the `authStatus === 'loading'` render below).
-        authStatusRef.current = 'locked';
-        setAuthStatus('locked');
+        authStatusRef.current = "locked";
+        setAuthStatus("locked");
       }
       // Otherwise we were already locked: re-verify below without touching
       // `authStatus`, so the mounted PIN screen is never unmounted/remounted.
@@ -305,9 +357,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       void verifyAgentOnLockScreen(activeUser).then((status) => {
         // Skip re-locking if verification deactivated the account (revoked or
         // admin-reset) and there is no longer an active user; deactivateAccount
-        // has already routed to the correct screen.
-        if (status !== 'revoked' && userRef.current) {
-          setAuthStatus('locked');
+        // has already routed to the correct screen. Also skip if the user
+        // unlocked via the PIN screen while this background verify was still
+        // in flight — re-locking would clobber a legitimate unlock.
+        if (
+          status !== "revoked" &&
+          userRef.current &&
+          authStatusRef.current !== "unlocked"
+        ) {
+          setAuthStatus("locked");
         }
       });
     });
@@ -315,30 +373,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     return () => subscription.remove();
   }, [verifyAgentOnLockScreen]);
 
-  const login = useCallback(async (nextUser: AuthUser) => {
-    const validatedUser = authUserSchema.parse(nextUser);
+  const login = useCallback(
+    async (nextUser: AuthUser) => {
+      const validatedUser = authUserSchema.parse(nextUser);
 
-    const isFirstAccount = accounts.length === 0;
-    await initPersistence();
-    await saveAndActivateAccount(validatedUser);
-    activateAgentStore(validatedUser, isFirstAccount);
-    setAccounts(await getStoredAccounts());
-    setUser(validatedUser);
-    setAuthStatus(hasPin ? 'unlocked' : 'pinSetupRequired');
-  }, [accounts.length, hasPin]);
+      const isFirstAccount = accounts.length === 0;
+      await initPersistence();
+      await saveAndActivateAccount(validatedUser);
+      activateAgentStore(validatedUser, isFirstAccount);
+      setAccounts(await getStoredAccounts());
+      setUser(validatedUser);
+      setAuthStatus(hasPin ? "unlocked" : "pinSetupRequired");
+    },
+    [accounts.length, hasPin],
+  );
 
   const reauthenticateAccount = useCallback(
     async (accountId: string, nextUser: AuthUser) => {
       const validated = authUserSchema.parse(nextUser);
       if (getAgentAccountId(validated) !== accountId) {
-        throw new Error('The credentials belong to a different agent account.');
+        throw new Error("The credentials belong to a different agent account.");
       }
       await initPersistence();
       await saveAndActivateAccount(validated);
       activateAgentStore(validated);
       setAccounts(await getStoredAccounts());
       setUser(validated);
-      setAuthStatus(hasPin ? 'unlocked' : 'pinSetupRequired');
+      setAuthStatus(hasPin ? "unlocked" : "pinSetupRequired");
     },
     [hasPin],
   );
@@ -354,7 +415,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     activateAgentStore(nextUser);
     setUser(nextUser);
     setAccounts(await getStoredAccounts());
-    setAuthStatus('unlocked');
+    setAuthStatus("unlocked");
   }, []);
 
   const logout = useCallback(async () => {
@@ -362,39 +423,59 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     await waitForOutboxIdle();
     stopOutboxSync();
     resetRefreshState();
-    await deactivateAccount(getAgentAccountId(user), 'manual', user);
+    await deactivateAccount(getAgentAccountId(user), "manual", user);
   }, [deactivateAccount, user]);
 
   const setupPin = useCallback(async (pin: string) => {
     if (!/^\d{6}$/.test(pin)) {
-      throw new Error('PIN must contain exactly six digits.');
+      throw new Error("PIN must contain exactly six digits.");
     }
     await storePin(pin);
     hasPinRef.current = true;
     setHasPin(true);
-    setAuthStatus('unlocked');
+    setAuthStatus("unlocked");
   }, []);
 
-  const unlockWithPin = useCallback(async (pin: string) => {
-    if (!/^\d{6}$/.test(pin)) return false;
-    await assertPinAvailable();
-    const storedPin = await SecureStore.getItemAsync(PIN_SECURE_STORE_KEY);
-    if (!(await storedPinMatches(storedPin, pin))) {
-      await recordFailedPinAttempt();
-      return false;
-    }
-    await clearPinAttempts();
-    setAuthStatus('unlocked');
-    return true;
-  }, []);
+  const unlockWithPin = useCallback(
+    async (pin: string) => {
+      if (!/^\d{6}$/.test(pin)) return false;
+      await assertPinAvailable();
+      const storedPin = await SecureStore.getItemAsync(PIN_SECURE_STORE_KEY);
+      if (!(await storedPinMatches(storedPin, pin))) {
+        await recordFailedPinAttempt();
+        return false;
+      }
+      await clearPinAttempts();
+
+      // The PIN was correct, but that only proves the device is trusted — it
+      // says nothing about whether the agent's account is still valid server
+      // side. Re-verify before granting access so a revoked agent or a
+      // permanently-failed token refresh is caught right here instead of only
+      // at boot/foreground.
+      const activeUser = userRef.current;
+      if (!activeUser) {
+        throw new SessionEndedError();
+      }
+      const status = await verifyAgentOnLockScreen(activeUser);
+      if (status === "revoked" || !userRef.current) {
+        throw new SessionEndedError();
+      }
+
+      setAuthStatus("unlocked");
+      return true;
+    },
+    [verifyAgentOnLockScreen],
+  );
 
   useEffect(() => {
     setUnauthorizedHandler(async (accountId) => {
-      await deactivateAccount(accountId, 'expired');
+      await deactivateAccount(accountId, "expired");
     });
     setAuthUserUpdatedHandler((accountId, nextUser) => {
       setUser((current) =>
-        current && getAgentAccountId(current) === accountId ? nextUser : current,
+        current && getAgentAccountId(current) === accountId
+          ? nextUser
+          : current,
       );
       void getStoredAccounts().then(setAccounts);
     });
@@ -408,14 +489,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const getToken = useCallback(() => user?.accessToken ?? null, [user]);
   const getUser = useCallback(() => user, [user]);
 
+  const beginTrustedHandoff = useCallback(() => {
+    suppressAutoLockRef.current += 1;
+  }, []);
+
+  const endTrustedHandoff = useCallback(() => {
+    suppressAutoLockRef.current = Math.max(0, suppressAutoLockRef.current - 1);
+  }, []);
+
   const value = useMemo<AuthContextType>(
     () => ({
       user,
       accounts,
       sessionNotice,
       isAuthenticated: Boolean(user?.accessToken),
-      isUnlocked: authStatus === 'unlocked',
-      isLoading: authStatus === 'loading',
+      isUnlocked: authStatus === "unlocked",
+      isLoading: authStatus === "loading",
       authStatus,
       login,
       reauthenticateAccount,
@@ -426,17 +515,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       getToken,
       getUser,
       dismissSessionNotice: () => setSessionNotice(null),
+      beginTrustedHandoff,
+      endTrustedHandoff,
     }),
-    [accounts, authStatus, getToken, getUser, login, logout, reauthenticateAccount, sessionNotice, setupPin, switchAccount, unlockWithPin, user],
+    [
+      accounts,
+      authStatus,
+      beginTrustedHandoff,
+      endTrustedHandoff,
+      getToken,
+      getUser,
+      login,
+      logout,
+      reauthenticateAccount,
+      sessionNotice,
+      setupPin,
+      switchAccount,
+      unlockWithPin,
+      user,
+    ],
   );
 
   // Only the initial boot-time load (loadAuthState above) sets 'loading'; the
   // AppState re-lock listener never does, specifically so returning from a
   // background/foreground transition re-verifies without unmounting the whole
   // app tree (and any mounted PIN entry) behind this spinner.
-  if (authStatus === 'loading') {
+  if (authStatus === "loading") {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator animating={true} color={theme.colors.primary} />
       </View>
     ); // Show loading
@@ -448,7 +554,7 @@ export const useAuth = () => {
   const context = useContext(AuthContext);
 
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
 
   return context;

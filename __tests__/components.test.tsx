@@ -78,7 +78,7 @@ test('renders global snackbar messages', () => {
 test('keeps transaction confirmation disabled until values match', () => {
   const screen = render(
     <TransactionForm
-      customer={{ id: '1', name: 'Customer', agentCode: 2, bankCode: 'B', balance: 10, account: '3', image: '' }}
+      customer={{ id: '1', name: 'Customer', agentCode: 2, bankCode: 'B', balance: 10, account: '3' }}
       amount='100'
       setAmount={jest.fn()}
       scheme='Pigmy Deposit'
@@ -99,7 +99,7 @@ const QuickAmountForm = () => {
   const [amount, setAmount] = useState('');
   return (
     <TransactionForm
-      customer={{ id: '1', name: 'Customer', agentCode: 2, bankCode: 'B', balance: 10, account: '3', image: '' }}
+      customer={{ id: '1', name: 'Customer', agentCode: 2, bankCode: 'B', balance: 10, account: '3' }}
       amount={amount}
       setAmount={setAmount}
       scheme='Pigmy Deposit'

@@ -1,5 +1,8 @@
 import { AgentAccountSwitcher } from "@/components/AgentAccountSwitcher";
+import { CustomerAvatar } from "@/components/CustomerAvatar";
+import { useCustomerPhotosBatch } from "@/hooks/useCustomerPhoto";
 import { useAuth } from "@/providers/AuthProvider";
+import { buildCustomerPhotoKey } from "@/services/customerPhoto";
 import { fetchCollections } from "@/services/user";
 import { todaysTransactions$, totalCustomerCount$ } from "@/store/selectors";
 import { CollectionSummary, SyncStatus } from "@/types/user";
@@ -8,7 +11,7 @@ import { useSelector } from "@legendapp/state/react";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
-import { Avatar, Card, Icon, Text } from "react-native-paper";
+import { Card, Icon, Text } from "react-native-paper";
 
 const syncStatusPresentation: Record<
   SyncStatus,
@@ -59,6 +62,12 @@ export default function Dashboard() {
 
   const transactions = useSelector(todaysTransactions$);
   const totalCustomerCount = useSelector(totalCustomerCount$);
+  const photosByKey = useCustomerPhotosBatch(
+    transactions.map((transaction) => ({
+      bankCode: transaction.bankCode,
+      accountNumber: transaction.accountNumber,
+    })),
+  );
 
   const loadCollectionSummary = useCallback(async () => {
     if (!user) {
@@ -125,7 +134,7 @@ export default function Dashboard() {
                   {collectionSummary.totalTransactions}
                 </Text>
                 <Text variant="bodySmall" style={styles.statLabel}>
-                  Todtal Transactions
+                  Total Transactions
                 </Text>
               </View>
 
@@ -156,9 +165,19 @@ export default function Dashboard() {
                 key={transaction.transactionId}
                 style={styles.transactionItem}
               >
-                <Avatar.Text
+                <CustomerAvatar
+                  name={transaction.customerName}
                   size={48}
-                  label={transaction.customerName.charAt(0).toUpperCase()}
+                  bankCode={transaction.bankCode}
+                  accountNumber={transaction.accountNumber}
+                  photoUri={
+                    photosByKey[
+                      buildCustomerPhotoKey({
+                        bankCode: transaction.bankCode,
+                        accountNumber: transaction.accountNumber,
+                      })
+                    ] ?? null
+                  }
                   style={styles.transactionAvatar}
                 />
                 <View style={styles.transactionInfo}>

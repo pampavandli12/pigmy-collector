@@ -1,3 +1,4 @@
+import { CustomerAvatar } from '@/components/CustomerAvatar';
 import { usePrinter } from '@/contexts/PrinterContext';
 import { useAuth } from '@/providers/AuthProvider';
 import { ReceiptPrinter } from '@/utils/ReceiptPrinter';
@@ -21,13 +22,15 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { Avatar, Button, Card, Icon, Text } from 'react-native-paper';
+import { Button, Card, Icon, Text } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface TransactionSuccessProps {
   customerName?: string;
   customerId?: string;
   accountNumber?: string;
+  bankCode?: string;
+  customerAccountNumber?: number;
   amount?: string;
   openingBalance: number;
   totalBalance: number;
@@ -48,6 +51,8 @@ export const TransactionSuccess = ({
   customerName = 'SRIRAM.S',
   customerId = '60001',
   accountNumber = customerId,
+  bankCode,
+  customerAccountNumber,
   amount = '255',
   openingBalance,
   totalBalance,
@@ -60,13 +65,6 @@ export const TransactionSuccess = ({
   }),
   onDone,
 }: TransactionSuccessProps) => {
-  const initials = customerName
-    .split(' ')
-    .map((part) => part[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
-
   const { isConnected } = usePrinter();
   const [isPrinting, setIsPrinting] = useState(false);
   const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false);
@@ -222,9 +220,12 @@ export const TransactionSuccess = ({
         <Card style={styles.summaryCard}>
           <Card.Content>
             <View style={styles.customerRow}>
-              <Avatar.Text
+              <CustomerAvatar
+                name={customerName}
                 size={52}
-                label={initials}
+                labelMode='initials'
+                bankCode={bankCode}
+                accountNumber={customerAccountNumber}
                 style={styles.avatar}
                 labelStyle={styles.avatarLabel}
               />

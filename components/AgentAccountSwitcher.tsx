@@ -1,3 +1,4 @@
+import { CustomerAvatar } from '@/components/CustomerAvatar';
 import { useAuth } from '@/providers/AuthProvider';
 import { getAgentAccountId } from '@/services/authStorage';
 import { userLogin } from '@/services/login';
@@ -5,7 +6,6 @@ import { showSnackbar } from '@/utils/snackbar';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import {
-  Avatar,
   Button,
   Dialog,
   Divider,
@@ -125,10 +125,10 @@ export function AgentAccountSwitcher() {
                     onPress={() => void handleSwitch(accountId)}
                     disabled={loading}
                     left={() => (
-                      <Avatar.Text
-                        size={42}
-                        label={account.agentName.charAt(0).toUpperCase()}
-                      />
+                      // Agent accounts aren't customers — there's no
+                      // bankCode/accountNumber to look a photo up by, so this
+                      // always renders initials-only.
+                      <CustomerAvatar name={account.agentName} size={42} />
                     )}
                     right={(props) =>
                       account.status === 'loginRequired' ? (

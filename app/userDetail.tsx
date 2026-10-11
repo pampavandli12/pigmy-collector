@@ -73,7 +73,6 @@ export default function UserDetail() {
     balance:
       storedCustomer?.currentBalance ?? Number(firstParam(params.balance) || 0),
     account,
-    image: firstParam(params.image),
     mobilenumber: firstParam(params.mobilenumber),
   };
 
@@ -227,6 +226,8 @@ export default function UserDetail() {
             customerName={customer.name}
             customerId={customer.id}
             accountNumber={customer.account}
+            bankCode={customer.bankCode}
+            customerAccountNumber={accountNumber}
             amount={`₹${transactionSuccess.amount}`}
             openingBalance={transactionSuccess.openingBalance}
             totalBalance={transactionSuccess.totalBalance}

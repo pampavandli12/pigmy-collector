@@ -9,9 +9,20 @@ let mockAuthUser = {
   graceDays: 3,
 };
 
-jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: mockPush }),
-}));
+jest.mock('expo-router', () => {
+  const { useEffect } = require('react');
+  return {
+    useRouter: () => ({ push: mockPush }),
+    // Mirror real useFocusEffect's effect-based (deferred) timing — see
+    // jest.setup.ts for why calling back synchronously during render trips
+    // React's render-loop guard.
+    useFocusEffect: (callback: () => void) => {
+      useEffect(() => {
+        callback();
+      }, [callback]);
+    },
+  };
+});
 jest.mock('../providers/AuthProvider', () => ({
   useAuth: () => ({ user: mockAuthUser }),
 }));

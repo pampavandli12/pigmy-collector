@@ -30,22 +30,60 @@ jest.mock('expo-crypto', () => {
   };
 });
 
-jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn() }),
-  useFocusEffect: (callback: () => void) => callback(),
-  useLocalSearchParams: () => ({
-    id: '1',
-    name: 'Customer',
-    agentCode: '2',
-    bankCode: 'B',
-    balance: '100',
-    account: '3',
-    mobilenumber: '9876543210',
-  }),
-  Stack: Object.assign(({ children }: { children: React.ReactNode }) => children, {
-    Screen: () => null,
-    Protected: ({ children }: { children: React.ReactNode }) => children,
-  }),
+jest.mock('expo-router', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { useEffect } = require('react');
+  return {
+    useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn() }),
+    // Real useFocusEffect runs its callback as an effect (after commit), not
+    // during render — mirror that here so render-phase state updates in the
+    // callback don't trip React's "too many re-renders" render-loop guard.
+    useFocusEffect: (callback: () => void) => {
+      useEffect(() => {
+        callback();
+      }, [callback]);
+    },
+    useLocalSearchParams: () => ({
+      id: '1',
+      name: 'Customer',
+      agentCode: '2',
+      bankCode: 'B',
+      balance: '100',
+      account: '3',
+      mobilenumber: '9876543210',
+    }),
+    Stack: Object.assign(({ children }: { children: React.ReactNode }) => children, {
+      Screen: () => null,
+      Protected: ({ children }: { children: React.ReactNode }) => children,
+    }),
+  };
+});
+
+jest.mock('expo-sqlite', () => ({
+  openDatabaseAsync: jest.fn(async () => ({
+    execAsync: jest.fn(async () => undefined),
+    runAsync: jest.fn(async () => ({ changes: 0, lastInsertRowId: 0 })),
+    getAllAsync: jest.fn(async () => []),
+    getFirstAsync: jest.fn(async () => null),
+    closeAsync: jest.fn(async () => undefined),
+  })),
+}));
+
+jest.mock('expo-image-picker', () => ({
+  launchCameraAsync: jest.fn(async () => ({ canceled: true, assets: null })),
+  launchImageLibraryAsync: jest.fn(async () => ({ canceled: true, assets: null })),
+  requestCameraPermissionsAsync: jest.fn(async () => ({ granted: true })),
+  requestMediaLibraryPermissionsAsync: jest.fn(async () => ({ granted: true })),
+}));
+
+jest.mock('expo-image-manipulator', () => ({
+  manipulateAsync: jest.fn(async () => ({
+    uri: 'mock://compressed.jpg',
+    width: 1,
+    height: 1,
+    base64: 'AAAA',
+  })),
+  SaveFormat: { JPEG: 'jpeg', PNG: 'png', WEBP: 'webp' },
 }));
 
 jest.mock('react-native-share', () => ({

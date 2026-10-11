@@ -1,15 +1,18 @@
+import { CustomerAvatar } from '@/components/CustomerAvatar';
 import { Customer } from '@/types/user';
 import React, { memo } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Avatar, Card, IconButton, Text } from 'react-native-paper';
+import { Card, IconButton, Text } from 'react-native-paper';
 
 type CustomerListItemProps = {
   customer: Customer;
+  photoUri?: string | null;
   onPress: (customer: Customer) => void;
 };
 
 function CustomerListItemComponent({
   customer,
+  photoUri,
   onPress,
 }: CustomerListItemProps) {
   const customerName = customer.customerName?.trim() || 'Unknown Customer';
@@ -18,9 +21,12 @@ function CustomerListItemComponent({
     <Card style={styles.customerCard} onPress={() => onPress(customer)}>
       <Card.Content style={styles.cardContent}>
         <View style={styles.customerInfo}>
-          <Avatar.Text
+          <CustomerAvatar
+            name={customerName}
             size={45}
-            label={customerName.charAt(0).toUpperCase() || 'U'}
+            bankCode={customer.bankCode}
+            accountNumber={customer.accountNumber}
+            photoUri={photoUri}
             style={styles.avatar}
           />
 
@@ -56,6 +62,7 @@ export const CustomerListItem = memo(
   CustomerListItemComponent,
   (previous, next) =>
     previous.onPress === next.onPress &&
+    previous.photoUri === next.photoUri &&
     previous.customer.accountNumber === next.customer.accountNumber &&
     previous.customer.customerName === next.customer.customerName &&
     previous.customer.currentBalance === next.customer.currentBalance &&

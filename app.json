@@ -65,6 +65,15 @@
             "targetSdkVersion": 36
           }
         }
+      ],
+      "expo-sqlite",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos to attach a customer photo.",
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to take a customer photo.",
+          "microphonePermission": false
+        }
       ]
     ],
     "experiments": {
