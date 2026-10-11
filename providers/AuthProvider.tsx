@@ -65,6 +65,13 @@ interface AuthContextType {
   getToken: () => string | null;
   getUser: () => AuthUser | null;
   dismissSessionNotice: () => void;
+  // Suppresses the auto-lock around a trusted, user-initiated system UI
+  // handoff (camera, photo library, etc.) that backgrounds the app for an
+  // unbounded amount of time — see the AppState listener below. Callers must
+  // call endTrustedHandoff() in a `finally` so a thrown/cancelled handoff
+  // never leaves the lock permanently suppressed.
+  beginTrustedHandoff: () => void;
+  endTrustedHandoff: () => void;
 }
 
 export interface SessionNotice {
@@ -108,6 +115,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const userRef = useRef(user);
   const hasPinRef = useRef(hasPin);
   const backgroundedAtRef = useRef<number | null>(null);
+  // Counter, not a boolean: guards against a stray endTrustedHandoff (e.g. a
+  // double-invoked finally) dropping suppression while another handoff is
+  // still legitimately in flight.
+  const suppressAutoLockRef = useRef(0);
 
   useEffect(() => {
     authStatusRef.current = authStatus;
@@ -288,6 +299,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         (authStatusRef.current === "unlocked" ||
           authStatusRef.current === "locked")
       ) {
+        // A trusted handoff (camera, photo library) is expected to background
+        // the app for however long the agent takes — unlike the grace window
+        // below, which only covers brief, unbounded-duration-free system
+        // dialogs. Don't even arm the timestamp, so no later 'active' event
+        // can treat this as a real absence.
+        if (suppressAutoLockRef.current > 0) {
+          return;
+        }
         // Defer the decision to (re-)lock until we come back: record when we
         // left, whether we were unlocked or already on the lock screen. A
         // transient background (e.g. a Bluetooth/permission system dialog, a
@@ -298,6 +317,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       if (nextState !== "active" || !hasPinRef.current || !userRef.current) {
+        return;
+      }
+
+      if (suppressAutoLockRef.current > 0) {
+        // Still inside (or just exited) a trusted handoff — nothing was
+        // armed on the way out, but clear defensively in case of a race.
+        backgroundedAtRef.current = null;
         return;
       }
 
@@ -463,6 +489,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const getToken = useCallback(() => user?.accessToken ?? null, [user]);
   const getUser = useCallback(() => user, [user]);
 
+  const beginTrustedHandoff = useCallback(() => {
+    suppressAutoLockRef.current += 1;
+  }, []);
+
+  const endTrustedHandoff = useCallback(() => {
+    suppressAutoLockRef.current = Math.max(0, suppressAutoLockRef.current - 1);
+  }, []);
+
   const value = useMemo<AuthContextType>(
     () => ({
       user,
@@ -481,10 +515,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       getToken,
       getUser,
       dismissSessionNotice: () => setSessionNotice(null),
+      beginTrustedHandoff,
+      endTrustedHandoff,
     }),
     [
       accounts,
       authStatus,
+      beginTrustedHandoff,
+      endTrustedHandoff,
       getToken,
       getUser,
       login,

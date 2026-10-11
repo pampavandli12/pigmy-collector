@@ -22,7 +22,7 @@ Keep outbox items keyed by `transactionId`. Respect the status lifecycle: `pendi
 
 ## Persistence Notes
 
-The active local persistence is Legend State plus MMKV. `expo-sqlite`, `DB_NAME`, and `TABLE_NAME` exist, but no SQLite schema/query layer is active. If adding SQLite, make it an explicit migration/design change rather than silently mixing persistence models.
+The active local persistence for customers/outbox is Legend State plus MMKV — do not mix SQLite into this. `expo-sqlite` is used elsewhere, but only for the independent customer-photo store (`db/customerPhotoDb.ts`, see AGENTS.md's "State, Offline Sync & SQLite" section); it has no bearing on outbox/sync state.
 
 ## Verification
 

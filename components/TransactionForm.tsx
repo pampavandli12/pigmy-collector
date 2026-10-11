@@ -1,10 +1,10 @@
+import { CustomerAvatar } from '@/components/CustomerAvatar';
 import { useAuth } from '@/providers/AuthProvider';
 import { parseDepositAmount } from '@/utils/depositAmount';
 import { Picker } from '@react-native-picker/picker';
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import {
-  Avatar,
   Button,
   Card,
   HelperText,
@@ -20,7 +20,6 @@ interface TransactionFormProps {
     bankCode: string;
     balance: number;
     account: string;
-    image: string;
   };
   amount: string;
   setAmount: (value: string) => void;
@@ -72,9 +71,12 @@ export const TransactionForm = ({
         {/* Customer Info Card */}
         <Card style={styles.customerCard}>
           <Card.Content style={styles.customerContent}>
-            <Avatar.Text
+            <CustomerAvatar
+              name={customer.name}
               size={45}
-              label={customer.name.charAt(0).toUpperCase()}
+              bankCode={customer.bankCode}
+              accountNumber={Number(customer.account)}
+              editable
               style={styles.avatar}
             />
             <View style={styles.customerInfo}>

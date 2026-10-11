@@ -456,3 +456,75 @@ test('re-verifying from the lock screen never passes through the loading state',
   nowSpy.mockRestore();
   subscription.mockRestore();
 });
+
+test('a trusted handoff (camera/library) never re-locks regardless of duration', async () => {
+  const listeners = new Set<(state: string) => void>();
+  const subscription = jest
+    .spyOn(AppState, 'addEventListener')
+    .mockImplementation((_type, listener) => {
+      const typedListener = listener as (state: string) => void;
+      listeners.add(typedListener);
+      return {
+        remove: () => {
+          listeners.delete(typedListener);
+        },
+      };
+    });
+  (SecureStore.getItemAsync as jest.Mock).mockImplementation((key: string) =>
+    Promise.resolve(
+      key === 'userInfo' ? JSON.stringify(user) : key === 'appPin' ? '123456' : null,
+    ),
+  );
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <AuthProvider>{children}</AuthProvider>
+  );
+  const { result } = renderHook(() => useAuth(), { wrapper });
+
+  await waitFor(() => expect(result.current.authStatus).toBe('locked'));
+  await act(async () => {
+    await result.current.unlockWithPin('123456');
+  });
+  expect(result.current.authStatus).toBe('unlocked');
+
+  const nowSpy = jest.spyOn(Date, 'now');
+
+  // Simulate opening the camera: begin the handoff, background, let an
+  // unbounded amount of time pass (far past AUTO_LOCK_GRACE_MS), then return
+  // to active and only end the handoff afterwards — exactly the order
+  // PhotoSourceDialog uses around launchCameraAsync.
+  act(() => {
+    result.current.beginTrustedHandoff();
+  });
+
+  nowSpy.mockReturnValue(1_000);
+  await act(async () => {
+    listeners.forEach((listener) => listener('background'));
+  });
+  expect(result.current.authStatus).toBe('unlocked');
+
+  nowSpy.mockReturnValue(120_000);
+  await act(async () => {
+    listeners.forEach((listener) => listener('active'));
+  });
+  expect(result.current.authStatus).toBe('unlocked');
+
+  act(() => {
+    result.current.endTrustedHandoff();
+  });
+  expect(result.current.authStatus).toBe('unlocked');
+
+  // A real background AFTER the handoff ends still locks normally — the
+  // suppression must not leak past the handoff it was meant to cover.
+  nowSpy.mockReturnValue(130_000);
+  await act(async () => {
+    listeners.forEach((listener) => listener('background'));
+  });
+  nowSpy.mockReturnValue(140_000);
+  await act(async () => {
+    listeners.forEach((listener) => listener('active'));
+  });
+  await waitFor(() => expect(result.current.authStatus).toBe('locked'));
+
+  nowSpy.mockRestore();
+  subscription.mockRestore();
+});

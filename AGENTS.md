@@ -21,7 +21,9 @@ Customer data flows from `services/user.ts` into Legend State via `store/actions
 
 Primary app state uses `@legendapp/state` in `store/store.ts`. `customers` and `outbox` persist to MMKV through `store/persistence.ts`; selectors compute filtered customers, today’s transactions, totals, and counts. `zustand` remains for snackbar state and an older `userStore`; prefer Legend State for customer and transaction work.
 
-Offline sync is outbox-based. Transactions are stored by `transactionId` with `pending`, `syncing`, `failed`, or `synced` status. `processOutbox` checks NetInfo, syncs oldest first, and retries failed items. The tab layout triggers sync and cleanup when connectivity returns. `expo-sqlite`, `DB_NAME`, and `TABLE_NAME` exist, but there is no active SQLite schema or query layer; do not assume SQLite persistence unless adding it intentionally.
+Offline sync is outbox-based. Transactions are stored by `transactionId` with `pending`, `syncing`, `failed`, or `synced` status. `processOutbox` checks NetInfo, syncs oldest first, and retries failed items. The tab layout triggers sync and cleanup when connectivity returns.
+
+`expo-sqlite` is used, deliberately, for exactly one thing: customer photos, kept fully independent of the MMKV/Legend-State model above. `db/customerPhotoDb.ts` owns the `customer_photos` table (keyed by `(bank_code, account_number)`, storing a compressed photo as base64 TEXT) and never throws — a DB-open or query failure resolves to `null`/`{}` so a broken photo store can never affect deposits or sync. `services/customerPhoto.ts` is the only consumer-facing API (save/get/get-batch), and `hooks/useCustomerPhoto.ts` + `components/CustomerAvatar.tsx` are how screens read and display it. Do not store anything else in SQLite, and do not assume SQLite persistence for other state, without the same explicit, documented decision.
 
 ## Navigation & Reusable Patterns
 
