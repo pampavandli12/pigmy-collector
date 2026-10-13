@@ -41,6 +41,7 @@ export const API_ENDPOINTS = {
   FETCH_COLLECTIONS: '/pigmyMobile/v2/transaction/fetchCollections',
   ADD_TRANSACTION: '/pigmyMobile/v2/transaction',
   ADD_TRANSACTION_PEOCIT: '/pigmyMobile/v2/transaction/peocit',
+  ADD_TRANSACTION_SLEDGER: '/pigmyMobile/v2/transaction/sledger',
 } as const;
 export const SECURE_STORE_KEY = 'userInfo';
 export const AGENT_ACCOUNTS_SECURE_STORE_KEY = 'agentAccounts';

@@ -13,6 +13,10 @@ export interface Customer {
   // record from customerSchema (see services/user.ts's per-record parsing).
   mobilenumber: string | null;
   userId: number;
+  // Only present for sledger-bankType agents; other banks' records omit it.
+  branchCode?: string;
+  // Only present for peocit-bankType agents; other banks' records omit it.
+  vpncode?: string;
 }
 
 export interface SyncableTransactionPayload {
@@ -29,6 +33,8 @@ export interface SyncableTransactionPayload {
   bankType?: string;
   agentName?: string;
   finalAmount?: number;
+  branchCode?: string;
+  vpncode?: string;
 }
 
 export type SyncStatus = 'pending' | 'syncing' | 'failed' | 'synced';
@@ -79,6 +85,8 @@ export const customerSchema = z.object({
   // at the point of use, so no format validation belongs here.
   mobilenumber: z.string().nullable(),
   userId: z.number().int(),
+  branchCode: z.string().optional(),
+  vpncode: z.string().optional(),
 });
 
 export const customerListSchema = z.array(customerSchema);
@@ -109,12 +117,23 @@ export const peocitTransactionSchema = z
     bankType: z.literal('peocit'),
     agentName: z.string().min(1),
     finalAmount: z.number().finite(),
+    vpncode: z.string().min(1),
+  })
+  .strict();
+
+export const sledgerTransactionSchema = z
+  .object({
+    ...transactionFields,
+    bankType: z.literal('sledger'),
+    agentName: z.string().min(1),
+    branchCode: z.string().min(1),
   })
   .strict();
 
 export const transactionPayloadSchema = z.discriminatedUnion('bankType', [
   banksoftTransactionSchema,
   peocitTransactionSchema,
+  sledgerTransactionSchema,
 ]);
 
 export type TransactionPayload = z.infer<typeof transactionPayloadSchema>;

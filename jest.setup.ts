@@ -51,6 +51,7 @@ jest.mock('expo-router', () => {
       balance: '100',
       account: '3',
       mobilenumber: '9876543210',
+      vpncode: '123456',
     }),
     Stack: Object.assign(({ children }: { children: React.ReactNode }) => children, {
       Screen: () => null,

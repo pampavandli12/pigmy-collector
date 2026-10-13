@@ -143,12 +143,14 @@ test('stores peocit final amount and rejects it on banksoft payloads', () => {
       bankType: 'peocit',
       agentName: 'Agent',
       finalAmount: 175,
+      vpncode: '123456',
     }),
   ).toBe(true);
   expect(store$.outbox['tx-peocit'].payload.peek()).toMatchObject({
     bankType: 'peocit',
     agentName: 'Agent',
     finalAmount: 175,
+    vpncode: '123456',
     accountNumber: 3,
   });
   expect(store$.outbox.peek()).not.toHaveProperty('tx');

@@ -74,6 +74,8 @@ export default function UserDetail() {
       storedCustomer?.currentBalance ?? Number(firstParam(params.balance) || 0),
     account,
     mobilenumber: firstParam(params.mobilenumber),
+    branchCode: firstParam(params.branchCode),
+    vpncode: firstParam(params.vpncode),
   };
 
   const [amount, setAmount] = useState('');
@@ -170,6 +172,8 @@ export default function UserDetail() {
         transactionId: Crypto.randomUUID(),
         openingBalance,
         agentName: user?.agentName,
+        branchCode: customer.branchCode || undefined,
+        vpncode: customer.vpncode || undefined,
       });
       const parsedPayload = transactionPayloadSchema.safeParse(payload);
       if (!parsedPayload.success) {

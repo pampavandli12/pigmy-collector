@@ -127,6 +127,8 @@ export default function Users() {
           // (hasUsablePhoneNumber/TransactionSuccess's default already treat it
           // that way) — route params must be strings, so normalize null here.
           mobilenumber: customer.mobilenumber ?? '',
+          branchCode: customer.branchCode ?? '',
+          vpncode: customer.vpncode ?? '',
         },
       });
     },

@@ -13,6 +13,8 @@ export interface DepositDraft {
   accountNumber: number;
   openingBalance: number;
   agentName?: string;
+  branchCode?: string;
+  vpncode?: string;
 }
 
 export function commonTransactionFields(draft: DepositDraft) {

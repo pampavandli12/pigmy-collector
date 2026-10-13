@@ -7,6 +7,7 @@ import { api } from '../services/axios';
 import { userLogin } from '../services/login';
 import { banksoftAdapter } from '../services/banks/banksoft';
 import { peocitAdapter } from '../services/banks/peocit';
+import { sledgerAdapter } from '../services/banks/sledger';
 import { createTransaction, fetchCollections, fetchCustomers } from '../services/user';
 import { loginResponseSchema } from '../types/auth';
 
@@ -169,6 +170,7 @@ test('builds a peocit payload with final amount and a banksoft payload without i
     accountNumber: 101,
     openingBalance: 500,
     agentName: 'Agent',
+    vpncode: '390879',
   };
 
   expect(peocitAdapter.buildPayload(draft)).toEqual({
@@ -185,6 +187,7 @@ test('builds a peocit payload with final amount and a banksoft payload without i
     bankType: 'peocit',
     agentName: 'Agent',
     finalAmount: 2000,
+    vpncode: '390879',
   });
 
   const banksoftPayload = banksoftAdapter.buildPayload(draft);
@@ -203,6 +206,42 @@ test('builds a peocit payload with final amount and a banksoft payload without i
   });
   expect(banksoftPayload).not.toHaveProperty('finalAmount');
   expect(banksoftPayload).not.toHaveProperty('agentName');
+});
+
+test('builds a sledger payload with branch code and no final amount', () => {
+  const draft = {
+    transactionId: 'tx',
+    userId: 1,
+    agentCode: 2,
+    bankCode: 'B1',
+    collectedAmount: 1500,
+    schemename: 'Pigmy Deposit',
+    schemeId: '38',
+    collectiontype: 'cash',
+    customerName: 'Customer',
+    accountNumber: 101,
+    openingBalance: 500,
+    agentName: 'Agent',
+    branchCode: '001',
+  };
+
+  const sledgerPayload = sledgerAdapter.buildPayload(draft);
+  expect(sledgerPayload).toEqual({
+    transactionId: 'tx',
+    userId: 1,
+    agentCode: 2,
+    bankCode: 'B1',
+    collectedAmount: 1500,
+    schemename: 'Pigmy Deposit',
+    schemeId: '38',
+    collectiontype: 'cash',
+    customerName: 'Customer',
+    accountNumber: 101,
+    bankType: 'sledger',
+    agentName: 'Agent',
+    branchCode: '001',
+  });
+  expect(sledgerPayload).not.toHaveProperty('finalAmount');
 });
 
 test('posts banksoft transactions with scheme id and without peocit fields', async () => {
@@ -257,6 +296,7 @@ test('posts peocit transactions to the peocit endpoint', async () => {
     customerName: 'Customer_101',
     accountNumber: 101,
     bankType: 'peocit',
+    vpncode: '390879',
   };
   mockedApi.post.mockResolvedValueOnce({ data: { ok: true } });
   await createTransaction(payload);
@@ -273,7 +313,53 @@ test('posts peocit transactions to the peocit endpoint', async () => {
     customerName: 'Customer_101',
     accountNumber: 101,
     transactionId: '3c00c185-0579-4cac-a144-660950138fd7',
+    vpncode: '390879',
   });
+});
+
+test('posts sledger transactions to the sledger endpoint without schemename and with a string account number', async () => {
+  const payload = {
+    transactionId: '3c00c185-0579-4cac-a144-660950138fd7',
+    userId: 1,
+    agentCode: 1,
+    agentName: 'SledgerAgent1',
+    bankCode: 'SLD123',
+    collectedAmount: 1500,
+    schemename: 'Pigmy Deposit',
+    schemeId: 'PD001',
+    collectiontype: 'cash',
+    customerName: 'Customer_101',
+    accountNumber: 101,
+    bankType: 'sledger',
+    branchCode: '001',
+  };
+  mockedApi.post.mockResolvedValueOnce({ data: { ok: true } });
+  await createTransaction(payload);
+  expect(mockedApi.post).toHaveBeenCalledWith('/pigmyMobile/v2/transaction/sledger', {
+    userId: 1,
+    agentCode: 1,
+    agentName: 'SledgerAgent1',
+    bankCode: 'SLD123',
+    collectedAmount: 1500,
+    schemeId: 'PD001',
+    collectiontype: 'cash',
+    customerName: 'Customer_101',
+    accountNumber: '101',
+    transactionId: '3c00c185-0579-4cac-a144-660950138fd7',
+    branchCode: '001',
+  });
+});
+
+test('does not post an incomplete sledger transaction', async () => {
+  await expect(
+    createTransaction({
+      transactionId: 'tx', userId: 1, agentCode: 2, bankCode: 'B1',
+      collectedAmount: 100, schemename: 'Pigmy Deposit', schemeId: '38',
+      collectiontype: 'cash', customerName: 'Customer', accountNumber: 3,
+      bankType: 'sledger', agentName: 'Agent',
+    }),
+  ).rejects.toThrow('Sledger transaction is missing agent name or branch code.');
+  expect(mockedApi.post).not.toHaveBeenCalled();
 });
 
 test('does not post an incomplete peocit transaction', async () => {
@@ -284,7 +370,23 @@ test('does not post an incomplete peocit transaction', async () => {
       collectiontype: 'cash', customerName: 'Customer', accountNumber: 3,
       bankType: 'peocit',
     }),
-  ).rejects.toThrow('Peocit transaction is missing agent name or final amount.');
+  ).rejects.toThrow(
+    'Peocit transaction is missing agent name, final amount, or vpn code.',
+  );
+  expect(mockedApi.post).not.toHaveBeenCalled();
+});
+
+test('does not post a peocit transaction missing only the vpn code', async () => {
+  await expect(
+    createTransaction({
+      transactionId: 'tx', userId: 1, agentCode: 2, bankCode: 'B1',
+      collectedAmount: 100, schemename: 'Pigmy Deposit', schemeId: '38',
+      collectiontype: 'cash', customerName: 'Customer', accountNumber: 3,
+      bankType: 'peocit', agentName: 'Agent', finalAmount: 250,
+    }),
+  ).rejects.toThrow(
+    'Peocit transaction is missing agent name, final amount, or vpn code.',
+  );
   expect(mockedApi.post).not.toHaveBeenCalled();
 });
 

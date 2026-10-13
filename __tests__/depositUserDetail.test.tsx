@@ -122,6 +122,7 @@ test('queues a peocit deposit with finalAmount equal to collected amount plus ba
     bankType: 'peocit',
     agentName: 'Agent',
     finalAmount: 250,
+    vpncode: '123456',
   });
 });
 
