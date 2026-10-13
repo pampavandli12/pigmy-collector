@@ -26,9 +26,19 @@ jest.mock('../utils/snackbar', () => ({
 jest.mock('../components/TransactionForm', () => {
   const { Button, Text } = require('react-native-paper');
   return {
-    TransactionForm: ({ handleConfirm }: { handleConfirm: () => void }) => (
+    TransactionForm: ({
+      handleConfirm,
+      scheme,
+      schemeLocked,
+    }: {
+      handleConfirm: () => void;
+      scheme: string;
+      schemeLocked?: boolean;
+    }) => (
       <>
         <Text>Deposit Details</Text>
+        <Text testID='scheme-value'>{scheme}</Text>
+        <Text testID='scheme-locked'>{String(Boolean(schemeLocked))}</Text>
         <Button onPress={handleConfirm}>Test Confirm</Button>
       </>
     ),
@@ -145,4 +155,46 @@ test('ignores a second confirm while the first deposit is still submitting', () 
   useStateSpy.mockRestore();
 
   expect(mockAddTransaction).toHaveBeenCalledTimes(1);
+});
+
+test('pre-selects and locks the scheme when the customer has a matching schemeId', () => {
+  store$.customers.set({
+    3: {
+      accountNumber: 3,
+      customerName: 'Customer',
+      currentBalance: 10,
+      lastDepositDate: '2026-01-01',
+      schemeId: '38',
+      agentCode: 2,
+      bankCode: 'B',
+      mobilenumber: null,
+      userId: 1,
+    },
+  });
+
+  const screen = render(<UserDetail />, { wrapper });
+
+  expect(screen.getByTestId('scheme-value').props.children).toBe('38');
+  expect(screen.getByTestId('scheme-locked').props.children).toBe('true');
+});
+
+test('leaves the scheme editable when the customer has no matching schemeId', () => {
+  store$.customers.set({
+    3: {
+      accountNumber: 3,
+      customerName: 'Customer',
+      currentBalance: 10,
+      lastDepositDate: '2026-01-01',
+      schemeId: 'unknown-scheme',
+      agentCode: 2,
+      bankCode: 'B',
+      mobilenumber: null,
+      userId: 1,
+    },
+  });
+
+  const screen = render(<UserDetail />, { wrapper });
+
+  expect(screen.getByTestId('scheme-value').props.children).toBe('');
+  expect(screen.getByTestId('scheme-locked').props.children).toBe('false');
 });

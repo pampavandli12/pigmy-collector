@@ -31,6 +31,7 @@ interface TransactionFormProps {
   setAmount: (value: string) => void;
   scheme: string;
   setScheme: (value: string) => void;
+  schemeLocked?: boolean;
   date: string;
   handleConfirm: () => void;
   isTransactionLoading: boolean;
@@ -42,6 +43,7 @@ export const TransactionForm = ({
   setAmount,
   scheme,
   setScheme,
+  schemeLocked = false,
   date,
   handleConfirm,
   isTransactionLoading,
@@ -176,10 +178,21 @@ export const TransactionForm = ({
             <Text variant='bodyMedium' style={styles.fieldLabel}>
               Scheme
             </Text>
-            <View style={styles.pickerContainer}>
+            <View
+              testID='scheme-picker-container'
+              style={[
+                styles.pickerContainer,
+                schemeLocked && styles.pickerContainerLocked,
+              ]}
+              // `enabled` on the Picker itself is Android-only, so pointerEvents
+              // is what actually blocks interaction on iOS too.
+              pointerEvents={schemeLocked ? 'none' : 'auto'}
+            >
               <Picker
+                testID='scheme-picker'
                 selectedValue={scheme}
                 onValueChange={(itemValue) => setScheme(String(itemValue ?? ''))}
+                enabled={!schemeLocked}
                 style={styles.picker}
               >
                 <Picker.Item label='Select scheme' value='' />
@@ -352,6 +365,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     height: 60,
     justifyContent: 'center',
+  },
+  pickerContainerLocked: {
+    backgroundColor: '#F0F0F0',
   },
   picker: {
     height: 60,

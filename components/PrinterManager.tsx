@@ -1,26 +1,29 @@
 /**
- * The Bluetooth printer settings screen's content: shows connection status,
- * lists available/paired devices, and runs a test print. Built on
- * `contexts/PrinterContext.tsx`.
+ * The Bluetooth printer setup screen's content: a two-step wizard — pick and
+ * pair a device (with an optional "default printer" preference), then verify
+ * the connection with a test print. Built on `contexts/PrinterContext.tsx`.
  */
 import React, { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Button, Icon, IconButton, Switch, Text } from "react-native-paper";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { usePrinter } from "../contexts/PrinterContext";
-import { ReceiptData, ReceiptPrinter } from "../utils/ReceiptPrinter";
+import { PrinterDevice } from "../services/BluetoothPrinterService";
+import { ReceiptPrinter } from "../utils/ReceiptPrinter";
+import { showSnackbar } from "../utils/snackbar";
 
 interface PrinterManagerProps {
   onConnectSuccess?: () => void;
+  onClose?: () => void;
 }
 
-export default function PrinterManager({ onConnectSuccess }: PrinterManagerProps) {
+type Step = "select" | "ready";
+
+const PRIMARY = "#007AFF";
+const SUCCESS = "#0D9F59";
+const DANGER = "#D32F2F";
+
+export default function PrinterManager({ onConnectSuccess, onClose }: PrinterManagerProps) {
   const {
     isConnected,
     connectedDevice,
@@ -31,54 +34,74 @@ export default function PrinterManager({ onConnectSuccess }: PrinterManagerProps
     connectToPrinter,
     disconnectPrinter,
     requestPermissions,
+    getDefaultPrinter,
+    setDefaultPrinter,
   } = usePrinter();
 
+  const [step, setStep] = useState<Step>(() => (isConnected ? "ready" : "select"));
+  const [selectedAddress, setSelectedAddress] = useState<string | null>(
+    () => connectedDevice?.address ?? null
+  );
+  const [autoDefault, setAutoDefault] = useState(true);
+  const [defaultAddress, setDefaultAddress] = useState<string | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
 
   useEffect(() => {
     requestPermissions();
   }, [requestPermissions]);
 
-  const handleScan = async () => {
-    await scanForDevices();
-  };
+  useEffect(() => {
+    setDefaultAddress(getDefaultPrinter()?.address ?? null);
+  }, [getDefaultPrinter]);
 
-  const handleConnect = async (address: string) => {
-    const success = await connectToPrinter(address);
-    if (success) {
-      Alert.alert("Success", "Connected to printer successfully!", [
-        {
-          text: "OK",
-          onPress: () => {
-            onConnectSuccess?.();
-          },
-        },
-      ]);
-    } else {
-      Alert.alert("Error", "Failed to connect to printer");
+  useEffect(() => {
+    if (step === "select") {
+      scanForDevices();
     }
-  };
+  }, [step, scanForDevices]);
 
-  const handlePair = async (address: string) => {
-    const success = await pairPrinter(address);
-    if (success) {
-      await handleConnect(address);
-    } else {
-      Alert.alert("Error", "Failed to pair printer");
+  useEffect(() => {
+    if (!selectedAddress && availableDevices.length > 0) {
+      setSelectedAddress(availableDevices[0].address);
     }
-  };
+  }, [availableDevices, selectedAddress]);
 
-  const handleDisconnect = async () => {
-    await disconnectPrinter();
-    Alert.alert("Disconnected", "Printer disconnected successfully");
+  const selectedDevice: PrinterDevice | null =
+    availableDevices.find((device) => device.address === selectedAddress) ?? null;
+
+  const handlePairAndConnect = async () => {
+    if (!selectedDevice || isConnecting) return;
+
+    setIsConnecting(true);
+    try {
+      if (!selectedDevice.paired) {
+        const paired = await pairPrinter(selectedDevice.address);
+        if (!paired) {
+          Alert.alert("Error", "Failed to pair printer");
+          return;
+        }
+      }
+
+      const connected = await connectToPrinter(selectedDevice.address, {
+        fallbackDevice: selectedDevice,
+      });
+      if (!connected) {
+        Alert.alert("Error", "Failed to connect to printer");
+        return;
+      }
+
+      if (autoDefault) {
+        setDefaultPrinter(selectedDevice);
+        setDefaultAddress(selectedDevice.address);
+      }
+      setStep("ready");
+    } finally {
+      setIsConnecting(false);
+    }
   };
 
   const handleTestPrint = async () => {
-    if (!isConnected) {
-      Alert.alert("Not Connected", "Please connect to a printer first");
-      return;
-    }
-
     setIsPrinting(true);
     const success = await ReceiptPrinter.printTest();
     setIsPrinting(false);
@@ -90,347 +113,388 @@ export default function PrinterManager({ onConnectSuccess }: PrinterManagerProps
     }
   };
 
-  const handlePrintSampleReceipt = async () => {
-    if (!isConnected) {
-      Alert.alert("Not Connected", "Please connect to a printer first");
-      return;
-    }
-
-    setIsPrinting(true);
-
-    const sampleReceipt: ReceiptData = {
-      storeName: "Pigmy Collector Store",
-      storeAddress: "123 Main Street, City",
-      phone: "+1 234-567-8900",
-      receiptNumber: `RC${Date.now()}`,
-      date: new Date().toLocaleString(),
-      items: [
+  const handleForget = () => {
+    Alert.alert(
+      "Forget printer?",
+      "This disconnects the printer and clears it as your default receipt printer.",
+      [
+        { text: "Cancel", style: "cancel" },
         {
-          name: "Product A",
-          quantity: 2,
-          price: 25.0,
-          total: 50.0,
+          text: "Forget",
+          style: "destructive",
+          onPress: async () => {
+            await disconnectPrinter();
+            setDefaultPrinter(null);
+            setDefaultAddress(null);
+            setSelectedAddress(null);
+            setStep("select");
+            showSnackbar("Printer disconnected.", { type: "success" });
+          },
         },
-        {
-          name: "Product B",
-          quantity: 1,
-          price: 15.5,
-          total: 15.5,
-        },
-        {
-          name: "Product C",
-          quantity: 3,
-          price: 10.0,
-          total: 30.0,
-        },
-      ],
-      subtotal: 95.5,
-      tax: 9.55,
-      discount: 5.0,
-      total: 100.05,
-      paymentMethod: "Cash",
-      footer: "Visit us again!",
-    };
-
-    const success = await ReceiptPrinter.printReceipt(sampleReceipt);
-    setIsPrinting(false);
-
-    if (success) {
-      Alert.alert("Success", "Receipt printed successfully!");
-    } else {
-      Alert.alert("Error", "Failed to print receipt");
-    }
+      ]
+    );
   };
 
-  const renderDeviceItem = ({
-    item,
-  }: {
-    item: { name: string; address: string; paired: boolean; connected: boolean };
-  }) => (
-    <View style={styles.deviceItem}>
-      <View style={styles.deviceDetails}>
-        <Text style={styles.deviceName}>{item.name}</Text>
-        <Text style={styles.deviceAddress}>{item.address}</Text>
-        <View style={styles.deviceBadges}>
-          <Text style={[styles.deviceBadge, item.paired && styles.deviceBadgePaired]}>
-            {item.paired ? "Paired" : "New"}
-          </Text>
-          {item.connected && (
-            <Text style={[styles.deviceBadge, styles.deviceBadgeConnected]}>
-              Connected
-            </Text>
-          )}
-        </View>
-      </View>
-      {item.paired ? (
-        <TouchableOpacity
-          style={styles.deviceAction}
-          onPress={() => handleConnect(item.address)}
-          disabled={item.connected}
-        >
-          <Text style={styles.connectText}>
-            {item.connected ? "Connected" : "Connect"}
-          </Text>
-        </TouchableOpacity>
-      ) : (
-        <TouchableOpacity
-          style={styles.deviceAction}
-          onPress={() => handlePair(item.address)}
-        >
-          <Text style={styles.connectText}>Pair</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
+  const handleBack = () => {
+    if (step === "ready") {
+      setStep("select");
+      return;
+    }
+    onClose?.();
+  };
 
   return (
-    <ScrollView style={styles.container}>
-      {/* Connection Status */}
-      <View style={styles.statusContainer}>
-        <View style={styles.statusRow}>
-          <Text style={styles.statusLabel}>Status:</Text>
-          <View
-            style={[
-              styles.statusBadge,
-              isConnected && styles.statusBadgeConnected,
-            ]}
-          >
-            <Text style={styles.statusText}>
-              {isConnected ? "Connected" : "Disconnected"}
-            </Text>
-          </View>
-        </View>
-
-        {connectedDevice && (
-          <View style={styles.connectedDevice}>
-            <Text style={styles.connectedLabel}>Connected to:</Text>
-            <Text style={styles.connectedName}>{connectedDevice.name}</Text>
-            <TouchableOpacity
-              style={styles.disconnectButton}
-              onPress={handleDisconnect}
-            >
-              <Text style={styles.disconnectText}>Disconnect</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-
-      {/* Scan Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Available Devices</Text>
-        <TouchableOpacity
-          style={styles.scanButton}
-          onPress={handleScan}
-          disabled={isScanning}
-        >
-          {isScanning ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.scanButtonText}>Scan for Devices</Text>
-          )}
-        </TouchableOpacity>
-
-        {availableDevices.length > 0 ? (
-          <View>
-            {availableDevices.map((device) => (
-              <React.Fragment key={device.address}>
-                {renderDeviceItem({ item: device })}
-              </React.Fragment>
-            ))}
-          </View>
-        ) : (
-          <Text style={styles.emptyText}>
-            No printers found. Turn on the printer and scan again.
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <View style={styles.header}>
+        <IconButton icon="arrow-left" size={22} onPress={handleBack} style={styles.headerButton} />
+        <View style={styles.headerTitleWrap}>
+          <Text variant="titleMedium" style={styles.headerTitle}>
+            Printer Setup
           </Text>
-        )}
-      </View>
-
-      {/* Print Actions */}
-      {isConnected && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Print Actions</Text>
-
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={handleTestPrint}
-            disabled={isPrinting}
-          >
-            {isPrinting ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.actionButtonText}>Print Test Page</Text>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.actionButton, styles.actionButtonPrimary]}
-            onPress={handlePrintSampleReceipt}
-            disabled={isPrinting}
-          >
-            {isPrinting ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.actionButtonText}>Print Sample Receipt</Text>
-            )}
-          </TouchableOpacity>
+          {step === "ready" && (
+            <Text variant="labelSmall" style={styles.headerSubtitle}>
+              STEP 2: READY & TEST
+            </Text>
+          )}
         </View>
-      )}
-
-      <View style={styles.infoSection}>
-        <Text style={styles.infoTitle}>Printer setup</Text>
-        <Text style={styles.infoText}>Scan, pair new printers, then connect.</Text>
-        <Text style={styles.infoText}>Connected printers can print test pages and receipts.</Text>
+        <IconButton icon="close" size={22} onPress={onClose} style={styles.headerButton} />
       </View>
-    </ScrollView>
+
+      {step === "select" ? (
+        <>
+          <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+            <View style={styles.scanBanner}>
+              <View style={styles.scanBannerLeft}>
+                <View style={styles.scanIconWrap}>
+                  <Icon source="bluetooth" size={18} color={PRIMARY} />
+                </View>
+                <View>
+                  <Text variant="labelLarge">
+                    {isScanning ? "Searching for printers…" : "Available printers"}
+                  </Text>
+                  <Text variant="bodySmall" style={styles.hintText}>
+                    Keep device within 2m
+                  </Text>
+                </View>
+              </View>
+              <Button
+                mode="outlined"
+                compact
+                icon="refresh"
+                loading={isScanning}
+                onPress={scanForDevices}
+              >
+                Rescan
+              </Button>
+            </View>
+
+            <View style={styles.sectionHeaderRow}>
+              <Text variant="titleSmall" style={styles.sectionHeaderText}>
+                Available Devices
+              </Text>
+              <View style={styles.countChip}>
+                <Text variant="labelSmall" style={styles.countChipText}>
+                  {availableDevices.length} found
+                </Text>
+              </View>
+            </View>
+
+            {availableDevices.length > 0 ? (
+              <View style={styles.deviceList}>
+                {availableDevices.map((device) => {
+                  const isSelected = device.address === selectedAddress;
+                  const badgeLabel = device.connected
+                    ? "Connected"
+                    : device.paired
+                      ? "Paired"
+                      : "Available";
+                  return (
+                    <DeviceRow
+                      key={device.address}
+                      device={device}
+                      isSelected={isSelected}
+                      badgeLabel={badgeLabel}
+                      onPress={() => setSelectedAddress(device.address)}
+                    />
+                  );
+                })}
+              </View>
+            ) : (
+              <Text style={styles.emptyText}>
+                {isScanning
+                  ? "Scanning for nearby printers…"
+                  : "No printers found. Turn on the printer and scan again."}
+              </Text>
+            )}
+
+            <View style={styles.defaultRow}>
+              <View style={styles.defaultRowLeft}>
+                <Icon source="star" size={18} color={PRIMARY} />
+                <View style={styles.defaultRowText}>
+                  <Text variant="labelLarge">Set as default receipt printer</Text>
+                  <Text variant="bodySmall" style={styles.hintText}>
+                    Auto-connect on collection screens
+                  </Text>
+                </View>
+              </View>
+              <Switch value={autoDefault} onValueChange={setAutoDefault} color={PRIMARY} />
+            </View>
+
+            <View style={styles.infoBanner}>
+              <Icon source="information-outline" size={18} color={PRIMARY} />
+              <Text variant="bodySmall" style={styles.infoText}>
+                Turn on printer Bluetooth before pairing. Press the printer feed button twice if
+                not listed.
+              </Text>
+            </View>
+          </ScrollView>
+
+          <View style={styles.footer}>
+            <Button
+              mode="contained"
+              icon="bluetooth"
+              loading={isConnecting}
+              disabled={!selectedDevice || isConnecting}
+              onPress={handlePairAndConnect}
+              contentStyle={styles.footerButtonContent}
+            >
+              {selectedDevice?.paired ? "Connect" : "Pair & Connect"}
+            </Button>
+          </View>
+        </>
+      ) : (
+        <>
+          <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+            <View style={styles.readyCard}>
+              <View style={styles.readyIconWrap}>
+                <Icon source="check-circle" size={40} color={SUCCESS} />
+              </View>
+              <View style={styles.readyChip}>
+                <Text variant="labelSmall" style={styles.readyChipText}>
+                  Connected & Ready
+                </Text>
+              </View>
+              <Text variant="titleMedium" style={styles.readyDeviceName}>
+                {connectedDevice?.name ?? "Printer"}
+              </Text>
+              <Text variant="bodySmall" style={styles.hintText}>
+                Connected via Bluetooth ({connectedDevice?.address ?? "unknown"})
+              </Text>
+
+              <View style={styles.verifyRow}>
+                <Icon source="receipt-text-outline" size={20} color={PRIMARY} />
+                <View style={styles.verifyText}>
+                  <Text variant="labelLarge">Verify Thermal Print</Text>
+                  <Text variant="bodySmall" style={styles.hintText}>
+                    Feeds a short test line to check paper feed and print clarity
+                  </Text>
+                </View>
+              </View>
+
+              <Button
+                mode="outlined"
+                icon="printer-outline"
+                loading={isPrinting}
+                disabled={isPrinting}
+                onPress={handleTestPrint}
+                style={styles.testPrintButton}
+              >
+                Print Test Slip
+              </Button>
+            </View>
+
+            <Button mode="text" textColor={DANGER} icon="bluetooth-off" onPress={handleForget}>
+              Disconnect or Forget Printer
+            </Button>
+          </ScrollView>
+
+          <View style={styles.footer}>
+            <Button
+              mode="contained"
+              icon="check"
+              onPress={() => onConnectSuccess?.()}
+              contentStyle={styles.footerButtonContent}
+            >
+              Continue to Print Receipt
+            </Button>
+            {connectedDevice && connectedDevice.address === defaultAddress && (
+              <Text variant="bodySmall" style={styles.footerCaption}>
+                {connectedDevice.name} is selected as default for all collection slips
+              </Text>
+            )}
+          </View>
+        </>
+      )}
+    </SafeAreaView>
+  );
+}
+
+function DeviceRow({
+  device,
+  isSelected,
+  badgeLabel,
+  onPress,
+}: {
+  device: PrinterDevice;
+  isSelected: boolean;
+  badgeLabel: string;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={[styles.deviceCard, isSelected && styles.deviceCardSelected]}
+      activeOpacity={0.7}
+    >
+      <View style={styles.deviceCardIconWrap}>
+        <Icon source="printer" size={20} color={isSelected ? PRIMARY : "#666"} />
+      </View>
+      <View style={styles.deviceCardDetails}>
+        <Text variant="labelLarge">{device.name}</Text>
+        <Text variant="bodySmall" style={styles.hintText}>
+          {device.address}
+        </Text>
+      </View>
+      <View style={[styles.badge, isSelected && styles.badgeSelected]}>
+        <Text
+          variant="labelSmall"
+          style={[styles.badgeText, isSelected && styles.badgeTextSelected]}
+        >
+          {badgeLabel}
+        </Text>
+      </View>
+      <Icon
+        source={isSelected ? "check-circle" : "checkbox-blank-circle-outline"}
+        size={22}
+        color={isSelected ? PRIMARY : "#C7C7CC"}
+      />
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#F5F5F5",
   },
-  statusContainer: {
-    backgroundColor: "#fff",
-    margin: 16,
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  statusRow: {
+  header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: "#F5F5F5",
   },
-  statusLabel: {
-    fontSize: 16,
-    fontWeight: "600",
+  headerButton: {
+    margin: 0,
   },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: "#FF3B30",
-  },
-  statusBadgeConnected: {
-    backgroundColor: "#34C759",
-  },
-  statusText: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 14,
-  },
-  connectedDevice: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#e0e0e0",
-  },
-  connectedLabel: {
-    fontSize: 14,
-    color: "#666",
-    marginBottom: 4,
-  },
-  connectedName: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 8,
-  },
-  disconnectButton: {
-    backgroundColor: "#FF3B30",
-    padding: 10,
-    borderRadius: 8,
+  headerTitleWrap: {
+    flex: 1,
     alignItems: "center",
   },
-  disconnectText: {
-    color: "#fff",
-    fontWeight: "600",
-  },
-  section: {
-    backgroundColor: "#fff",
-    margin: 16,
-    marginTop: 0,
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  sectionTitle: {
-    fontSize: 18,
+  headerTitle: {
     fontWeight: "700",
-    marginBottom: 12,
+    color: "#000",
   },
-  scanButton: {
-    backgroundColor: "#007AFF",
-    padding: 14,
-    borderRadius: 8,
+  headerSubtitle: {
+    color: "#666",
+    letterSpacing: 0.5,
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 32,
+  },
+  scanBanner: {
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 14,
     marginBottom: 16,
   },
-  scanButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  deviceItem: {
+  scanBannerLeft: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
+    gap: 10,
+    flexShrink: 1,
   },
-  deviceDetails: {
-    flex: 1,
-    paddingRight: 12,
+  scanIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#E7F0FF",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  deviceName: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 4,
-  },
-  deviceAddress: {
-    fontSize: 12,
+  hintText: {
     color: "#666",
+    marginTop: 2,
   },
-  deviceBadges: {
+  sectionHeaderRow: {
     flexDirection: "row",
-    gap: 6,
-    marginTop: 8,
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
   },
-  deviceBadge: {
+  sectionHeaderText: {
+    fontWeight: "700",
+  },
+  countChip: {
     backgroundColor: "#F2F2F7",
     borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  countChipText: {
     color: "#666",
-    fontSize: 11,
-    fontWeight: "600",
-    overflow: "hidden",
+  },
+  deviceList: {
+    gap: 10,
+    marginBottom: 16,
+  },
+  deviceCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: "transparent",
+    padding: 12,
+  },
+  deviceCardSelected: {
+    borderColor: PRIMARY,
+  },
+  deviceCardIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: "#F2F2F7",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  deviceCardDetails: {
+    flex: 1,
+    alignItems: "flex-start",
+  },
+  badge: {
+    backgroundColor: "#F2F2F7",
+    borderRadius: 10,
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
-  deviceBadgePaired: {
+  badgeSelected: {
     backgroundColor: "#E8F5E9",
+  },
+  badgeText: {
+    color: "#666",
+  },
+  badgeTextSelected: {
     color: "#1B7F3A",
-  },
-  deviceBadgeConnected: {
-    backgroundColor: "#E7F0FF",
-    color: "#0066CC",
-  },
-  deviceAction: {
-    minWidth: 78,
-    alignItems: "flex-end",
-    paddingVertical: 8,
-  },
-  connectText: {
-    color: "#007AFF",
-    fontWeight: "600",
   },
   emptyText: {
     textAlign: "center",
@@ -438,38 +502,84 @@ const styles = StyleSheet.create({
     fontSize: 14,
     padding: 20,
   },
-  actionButton: {
-    backgroundColor: "#5856D6",
-    padding: 14,
-    borderRadius: 8,
+  defaultRow: {
+    flexDirection: "row",
     alignItems: "center",
-    marginBottom: 12,
-  },
-  actionButtonPrimary: {
-    backgroundColor: "#34C759",
-  },
-  actionButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  infoSection: {
+    justifyContent: "space-between",
     backgroundColor: "#fff",
-    margin: 16,
-    marginTop: 0,
-    padding: 16,
     borderRadius: 12,
-    marginBottom: 32,
-  },
-  infoTitle: {
-    fontSize: 16,
-    fontWeight: "700",
+    padding: 14,
     marginBottom: 12,
+  },
+  defaultRowLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flexShrink: 1,
+  },
+  defaultRowText: {
+    flexShrink: 1,
+  },
+  infoBanner: {
+    flexDirection: "row",
+    gap: 8,
+    backgroundColor: "#E7F0FF",
+    borderRadius: 12,
+    padding: 12,
   },
   infoText: {
-    fontSize: 14,
+    flex: 1,
+    color: "#3A3A3C",
+  },
+  footer: {
+    padding: 16,
+    backgroundColor: "#F5F5F5",
+    borderTopWidth: 1,
+    borderTopColor: "#E5E5EA",
+  },
+  footerButtonContent: {
+    height: 48,
+  },
+  footerCaption: {
+    textAlign: "center",
     color: "#666",
+    marginTop: 8,
+  },
+  readyCard: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 20,
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  readyIconWrap: {
     marginBottom: 8,
-    lineHeight: 20,
+  },
+  readyChip: {
+    backgroundColor: "#E8F5E9",
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginBottom: 10,
+  },
+  readyChipText: {
+    color: "#1B7F3A",
+  },
+  readyDeviceName: {
+    fontWeight: "700",
+  },
+  verifyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    alignSelf: "stretch",
+    marginTop: 20,
+    marginBottom: 12,
+  },
+  verifyText: {
+    flex: 1,
+  },
+  testPrintButton: {
+    alignSelf: "stretch",
   },
 });
