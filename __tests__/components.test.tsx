@@ -9,6 +9,9 @@ jest.mock('../contexts/PrinterContext', () => ({
     connectToPrinter: jest.fn(),
     disconnectPrinter: jest.fn(),
     requestPermissions: jest.fn(),
+    getDefaultPrinter: jest.fn(() => null),
+    setDefaultPrinter: jest.fn(),
+    connectToDefaultPrinter: jest.fn().mockResolvedValue(true),
   }),
 }));
 jest.mock('expo-sms', () => ({
@@ -52,6 +55,7 @@ jest.mock('../providers/AuthProvider', () => ({
 }));
 
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { Picker } from '@react-native-picker/picker';
 import * as SMS from 'expo-sms';
 import { useState } from 'react';
 import { HelperText, PaperProvider } from 'react-native-paper';
@@ -93,6 +97,46 @@ test('keeps transaction confirmation disabled until values match', () => {
     screen.getByRole('button', { name: 'Confirm + Save' }).props
       .accessibilityState.disabled,
   ).toBe(true);
+});
+
+test('leaves the scheme picker editable when schemeLocked is omitted', () => {
+  const screen = render(
+    <TransactionForm
+      customer={{ id: '1', name: 'Customer', agentCode: 2, bankCode: 'B', balance: 10, account: '3' }}
+      amount='100'
+      setAmount={jest.fn()}
+      scheme=''
+      setScheme={jest.fn()}
+      date='July 18, 2026'
+      handleConfirm={jest.fn()}
+      isTransactionLoading={false}
+    />,
+    { wrapper },
+  );
+  expect(screen.getByTestId('scheme-picker-container').props.pointerEvents).toBe(
+    'auto',
+  );
+});
+
+test('disables the scheme picker when schemeLocked is true', () => {
+  const screen = render(
+    <TransactionForm
+      customer={{ id: '1', name: 'Customer', agentCode: 2, bankCode: 'B', balance: 10, account: '3' }}
+      amount='100'
+      setAmount={jest.fn()}
+      scheme='38'
+      setScheme={jest.fn()}
+      schemeLocked
+      date='July 18, 2026'
+      handleConfirm={jest.fn()}
+      isTransactionLoading={false}
+    />,
+    { wrapper },
+  );
+  expect(screen.UNSAFE_getByType(Picker).props.selectedValue).toBe('38');
+  expect(screen.getByTestId('scheme-picker-container').props.pointerEvents).toBe(
+    'none',
+  );
 });
 
 const QuickAmountForm = () => {
@@ -445,6 +489,6 @@ test('reports an outdated native build without importing receipt modules', async
 
 test('renders printer connection state and actions', () => {
   const screen = render(<PrinterManager />);
-  expect(screen.getByText('Connected')).toBeTruthy();
-  expect(screen.getByText('Print Test Page')).toBeTruthy();
+  expect(screen.getByText('Connected & Ready')).toBeTruthy();
+  expect(screen.getByText('Print Test Slip')).toBeTruthy();
 });

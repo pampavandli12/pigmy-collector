@@ -70,7 +70,7 @@ export const TransactionSuccess = ({
   }),
   onDone,
 }: TransactionSuccessProps) => {
-  const { isConnected } = usePrinter();
+  const { isConnected, connectToDefaultPrinter } = usePrinter();
   const [isPrinting, setIsPrinting] = useState(false);
   const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false);
   const whatsAppShareInProgress = useRef(false);
@@ -139,7 +139,8 @@ export const TransactionSuccess = ({
   );
 
   const onPrintReceipt = useCallback(async () => {
-    if (!isConnected) {
+    const connected = isConnected || (await connectToDefaultPrinter());
+    if (!connected) {
       shouldPrintOnConnect.current = true;
       router.push({
         pathname: '/printer',
@@ -159,6 +160,7 @@ export const TransactionSuccess = ({
     }
   }, [
     isConnected,
+    connectToDefaultPrinter,
     createReceiptData,
     router,
   ]);

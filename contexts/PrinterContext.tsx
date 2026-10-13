@@ -16,7 +16,16 @@ import ExpoThermalPrinter from "../modules/expo-thermal-printer/src/ExpoThermalP
 import BluetoothPrinterService, {
   PrinterDevice,
 } from "../services/BluetoothPrinterService";
+import { mmkv } from "../store/persistence";
+import { DEFAULT_PRINTER_STORAGE_KEY } from "../utils/constants";
 import { showSnackbar } from "../utils/snackbar";
+
+interface ConnectOptions {
+  /** Skip the error snackbar — used for best-effort background auto-connect. */
+  silent?: boolean;
+  /** Device to remember as `connectedDevice` if it isn't in `availableDevices` yet. */
+  fallbackDevice?: PrinterDevice;
+}
 
 interface PrinterContextType {
   isConnected: boolean;
@@ -25,9 +34,12 @@ interface PrinterContextType {
   isScanning: boolean;
   scanForDevices: () => Promise<void>;
   pairPrinter: (address: string) => Promise<boolean>;
-  connectToPrinter: (address: string) => Promise<boolean>;
+  connectToPrinter: (address: string, options?: ConnectOptions) => Promise<boolean>;
   disconnectPrinter: () => Promise<void>;
   requestPermissions: () => Promise<boolean>;
+  getDefaultPrinter: () => PrinterDevice | null;
+  setDefaultPrinter: (device: PrinterDevice | null) => void;
+  connectToDefaultPrinter: () => Promise<boolean>;
 }
 
 const PrinterContext = createContext<PrinterContextType | undefined>(undefined);
@@ -181,11 +193,12 @@ export const PrinterProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   const connectToPrinter = useCallback(
-    async (address: string): Promise<boolean> => {
+    async (address: string, options?: ConnectOptions): Promise<boolean> => {
       try {
         const success = await BluetoothPrinterService.connect(address);
         if (success) {
-          const device = availableDevices.find((d) => d.address === address);
+          const device =
+            availableDevices.find((d) => d.address === address) ?? options?.fallbackDevice;
           setIsConnected(true);
           setConnectedDevice(
             device || { name: "Unknown", address, paired: true, connected: true }
@@ -193,7 +206,9 @@ export const PrinterProvider: React.FC<{ children: React.ReactNode }> = ({
         }
         return success;
       } catch {
-        showSnackbar("Unable to connect to the printer.", { type: "error" });
+        if (!options?.silent) {
+          showSnackbar("Unable to connect to the printer.", { type: "error" });
+        }
         return false;
       }
     },
@@ -210,6 +225,40 @@ export const PrinterProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, []);
 
+  // Storage may not be initialized yet (PrinterProvider mounts before
+  // AuthProvider's initPersistence completes), so every read/write here is
+  // best-effort: a preference that fails to load/save just behaves as unset.
+  const getDefaultPrinter = useCallback((): PrinterDevice | null => {
+    try {
+      const raw = mmkv.getString(DEFAULT_PRINTER_STORAGE_KEY);
+      return raw ? (JSON.parse(raw) as PrinterDevice) : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const setDefaultPrinter = useCallback((device: PrinterDevice | null) => {
+    try {
+      if (device) {
+        mmkv.set(DEFAULT_PRINTER_STORAGE_KEY, JSON.stringify(device));
+      } else {
+        mmkv.remove(DEFAULT_PRINTER_STORAGE_KEY);
+      }
+    } catch {
+      // Storage not ready; the preference silently stays unset.
+    }
+  }, []);
+
+  const connectToDefaultPrinter = useCallback(async (): Promise<boolean> => {
+    if (isConnected) return true;
+    const defaultDevice = getDefaultPrinter();
+    if (!defaultDevice) return false;
+    return connectToPrinter(defaultDevice.address, {
+      silent: true,
+      fallbackDevice: defaultDevice,
+    });
+  }, [isConnected, getDefaultPrinter, connectToPrinter]);
+
   const value: PrinterContextType = {
     isConnected,
     connectedDevice,
@@ -220,6 +269,9 @@ export const PrinterProvider: React.FC<{ children: React.ReactNode }> = ({
     connectToPrinter,
     disconnectPrinter,
     requestPermissions,
+    getDefaultPrinter,
+    setDefaultPrinter,
+    connectToDefaultPrinter,
   };
 
   return (

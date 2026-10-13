@@ -56,3 +56,4 @@ export const PIN_SECURE_STORE_KEY = 'appPin';
 export const PIN_SALT_SECURE_STORE_KEY = 'appPinSalt';
 export const PIN_ATTEMPT_SECURE_STORE_KEY = 'appPinAttempts';
 export const MMKV_ENCRYPTION_KEY = 'mmkvEncryptionKey';
+export const DEFAULT_PRINTER_STORAGE_KEY = 'defaultPrinter';
