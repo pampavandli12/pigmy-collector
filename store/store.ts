@@ -1,3 +1,9 @@
+/**
+ * The Legend State observable `store$` (customers, outbox, search/UI state)
+ * and its per-agent MMKV persistence. Storage keys are scoped per active
+ * agent (`activateAgentStore`) so switching accounts never leaks one agent's
+ * customers/outbox into another's.
+ */
 import { observable } from '@legendapp/state';
 
 import { mmkv } from './persistence';

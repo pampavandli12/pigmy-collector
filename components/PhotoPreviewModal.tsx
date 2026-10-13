@@ -1,3 +1,4 @@
+/** Full-screen modal for viewing a customer's photo full-size; dismisses on tap outside the image. */
 import { Image } from 'expo-image';
 import { Modal, Pressable, StyleSheet } from 'react-native';
 import { IconButton } from 'react-native-paper';

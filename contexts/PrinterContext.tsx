@@ -1,3 +1,9 @@
+/**
+ * React context for the Bluetooth thermal printer's connection lifecycle
+ * (scan, pair, connect/disconnect) on top of
+ * `services/BluetoothPrinterService.ts`. Consumed via `usePrinter()`;
+ * `components/PrinterManager.tsx` is its primary UI.
+ */
 import React, {
   createContext,
   useCallback,

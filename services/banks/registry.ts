@@ -1,3 +1,10 @@
+/**
+ * Resolves a `BankTransactionAdapter` by `bankType`. `getBankAdapter` (sync
+ * path, throws on an unknown type; defaults missing `bankType` to banksoft
+ * for pre-multi-bank outbox records) and `getRegisteredBankAdapter`
+ * (UI-time lookup, returns undefined instead of throwing) are the two entry
+ * points. Register a new bank adapter in the `adapters` array below.
+ */
 import { SyncableTransactionPayload } from '@/types/user';
 import { BANKSOFT, banksoftAdapter } from './banksoft';
 import { UnsupportedBankTypeError } from './errors';

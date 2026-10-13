@@ -1,3 +1,4 @@
+/** Modal screen hosting `PrinterManager`; optionally navigates back on a successful connect (`redirectBack` param). */
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";

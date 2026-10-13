@@ -1,3 +1,9 @@
+/**
+ * Enforces the agent's grace-period deadline (last deposit date + grace
+ * days, from the authenticate response) before a new deposit can be queued.
+ * Fails open on missing/unparseable/invalid data — only a positively
+ * computed elapsed deadline blocks a deposit. Used by `app/userDetail.tsx`.
+ */
 export const GRACE_PERIOD_EXCEEDED_MESSAGE =
   'You are exceeding grace days, please deposit the amount to bank';
 

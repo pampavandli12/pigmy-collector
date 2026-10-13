@@ -1,3 +1,9 @@
+/**
+ * The Users tab: searchable/voice-searchable customer list
+ * (`filteredCustomers$`) with batch-loaded avatars, pull-to-refresh sync,
+ * and the grace-period/collection-limit gate before navigating to
+ * `userDetail` for a new deposit.
+ */
 import { useSelector } from '@legendapp/state/react';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';

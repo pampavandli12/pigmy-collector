@@ -1,3 +1,4 @@
+/** Pure header-mutation helper: sets/clears a request's Authorization and bankType headers. Kept free of any axios import so it's trivially unit-testable. */
 export interface RequestAuthContext {
   token: string;
   accountId: string;

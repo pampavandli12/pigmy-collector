@@ -1,3 +1,9 @@
+/**
+ * Dialog offering to take a new photo or pick one from the gallery for a
+ * customer. Suppresses the PIN auto-lock for the whole camera/gallery round
+ * trip (`beginTrustedHandoff`/`endTrustedHandoff`) since handing control to
+ * a system picker can take longer than the app's normal grace window.
+ */
 import { useAuth } from '@/providers/AuthProvider';
 import { showSnackbar } from '@/utils/snackbar';
 import * as ImagePicker from 'expo-image-picker';

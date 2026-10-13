@@ -1,3 +1,10 @@
+/**
+ * The contract every bank adapter implements (`BankTransactionAdapter`): its
+ * endpoint, how to build a stored payload from a deposit draft, and how to
+ * shape that payload into the actual HTTP request body. `DepositDraft` is
+ * the input every adapter receives; `commonTransactionFields` is the subset
+ * every bank shares.
+ */
 import { TransactionPayload, SyncableTransactionPayload } from '@/types/user';
 
 export interface DepositDraft {

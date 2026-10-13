@@ -1,3 +1,8 @@
+/**
+ * The Home tab: today's collection total/limit, synced-vs-pending status
+ * counts, and a list of today's transactions (`todaysTransactions$`), backed
+ * by both the live outbox and a `fetchCollections` summary call.
+ */
 import { AgentAccountSwitcher } from "@/components/AgentAccountSwitcher";
 import { CustomerAvatar } from "@/components/CustomerAvatar";
 import { useCustomerPhotosBatch } from "@/hooks/useCustomerPhoto";

@@ -1,3 +1,4 @@
+/** The sign-in screen: phone number + password login, shown when `authStatus` is `unauthenticated`. */
 import { useAuth } from '@/providers/AuthProvider';
 import { userLogin } from '@/services/login';
 import { showSnackbar } from '@/utils/snackbar';

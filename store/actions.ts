@@ -1,3 +1,10 @@
+/**
+ * The write-side API for `store$`: syncing the customer list from the
+ * backend (folding in today's unsynced local balances so a pending deposit
+ * isn't lost on refresh) and queueing a new deposit (`addTransaction`) —
+ * validated, written to the outbox as `pending`, and reflected in the
+ * customer's balance immediately, all before any network call.
+ */
 import { getAgentAccountId } from '@/services/authStorage';
 import { isRegisteredBankType } from '@/services/banks/registry';
 import { fetchCustomers } from '@/services/user';

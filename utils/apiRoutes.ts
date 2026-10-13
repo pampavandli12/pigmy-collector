@@ -1,3 +1,8 @@
+/**
+ * Identifies the unauthenticated "public auth" endpoints (login, token
+ * refresh) that `services/axios.ts`'s interceptors must never attach an
+ * Authorization header to or run proactive-refresh/401 handling against.
+ */
 import { API_ENDPOINTS } from '@/utils/constants';
 
 const PUBLIC_AUTH_ROUTES = new Set<string>([

@@ -1,3 +1,10 @@
+/**
+ * Root layout: wires `AuthProvider`/`PrinterProvider`, loads fonts, and
+ * gates every route group with `<Stack.Protected>` on `authStatus` (login,
+ * PIN setup/unlock, and the authenticated tabs/userDetail/printer screens
+ * are mutually exclusive route trees). Also mounts the global snackbar,
+ * error boundary, and session-ended fallback dialog.
+ */
 import { AuthProvider, useAuth } from '@/providers/AuthProvider';
 import { SessionFallbackDialog } from '@/components/SessionFallbackDialog';
 import {

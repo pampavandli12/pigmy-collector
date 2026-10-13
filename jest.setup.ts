@@ -1,3 +1,9 @@
+/**
+ * Jest global setup: mocks every native dependency the app touches (MMKV,
+ * SecureStore, expo-crypto, NetInfo, the thermal printer module, Expo
+ * Router, etc.) so tests can run under plain Node without a device/
+ * simulator. Add a new native dependency's mock here when a test needs it.
+ */
 import type React from 'react';
 
 jest.mock('react-native-mmkv', () => {

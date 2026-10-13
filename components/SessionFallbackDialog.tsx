@@ -1,3 +1,8 @@
+/**
+ * Blocking dialog shown when an agent's session was ended out from under
+ * them (expired, revoked, or logged out), telling them what happened and
+ * whether another device account was switched to automatically.
+ */
 import { useAuth } from '@/providers/AuthProvider';
 import { Button, Dialog, Portal, Text } from 'react-native-paper';
 

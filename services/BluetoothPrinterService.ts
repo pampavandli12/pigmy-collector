@@ -1,3 +1,9 @@
+/**
+ * Thin wrapper around the custom `expo-thermal-printer` native module:
+ * Bluetooth permission/enable checks, device scanning/pairing, connection
+ * lifecycle, and the low-level print/feed/cut calls. `contexts/PrinterContext.tsx`
+ * owns the connected-device state built on top of this.
+ */
 import ExpoThermalPrinter, {
   PrinterDevice,
   Receipt,

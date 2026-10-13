@@ -1,3 +1,8 @@
+/**
+ * Hooks for loading customer photos into components: `useCustomerPhoto` for
+ * one customer (e.g. the detail/preview screen), `useCustomerPhotosBatch`
+ * for a list (e.g. the customer list's avatars), refreshing on screen focus.
+ */
 import {
   buildCustomerPhotoKey,
   getCustomerPhoto,

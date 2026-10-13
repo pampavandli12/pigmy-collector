@@ -1,3 +1,10 @@
+/**
+ * The local app PIN lock: salted-hash storage/verification, and a
+ * failed-attempt lockout independent of the backend session. This gates
+ * re-entry into the app (see `app/pinSetup.tsx` / `app/pinUnlock.tsx`) after
+ * background/foreground transitions — it has nothing to do with the agent's
+ * server-side auth token.
+ */
 import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 import {

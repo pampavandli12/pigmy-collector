@@ -1,3 +1,10 @@
+/**
+ * Renders a receipt as a PDF for sharing (WhatsApp/SMS) instead of printing.
+ * Builds a minimal HTML document sized to the formatted receipt text,
+ * delegates rendering to `expo-print`, then caches the result under a
+ * retention window (`cleanupExpiredReceiptFiles`) so stale shared PDFs don't
+ * accumulate on device.
+ */
 import {
   formatReceiptData,
   type ReceiptData,

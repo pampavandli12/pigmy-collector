@@ -1,3 +1,4 @@
+/** A render-error boundary component — see the docblock on the class below for what it does. */
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Button, Text } from 'react-native-paper';

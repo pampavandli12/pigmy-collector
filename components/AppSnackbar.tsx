@@ -1,3 +1,4 @@
+/** Renders the single app-wide snackbar; mounted once in `app/_layout.tsx` and driven entirely by `store/snackbarStore.ts`. */
 import { Snackbar } from 'react-native-paper';
 import { useSnackbarStore } from '../store/snackbarStore';
 

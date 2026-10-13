@@ -1,3 +1,9 @@
+/**
+ * The `peocit` bank adapter. Requires `agentName`, a computed `finalAmount`
+ * (opening balance + collected amount), and `vpncode` (sourced per-customer
+ * from the fetch-customers response) — a deposit missing any of these is
+ * rejected locally before it's ever queued or sent.
+ */
 import { API_ENDPOINTS } from '@/utils/constants';
 import { BankTransactionAdapter, commonTransactionFields } from './types';
 

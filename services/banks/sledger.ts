@@ -1,3 +1,9 @@
+/**
+ * The `sledger` bank adapter. Requires `agentName` and a per-customer
+ * `branchCode`; its request omits `schemename` (unlike the other adapters)
+ * and sends `accountNumber` as a string to match that backend's contract,
+ * even though it's stored as a number everywhere else in the app.
+ */
 import { API_ENDPOINTS } from '@/utils/constants';
 import { BankTransactionAdapter, commonTransactionFields } from './types';
 

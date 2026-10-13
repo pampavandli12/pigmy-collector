@@ -1,3 +1,9 @@
+/**
+ * Derived (`computed`) read-only views over `store$`: filtered customer
+ * search results, today's transactions/collection total/count, and total
+ * customer count. Screens read these via `useSelector` instead of deriving
+ * the same logic ad hoc.
+ */
 import { computed } from '@legendapp/state';
 
 import { isToday } from '@/utils/isToday';

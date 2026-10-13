@@ -1,3 +1,9 @@
+/**
+ * Shares a generated receipt PDF to a customer's WhatsApp number. Android
+ * uses a native `ExpoWhatsAppReceipt` module; other platforms fall back to
+ * the generic share sheet. Also owns phone-number normalization/validation
+ * and translating native share errors into user-facing messages.
+ */
 import { requireOptionalNativeModule } from 'expo-modules-core';
 import { Linking, Platform, TurboModuleRegistry } from 'react-native';
 

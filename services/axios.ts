@@ -1,7 +1,14 @@
+/**
+ * The shared axios instance every API call in the app goes through.
+ * Request interceptor resolves auth headers and proactively refreshes the
+ * access token before it expires (`resolveRequestAuth`,
+ * `services/authRefresh.ts`); response interceptor ends the session on a
+ * 401 and passes a 403 through untouched (`handleUnauthorizedResponse`).
+ */
 import axios, { InternalAxiosRequestConfig } from "axios";
 import { isPublicAuthRoute } from "../utils/apiRoutes";
 import { API_BASE_URL } from "../utils/constants";
-import { handleAuthResponseError } from "./authRefresh";
+import { ensureFreshAccessToken, handleUnauthorizedResponse } from "./authRefresh";
 import { getStoredAuthContext } from "./authStorage";
 import { applyAuthHeaders } from "./requestAuthHeaders";
 
@@ -20,51 +27,71 @@ export const api = axios.create({
   },
 });
 
-type AugmentedRequestConfig = InternalAxiosRequestConfig & {
+export type AugmentedRequestConfig = InternalAxiosRequestConfig & {
   _agentAccountId?: string;
   _authHeadersResolved?: boolean;
 };
+
+// Resolves auth headers for one request, refreshing the access token first if
+// it's already expired or expiring within PROACTIVE_REFRESH_THRESHOLD_MS
+// (services/authRefresh.ts) — so the request normally succeeds on its first
+// try instead of failing with 401 and having nothing left to retry against.
+export async function resolveRequestAuth(
+  config: AugmentedRequestConfig,
+): Promise<AugmentedRequestConfig> {
+  if (isPublicAuthRoute(config.url)) {
+    applyAuthHeaders(config.headers, null);
+    delete config._agentAccountId;
+    config._authHeadersResolved = true;
+    return config;
+  }
+
+  // Only resolve auth headers once per request — guards against double work
+  // if this config is ever re-entered (e.g. re-queued for another reason).
+  if (config._authHeadersResolved) {
+    return config;
+  }
+
+  const auth = await getStoredAuthContext();
+  if (!auth) {
+    applyAuthHeaders(config.headers, null);
+    delete config._agentAccountId;
+    config._authHeadersResolved = true;
+    return config;
+  }
+
+  const refreshed = await ensureFreshAccessToken(auth.accountId);
+  config._authHeadersResolved = true;
+  if (refreshed.status === "sessionEnded") {
+    return Promise.reject(new Error("Your session has expired. Please log in again."));
+  }
+
+  applyAuthHeaders(config.headers, { ...auth, token: refreshed.token });
+  config._agentAccountId = auth.accountId;
+  return config;
+}
 
 // Interceptor for adding auth token and logging requests/responses
 api.interceptors.request.use(
   async (config) => {
     config.headers["Content-Type"] = "application/json";
-    const augmented = config as AugmentedRequestConfig;
     console.log(
       "Request:",
       config.method?.toUpperCase(),
       config.url,
       config.params || config.data,
     );
-    if (isPublicAuthRoute(config.url)) {
-      applyAuthHeaders(config.headers, null);
-      delete augmented._agentAccountId;
-      augmented._authHeadersResolved = true;
-      return config;
-    }
-
-    // A request replayed after a token refresh (services/authRefresh.ts) already
-    // carries the account context and freshly-refreshed Authorization header it
-    // was issued under. Re-deriving from "whichever account is active right now"
-    // on the replay pass would silently re-tag it with a different account's
-    // token/bankType if the active account changed mid-refresh. Only resolve
-    // auth headers once per request.
-    if (augmented._authHeadersResolved) {
-      return config;
-    }
-
-    const auth = await getStoredAuthContext();
-    applyAuthHeaders(config.headers, auth);
-    augmented._agentAccountId = auth?.accountId;
-    augmented._authHeadersResolved = true;
-    return config;
+    return resolveRequestAuth(config as AugmentedRequestConfig);
   },
   (error) => {
     return Promise.reject(error);
   },
 );
 
-// Refresh expired access tokens once, and log out on non-recoverable auth errors.
+// No refresh-and-retry here — resolveRequestAuth already refreshed ahead of
+// expiry. A 401 means the (possibly just-refreshed) token was rejected
+// outright, so the session ends. A 403 is left untouched: the API overloads
+// it for business/permission denials unrelated to token expiry.
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -72,8 +99,6 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    return handleAuthResponseError(error, (config) =>
-      api.request(config as Parameters<typeof api.request>[0]),
-    );
+    return handleUnauthorizedResponse(error);
   },
 );

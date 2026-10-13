@@ -1,3 +1,4 @@
+/** Requests Android RECORD_AUDIO permission for voice search; a no-op on other platforms. */
 import { PermissionsAndroid, Platform } from 'react-native';
 
 export type MicrophonePermissionResult =

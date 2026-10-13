@@ -1,3 +1,8 @@
+/**
+ * The `customer_photos` SQLite table — the one deliberate use of SQLite in
+ * this app, keyed by `(bank_code, account_number)`. See the note below for
+ * why every function here fails safe to `null`/`{}` instead of throwing.
+ */
 import * as SQLite from 'expo-sqlite';
 
 // Independent SQLite store for customer photos, deliberately separate from

@@ -1,3 +1,9 @@
+/**
+ * A customer's avatar: shows their cached photo if one exists (loaded via
+ * `useCustomerPhoto` unless a controlled `photoUri` is passed in), otherwise
+ * a first-letter/initials fallback; tapping it offers to view/replace the
+ * photo via `PhotoPreviewModal`/`PhotoSourceDialog`.
+ */
 import { PhotoPreviewModal } from '@/components/PhotoPreviewModal';
 import { PhotoSourceDialog } from '@/components/PhotoSourceDialog';
 import { useCustomerPhoto } from '@/hooks/useCustomerPhoto';

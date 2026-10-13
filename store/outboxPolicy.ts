@@ -1,3 +1,10 @@
+/**
+ * Outbox item validation and retry policy: guards against malformed
+ * persisted entries, computes exponential backoff delays
+ * (`retryDelayMs`, capped, up to `MAX_AUTO_RETRIES`), and classifies a sync
+ * failure as retryable vs. permanent (e.g. an unsupported bank type never
+ * auto-retries).
+ */
 import { isUnsupportedBankTypeError } from '@/services/banks/errors';
 import { OutboxItem } from '@/types/user';
 

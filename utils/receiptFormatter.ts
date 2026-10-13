@@ -1,3 +1,10 @@
+/**
+ * Lays out a bank deposit receipt as fixed-width plain text for a thermal
+ * printer (32-character default width): centering, label/value and
+ * amount-right-aligned lines, word wrap, and Indian-numbering/amount-in-words
+ * formatting. Pure string formatting — no printer/Bluetooth I/O here (see
+ * `services/BluetoothPrinterService.ts` for that).
+ */
 export const RECEIPT_CHAR_WIDTH = 32;
 export const RECEIPT_SEPARATOR = '-'.repeat(RECEIPT_CHAR_WIDTH);
 export const RECEIPT_TRAILING_FEED_LINES = 3;

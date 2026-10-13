@@ -1,3 +1,8 @@
+/**
+ * Parses and validates a raw deposit-amount string into a positive number,
+ * rejecting malformed input (scientific notation, excess decimals, pasted
+ * garbage) that `Number.isFinite` alone would accept.
+ */
 // Shared by components/TransactionForm.tsx (live input validation) and
 // app/userDetail.tsx (the confirm-time backstop) so the two can't drift apart.
 // Strict digit-shape match (not just Number.isFinite) rejects scientific

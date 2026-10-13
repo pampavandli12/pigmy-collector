@@ -1,3 +1,9 @@
+/**
+ * Voice-driven customer search: wraps `expo-speech-recognition`, handling
+ * microphone permission (Android vs. other platforms), start/stop/cancel,
+ * and user-facing error messages. Without an `onResult` callback it writes
+ * the transcript straight into `store$.searchQuery`.
+ */
 import {
   ExpoSpeechRecognitionModule,
   useSpeechRecognitionEvent,

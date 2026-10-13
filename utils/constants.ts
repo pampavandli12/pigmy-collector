@@ -1,3 +1,10 @@
+/**
+ * Central config: the resolved API base URL (dev falls back to an emulator/
+ * simulator loopback address; production requires an explicit https URL),
+ * every backend endpoint path, and the SecureStore/MMKV key names used
+ * across the app. Keep new endpoints and storage keys here rather than
+ * inlining them at call sites.
+ */
 import { Platform } from 'react-native';
 
 const DEV_API_PORT = 1010;

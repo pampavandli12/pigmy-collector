@@ -1,5 +1,11 @@
 import { z } from 'zod';
 
+/**
+ * Zod schemas and inferred types for customers and deposit transactions,
+ * including the per-bank-type discriminated union (`transactionPayloadSchema`)
+ * that `banksoft`/`peocit`/`sledger` payloads validate against, and the
+ * looser `SyncableTransactionPayload` shape persisted in the outbox.
+ */
 export interface Customer {
   accountNumber: number;
   customerName: string;

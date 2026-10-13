@@ -1,3 +1,8 @@
+/**
+ * The bottom-tab shell (Home/Users/Settings), and where outbox sync is
+ * triggered: once on mount (recovering anything left mid-sync by a prior
+ * app kill) and again whenever connectivity returns.
+ */
 import { processOutbox } from '@/store/syncEngine';
 import NetInfo from '@react-native-community/netinfo';
 import { useCallback, useEffect, useState } from 'react';

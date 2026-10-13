@@ -1,3 +1,8 @@
+/**
+ * UI for switching between agent accounts stored on this device, and adding
+ * a new one (re-authenticating with phone + password) without logging the
+ * current agent out. Backed by `providers/AuthProvider.tsx`'s account list.
+ */
 import { CustomerAvatar } from '@/components/CustomerAvatar';
 import { useAuth } from '@/providers/AuthProvider';
 import { getAgentAccountId } from '@/services/authStorage';

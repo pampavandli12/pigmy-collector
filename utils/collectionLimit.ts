@@ -1,3 +1,9 @@
+/**
+ * Enforces the agent's per-agent daily collection limit (from the
+ * authenticate response). Fails open — a missing/invalid `limitAmount` means
+ * no limit is enforced — so bad or absent backend data never blocks a
+ * deposit. Used by `app/userDetail.tsx` before a deposit is queued.
+ */
 export const COLLECTION_LIMIT_EXCEEDED_MESSAGE =
   'Daily collection limit exceeded. Please deposit the collected amount to the bank.';
 
