@@ -1,3 +1,9 @@
+/**
+ * Consumer-facing API for customer photos: compresses an image (resize +
+ * JPEG) before handing it to `db/customerPhotoDb.ts`'s SQLite table, and
+ * decodes stored rows back into data URIs for display. The only layer
+ * screens/hooks should call — never query the DB module directly.
+ */
 import {
   getPhotoRow,
   getPhotoRowsForBank,

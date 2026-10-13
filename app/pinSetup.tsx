@@ -1,3 +1,4 @@
+/** First-time local PIN setup, shown when `authStatus` is `pinSetupRequired` (logged in, no PIN configured yet). */
 import { PinScreenLayout } from '@/components/PinScreenLayout';
 import { useAuth } from '@/providers/AuthProvider';
 import { showSnackbar } from '@/utils/snackbar';

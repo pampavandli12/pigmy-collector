@@ -1,3 +1,9 @@
+/**
+ * A tiny in-memory pub/sub that decouples the non-React auth/axios layer from
+ * `providers/AuthProvider.tsx`: `authRefresh.ts` calls `notifyUnauthorized`/
+ * `notifyAuthUserUpdated` without importing React, and AuthProvider registers
+ * the actual handlers (ending a session, syncing in-memory user state).
+ */
 import { AuthUser } from '@/types/auth';
 
 type UnauthorizedHandler = (accountId: string) => void | Promise<void>;

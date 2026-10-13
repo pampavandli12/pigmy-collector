@@ -1,3 +1,10 @@
+/**
+ * SecureStore-backed, multi-account auth storage. Two keys: `userInfo` (the
+ * currently active agent) and `agentAccounts` (every logged-in agent on this
+ * device, keyed by `bankCode:agentCode`, so accounts can be switched without
+ * logging out). All read-modify-write operations are serialized
+ * (`serializeAccountWrite`) so a token refresh can't race a profile update.
+ */
 import * as SecureStore from 'expo-secure-store';
 import {
   AgentAccountProfile,

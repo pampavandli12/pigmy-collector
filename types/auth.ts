@@ -1,3 +1,9 @@
+/**
+ * Zod schemas and inferred types for everything auth-related: the stored
+ * `AuthUser`, login/refresh/authenticate response shapes, and
+ * `legacyAuthUserSchema`, which upgrades a pre-multi-account, single-`token`
+ * session into the current shape.
+ */
 import { z } from 'zod';
 
 export const agentSchemeSchema = z

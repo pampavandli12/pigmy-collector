@@ -1,3 +1,8 @@
+/**
+ * The `banksoft` bank adapter — the default/fallback bank type. Sends only
+ * the shared transaction fields with no bank-specific extras; see
+ * `services/banks/registry.ts` for how adapters are selected.
+ */
 import { API_ENDPOINTS } from '@/utils/constants';
 import { BankTransactionAdapter, commonTransactionFields } from './types';
 

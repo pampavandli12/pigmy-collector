@@ -1,3 +1,8 @@
+/**
+ * The post-deposit success screen: shows the receipt summary and offers to
+ * print it (Bluetooth), or share it as a PDF over WhatsApp/SMS, for a
+ * customer without a connected printer.
+ */
 import { CustomerAvatar } from '@/components/CustomerAvatar';
 import { usePrinter } from '@/contexts/PrinterContext';
 import { useAuth } from '@/providers/AuthProvider';

@@ -1,3 +1,4 @@
+/** One row in the customer list (`app/(tabs)/users.tsx`): avatar, name, and balance; memoized since the list can be long. */
 import { CustomerAvatar } from '@/components/CustomerAvatar';
 import { Customer } from '@/types/user';
 import React, { memo } from 'react';

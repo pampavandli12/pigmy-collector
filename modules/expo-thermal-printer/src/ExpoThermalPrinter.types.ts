@@ -1,3 +1,4 @@
+/** Shared TypeScript types for the custom `expo-thermal-printer` native module: devices, the native receipt shape, and its event payloads. */
 export interface PrinterDevice {
   name: string;
   address: string;

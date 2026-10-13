@@ -1,3 +1,9 @@
+/**
+ * The deposit-entry form rendered by `app/userDetail.tsx`: customer summary,
+ * amount input (validated live via `parseDepositAmount`), scheme picker, and
+ * the confirm action. Pure presentation — submission/queueing logic lives in
+ * the screen, not here.
+ */
 import { CustomerAvatar } from '@/components/CustomerAvatar';
 import { useAuth } from '@/providers/AuthProvider';
 import { parseDepositAmount } from '@/utils/depositAmount';

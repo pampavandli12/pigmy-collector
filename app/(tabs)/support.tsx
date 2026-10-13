@@ -1,3 +1,4 @@
+/** The Settings tab: agent profile summary, printer settings entry point, and logout — labeled "Settings" in the tab bar though the file is `support.tsx`. */
 import { useAuth } from '@/providers/AuthProvider';
 import { useRouter } from 'expo-router';
 import { useMemo } from 'react';

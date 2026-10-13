@@ -1,3 +1,9 @@
+/**
+ * Android native-module binding (backed by Kotlin) for Bluetooth Classic
+ * ESC/POS thermal printing — permissions, pairing/connection, and
+ * print/scan calls. `ExpoThermalPrinterModule.web.ts` is the no-op
+ * counterpart for unsupported platforms.
+ */
 import { NativeModule, requireNativeModule } from 'expo';
 import {
   ExpoThermalPrinterModuleEvents,

@@ -1,3 +1,4 @@
+/** The re-lock PIN entry screen, shown when `authStatus` is `locked` (app backgrounded/foregrounded with a PIN already set). */
 import { PinScreenLayout } from '@/components/PinScreenLayout';
 import { SessionEndedError, useAuth } from '@/providers/AuthProvider';
 import { PinLockoutError } from '@/utils/appPin';

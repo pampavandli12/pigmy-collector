@@ -1,3 +1,11 @@
+/**
+ * Proactive token-refresh policy, called from `services/axios.ts`'s request
+ * interceptor before every authenticated call. `ensureFreshAccessToken`
+ * refreshes ahead of expiry (single-flight per account via `refreshPromises`,
+ * so concurrent requests share one refresh call) and ends the session on a
+ * non-recoverable failure; `handleUnauthorizedResponse` is the thin
+ * response-side backstop for a 401 that still gets through.
+ */
 import { notifyAuthUserUpdated, notifyUnauthorized } from './authSession';
 import {
   getAgentAccountId,
@@ -5,11 +13,11 @@ import {
   updateStoredTokensForAccount,
 } from './authStorage';
 import { refreshAccessToken } from './tokenRefresh';
+import { getJwtExpiryMs } from '@/utils/jwt';
 
 export type RetryableRequestConfig = {
   headers: Record<string, unknown>;
   _agentAccountId?: string;
-  _tokenRefreshAttempted?: boolean;
   [key: string]: unknown;
 };
 
@@ -33,6 +41,10 @@ const defaultDependencies: AuthRefreshDependencies = {
   notifyAuthUserUpdated,
   endSession: notifyUnauthorized,
 };
+
+// A token within this many ms of its exp claim (or already past it) is
+// refreshed proactively, before the request that needs it is ever sent.
+export const PROACTIVE_REFRESH_THRESHOLD_MS = 15 * 60 * 1000;
 
 const refreshPromises = new Map<string, Promise<Awaited<ReturnType<typeof refreshSession>>>>();
 
@@ -106,71 +118,80 @@ function isTransientNetworkError(error: unknown): boolean {
   return candidate.message === 'Network Error';
 }
 
-export async function handleAuthResponseError<T>(
-  error: AuthHttpError,
-  replayRequest: (config: RetryableRequestConfig) => Promise<T>,
+export type EnsureFreshAccessTokenResult =
+  | { status: 'ready'; token: string }
+  | { status: 'sessionEnded' };
+
+// Called from the request interceptor before every authenticated request.
+// Refreshes ahead of expiry instead of waiting for the server to reject a
+// stale token. A token that can't be decoded as a JWT at all is treated as
+// needing a refresh too (conservative default — see PROACTIVE_REFRESH_THRESHOLD_MS
+// callers), since we'd otherwise have no way to know it's about to expire.
+export async function ensureFreshAccessToken(
+  accountId: string,
   dependencies: AuthRefreshDependencies = defaultDependencies,
-): Promise<T> {
-  const status = error.response?.status;
-  const originalRequest = error.config;
-  const accountId = originalRequest?._agentAccountId;
-
-  if (status !== 401 && status !== 403) return Promise.reject(error);
-  if (!accountId) return Promise.reject(error);
-
-  // The Pigmy API returns 403 (not only 401) when an access token has expired, so
-  // both statuses get one refresh attempt. Known tradeoff: the API also uses 403
-  // for pure business/permission denials that have nothing to do with token
-  // expiry, and this code cannot tell the two apart on the FIRST 403 (only the
-  // backend knows which one it meant) — so a business-rule 403 still costs one
-  // extra refresh round trip before falling through unchanged below. Revisit if
-  // the backend ever adds a distinguishing error code/body to first-403 responses.
-  // Once we've already refreshed and replayed this request:
-  //  - a repeat 401 means even the refreshed token is unauthenticated → the
-  //    credentials are no longer valid (e.g. an admin reset the account) → end
-  //    the session.
-  //  - a repeat 403 means the token is valid and the endpoint is denying for a
-  //    business/permission reason → surface the error to the caller WITHOUT
-  //    logging the agent out mid-session.
-  if (originalRequest?._tokenRefreshAttempted) {
-    if (status === 401) {
-      try {
-        await dependencies.endSession(accountId);
-      } catch (endSessionError) {
-        console.error('Failed to end session after repeat 401:', endSessionError);
-      }
-    }
-    return Promise.reject(error);
+): Promise<EnsureFreshAccessTokenResult> {
+  const storedUser = await dependencies.getStoredAccountUser(accountId);
+  if (!storedUser?.accessToken) {
+    return { status: 'ready', token: storedUser?.accessToken ?? '' };
   }
 
-  originalRequest._tokenRefreshAttempted = true;
-  let updatedUser;
+  const expiresAtMs = getJwtExpiryMs(storedUser.accessToken);
+  const needsRefresh =
+    expiresAtMs === null ||
+    expiresAtMs - Date.now() <= PROACTIVE_REFRESH_THRESHOLD_MS;
+
+  if (!needsRefresh) {
+    return { status: 'ready', token: storedUser.accessToken };
+  }
+
   try {
-    updatedUser = await getRefreshPromise(accountId, dependencies);
-  } catch (refreshError) {
-    // The refresh call itself failed. A transient network error / timeout keeps
-    // the session (the request will be retried). Any other failure — the server
-    // rejected the refresh token, or there is no usable refresh credential —
-    // means the session cannot continue, so end it (this preserves the
-    // admin-reset / revoked-token forced logout).
-    if (!isTransientNetworkError(refreshError)) {
-      try {
-        await dependencies.endSession(accountId);
-      } catch (endSessionError) {
-        console.error('Failed to end session after refresh failure:', endSessionError);
-      }
+    const updatedUser = await getRefreshPromise(accountId, dependencies);
+    if (getAgentAccountId(updatedUser) !== accountId) {
+      throw new Error('Refreshed account does not match the requested account.');
     }
-    return Promise.reject(error);
-  }
-
-  if (getAgentAccountId(updatedUser) !== accountId) {
+    return { status: 'ready', token: updatedUser.accessToken };
+  } catch (refreshError) {
+    // A transient network error / timeout keeps the session alive — the
+    // unrefreshed token is sent as-is; if it's genuinely dead, the response
+    // interceptor's handleUnauthorizedResponse ends the session on the
+    // resulting 401. Any other failure (server rejected the refresh token,
+    // no refresh credential was stored, or an account mismatch) means the
+    // session cannot continue.
+    if (isTransientNetworkError(refreshError)) {
+      return { status: 'ready', token: storedUser.accessToken };
+    }
     try {
       await dependencies.endSession(accountId);
     } catch (endSessionError) {
-      console.error('Failed to end session after account mismatch:', endSessionError);
+      console.error('Failed to end session after refresh failure:', endSessionError);
     }
-    return Promise.reject(error);
+    return { status: 'sessionEnded' };
   }
-  originalRequest.headers.Authorization = updatedUser.accessToken;
-  return replayRequest(originalRequest);
+}
+
+type EndSessionDependencies = { endSession: AuthRefreshDependencies['endSession'] };
+
+// Called from the response interceptor. There is no refresh-and-retry here
+// anymore — ensureFreshAccessToken already refreshed before the request went
+// out, so a 401 means even a just-refreshed token was rejected (or no
+// proactive check ran for this request) and the session is over. A 403 is
+// left untouched: the API overloads it for business/permission denials that
+// have nothing to do with token expiry.
+export async function handleUnauthorizedResponse(
+  error: AuthHttpError,
+  dependencies: EndSessionDependencies = defaultDependencies,
+): Promise<never> {
+  const status = error.response?.status;
+  const accountId = error.config?._agentAccountId;
+
+  if (status === 401 && accountId) {
+    try {
+      await dependencies.endSession(accountId);
+    } catch (endSessionError) {
+      console.error('Failed to end session after 401:', endSessionError);
+    }
+  }
+
+  return Promise.reject(error);
 }

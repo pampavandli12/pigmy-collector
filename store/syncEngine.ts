@@ -1,3 +1,10 @@
+/**
+ * Drains the outbox: posts each pending/retryable deposit through
+ * `createTransaction`, advances it to `synced` or schedules a backoff retry
+ * on failure, and reverts the optimistic balance bump for anything that
+ * fails permanently. Runs on app start, on reconnect, and after every pass
+ * (see `store/syncCoordinator.ts` for the concurrency guard it relies on).
+ */
 import NetInfo from '@react-native-community/netinfo';
 
 import { createTransaction } from '@/services/user';

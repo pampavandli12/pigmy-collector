@@ -33,7 +33,7 @@ Layers under `services/`:
 
 ## Multi-bank transaction adapters
 
-Deposits are bank-type aware. `services/banks/registry.ts` resolves a `BankTransactionAdapter` by `bankType` (currently `banksoft` and `peocit`); each adapter owns its `endpoint`, `buildPayload`, and `toRequest` shaping. Unknown types raise `UnsupportedBankTypeError`. When adding a bank, implement the `BankTransactionAdapter` interface in `services/banks/`, register it in the `adapters` array, and keep shared fields in `commonTransactionFields`. `getBankAdapter` falls back to `banksoft` when `bankType` is undefined.
+Deposits are bank-type aware. `services/banks/registry.ts` resolves a `BankTransactionAdapter` by `bankType` (currently `banksoft`, `peocit`, and `sledger`); each adapter owns its `endpoint`, `buildPayload`, and `toRequest` shaping. Unknown types raise `UnsupportedBankTypeError`. When adding a bank, implement the `BankTransactionAdapter` interface in `services/banks/`, register it in the `adapters` array, and keep shared fields in `commonTransactionFields`. `getBankAdapter` falls back to `banksoft` when `bankType` is undefined.
 
 ## Deposit limits
 

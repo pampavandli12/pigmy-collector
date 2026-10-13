@@ -1,3 +1,8 @@
+/**
+ * The Bluetooth printer settings screen's content: shows connection status,
+ * lists available/paired devices, and runs a test print. Built on
+ * `contexts/PrinterContext.tsx`.
+ */
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,

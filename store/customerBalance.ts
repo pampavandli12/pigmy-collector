@@ -1,3 +1,10 @@
+/**
+ * Optimistic customer-balance adjustments for today's deposits: bumps a
+ * customer's shown balance the moment a deposit is queued
+ * (`updateCustomerBalanceForToday`), and reverses it if that deposit later
+ * fails permanently (`revertCustomerBalanceForFailedTransaction`, in
+ * `store/syncEngine.ts`).
+ */
 import { SyncableTransactionPayload } from '@/types/user';
 import { isToday } from '@/utils/isToday';
 import { store$ } from './store';

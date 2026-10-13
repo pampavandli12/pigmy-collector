@@ -1,3 +1,4 @@
+/** Shared title/description/content layout for the PIN setup and unlock screens. */
 import React from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';

@@ -1,3 +1,4 @@
+/** Fallback text labels (first letter / initials) for a customer avatar when no photo is available. */
 export function getFirstLetterLabel(name: string): string {
   return name.trim().charAt(0).toUpperCase() || 'U';
 }

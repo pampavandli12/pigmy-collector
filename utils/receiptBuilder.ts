@@ -1,3 +1,8 @@
+/**
+ * Builds a `ReceiptData` (utils/ReceiptPrinter.ts) object from the fields a
+ * completed deposit screen has on hand — the bridge between a deposit's
+ * on-screen values and the printable/shareable receipt format.
+ */
 import { ReceiptData } from '@/utils/ReceiptPrinter';
 
 export interface ReceiptBuilderInput {

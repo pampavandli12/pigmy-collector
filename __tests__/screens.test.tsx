@@ -90,7 +90,7 @@ test('renders the sign-in screen', () => {
 
 test('renders dashboard empty state and totals', async () => {
   const screen = render(<Dashboard />, { wrapper });
-  expect(screen.getByText("Today's Collection")).toBeTruthy();
+  expect(screen.getByText('Total Collection')).toBeTruthy();
   await waitFor(() =>
     expect(mockedFetchCollections).toHaveBeenCalledWith({
       agentCode: 1,
@@ -108,7 +108,7 @@ test('renders dashboard totals from the collections API', async () => {
   });
   const screen = render(<Dashboard />, { wrapper });
   expect(await screen.findByText(/₹\s*1,500/)).toBeTruthy();
-  expect(await screen.findByText("Today's Transactions")).toBeTruthy();
+  expect(await screen.findByText('Recent Transactions')).toBeTruthy();
 });
 
 test('renders customer search and empty state after initial loading', () => {

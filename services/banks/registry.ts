@@ -1,13 +1,25 @@
+/**
+ * Resolves a `BankTransactionAdapter` by `bankType`. `getBankAdapter` (sync
+ * path, throws on an unknown type; defaults missing `bankType` to banksoft
+ * for pre-multi-bank outbox records) and `getRegisteredBankAdapter`
+ * (UI-time lookup, returns undefined instead of throwing) are the two entry
+ * points. Register a new bank adapter in the `adapters` array below.
+ */
 import { SyncableTransactionPayload } from '@/types/user';
 import { BANKSOFT, banksoftAdapter } from './banksoft';
 import { UnsupportedBankTypeError } from './errors';
 import { peocitAdapter } from './peocit';
+import { sledgerAdapter } from './sledger';
 import { BankTransactionAdapter } from './types';
 
 export const UNSUPPORTED_BANK_DEPOSIT_MESSAGE =
   'Deposits are not available for this bank yet.';
 
-const adapters: BankTransactionAdapter[] = [banksoftAdapter, peocitAdapter];
+const adapters: BankTransactionAdapter[] = [
+  banksoftAdapter,
+  peocitAdapter,
+  sledgerAdapter,
+];
 
 const adaptersByType = new Map(
   adapters.map((adapter) => [adapter.bankType, adapter]),

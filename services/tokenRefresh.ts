@@ -1,3 +1,8 @@
+/**
+ * The raw token-refresh HTTP call only — no policy. Deliberately uses a bare,
+ * non-intercepted axios client (not `services/axios.ts`'s `api` instance) so
+ * a refresh failure can never recursively trigger another refresh.
+ */
 import { tokenRefreshResponseSchema } from '@/types/auth';
 import { API_BASE_URL, API_ENDPOINTS } from '@/utils/constants';
 import type { AxiosStatic } from 'axios';

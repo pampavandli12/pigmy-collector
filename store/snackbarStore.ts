@@ -1,3 +1,8 @@
+/**
+ * The app-wide snackbar's state, as a zustand store — the one piece of UI
+ * state in this codebase that intentionally stays on zustand rather than
+ * Legend State. Read via `utils/snackbar.ts`'s imperative helpers.
+ */
 import { create } from 'zustand';
 
 interface SnackbarState {

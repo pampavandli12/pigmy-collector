@@ -1,240 +1,163 @@
 # Pigmy Collector
 
-A mobile application for managing daily collections and deposits with Bluetooth receipt printing functionality. Built with Expo, React Native, and React Native Paper.
+An offline-first Expo / React Native app that field agents use to record daily pigmy-deposit collections, print Bluetooth thermal receipts, and share them over SMS/WhatsApp — even with no network connection at the time of collection.
+
+## Contents
+
+- [Features](#features)
+- [Tech stack](#tech-stack)
+- [Architecture & design](#architecture--design)
+- [Code structure](#code-structure)
+- [Setup](#setup)
+- [Running the app](#running-the-app)
+- [Testing & quality](#testing--quality)
+- [Configuration](#configuration)
+- [Building for production](#building-for-production)
 
 ## Features
 
-- 📱 **Agent Dashboard** - View daily collections, due payments, and completed transactions
-- 👥 **Customer Management** - Browse and search customer list with detailed profiles
-- 💰 **Deposit Management** - Record new deposits with amount, date, and receipt upload
-- 🖨️ **Bluetooth Printing** - Connect to Bluetooth thermal printers for receipt printing
-- 🔐 **Agent Login** - Secure authentication with username/password or OTP
-- 🌐 **Multi-language Support** - English and Kannada language options
-- 📊 **Transaction History** - View recent transactions with status tracking
-- 🆘 **Support** - Access help resources via call, email, or ticket submission
+- **Agent login & multi-account support** — phone number + password login; more than one agent account can be signed in on the same device and switched between.
+- **Local PIN lock** — a 6-digit app PIN gates re-entry after the app backgrounds/foregrounds, independent of the backend session.
+- **Customer list & search**, with per-customer running balance and a locally cached profile photo (camera or gallery).
+- **Deposit capture that works offline** — a deposit is written to a local queue immediately (optimistic balance update) and synced to the backend in the background whenever connectivity is available.
+- **Multi-bank backend support** — the same deposit screen posts to different backend shapes depending on the agent's bank (`banksoft`, `peocit`, `sledger` today), without screen-level branching.
+- **Deposit guardrails** — a configurable per-agent daily collection limit and a grace-period check run before a deposit can be queued.
+- **Bluetooth thermal receipt printing** (ESC/POS, Android only) via a custom native Expo module, plus PDF and WhatsApp/SMS receipt sharing.
+- **Proactive session management** — the access token is refreshed ahead of its own expiry instead of waiting for a request to fail, and a dead session (revoked token, 401) signs the agent out automatically.
 
-## Tech Stack
+## Tech stack
 
-- **Framework**: Expo SDK 54.0.29
-- **React Native**: 0.81.5
-- **React**: 19.1.0
-- **UI Library**: React Native Paper (Material Design 3)
-- **Navigation**: Expo Router 6.0.19
-- **Fonts**: Google Roboto (Regular, Medium, Bold)
-- **Bluetooth**: Local Expo Bluetooth Classic thermal printer module
-- **Icons**: Material Design Icons (via react-native-vector-icons)
+| Concern | Choice |
+|---|---|
+| Framework | Expo SDK 54, Expo Router 6 |
+| UI | React Native 0.81, React 19, React Native Paper (Material Design 3) |
+| Client state | `@legendapp/state` (customers, outbox, sync status) — the state model this app is built around |
+| Legacy/UI-only state | `zustand` (snackbar only — not used for app data) |
+| Persistence | MMKV (customers/outbox), Expo SecureStore (auth tokens, PIN), `expo-sqlite` (customer photos only) |
+| Networking | Axios, with request/response interceptors for auth and token refresh |
+| Validation | Zod schemas at every network and storage boundary |
+| Native module | `modules/expo-thermal-printer` — custom Kotlin module for Bluetooth Classic ESC/POS printing |
+| Testing | Jest (`jest-expo` preset), React Native Testing Library |
+| Package manager | pnpm (required — see `packageManager` in `package.json`) |
 
-## Prerequisites
+## Architecture & design
 
-Before you begin, ensure you have the following installed:
+### Auth state machine
 
-- **Node.js** (v18 or later)
-- **npm** or **yarn**
-- **Java Development Kit (JDK)** - Version 17
-- **Android Studio** (for Android development)
-  - Android SDK (API 34/36, minSdk 24)
-  - Android Emulator or physical device with USB debugging enabled
+`providers/AuthProvider.tsx` owns an `authStatus` union — `loading → unauthenticated | pinSetupRequired | locked | unlocked` (plus a `revoked` path for a deactivated agent) — and `app/_layout.tsx` gates entire route groups on it with `<Stack.Protected>`. Multiple agent accounts can be stored on one device (`services/authStorage.ts`'s per-account SecureStore map) and switched without logging out.
 
-### Environment Setup
+Token handling is **proactive**: `services/axios.ts`'s request interceptor decodes the stored access token's JWT `exp` claim (`utils/jwt.ts`) before every authenticated request and refreshes it first if it's already expired or expiring within 15 minutes (`services/authRefresh.ts`), instead of waiting for the server to reject a stale token. A 401 after that still ends the session immediately; a 403 is treated as a business/permission denial, not an auth failure, and is passed through to the caller.
 
-Set up Android environment variables (add to `~/.zshrc` or `~/.bashrc`):
+The local PIN (`utils/appPin.ts`, `app/pinSetup.tsx` / `app/pinUnlock.tsx`) is a second, offline gate on top of the backend session — the app re-locks on every background → foreground transition.
 
-```bash
-export ANDROID_HOME=$HOME/Library/Android/sdk
-export PATH=$PATH:$ANDROID_HOME/emulator
-export PATH=$PATH:$ANDROID_HOME/platform-tools
-```
+### Multi-bank transaction adapters
 
-## Installation
+Not every agent's backend expects the same deposit request shape. `services/banks/registry.ts` resolves a `BankTransactionAdapter` by the agent's `bankType` (`banksoft`, `peocit`, `sledger`); each adapter in `services/banks/` owns its own `endpoint`, `buildPayload`, and `toRequest` shaping, sharing only the common fields (`commonTransactionFields`). `app/userDetail.tsx` never branches on bank type itself — it just asks the registry for the right adapter. An unrecognized `bankType` raises `UnsupportedBankTypeError` and the deposit screen shows a friendly "not available for this bank yet" message instead of silently failing.
 
-1. **Clone the repository**
+### Offline sync (the outbox model)
 
-   ```bash
-   git clone <your-repo-url>
-   cd pigmy-collector
-   ```
+A deposit is never sent synchronously from the deposit screen. `store/actions.ts`'s `addTransaction` validates it, writes it to `store$.outbox` with status `pending`, and optimistically bumps the customer's shown balance — all before any network call. `store/syncEngine.ts` drains that queue (oldest first) whenever connectivity is available (triggered on app start, on `NetInfo` reconnect, and after every successful sync), calling the bank adapter's `createTransaction` for each item and advancing it through `pending → syncing → synced` or `failed` (with backoff/retry, see `store/outboxPolicy.ts`). `store/syncCoordinator.ts` guards against two sync passes running concurrently and lets callers `await` an idle queue (used before switching/logging out an agent account). A transaction that fails permanently (e.g. an unsupported bank type) reverts the optimistic balance bump it made at queue time.
 
-2. **Install dependencies**
+### Customer photos (the one deliberate use of SQLite)
 
-   ```bash
-   pnpm install
-   ```
+Everything above persists through MMKV via Legend State. Customer photos are the single, deliberate exception: `db/customerPhotoDb.ts` owns a small `expo-sqlite` table (keyed by bank code + account number, storing a compressed base64 image) that is fully independent of the deposit/sync model and **never throws** — a broken photo store degrades to "no photo" and can never affect a deposit. `services/customerPhoto.ts` is the only consumer-facing API; `hooks/useCustomerPhoto.ts` and `components/CustomerAvatar.tsx` are how screens read and render it.
 
-## Running the App
+### Receipts
 
-**⚠️ Important**: This app uses native Bluetooth modules and **cannot run on Expo Go**. You must build a development version.
+`utils/ReceiptPrinter.ts` + `utils/receiptBuilder.ts` + `utils/receiptFormatter.ts` format a completed deposit into ESC/POS commands sent through the custom `expo-thermal-printer` module (`contexts/PrinterContext.tsx` / `services/BluetoothPrinterService.ts` own the Bluetooth connection lifecycle). `utils/receiptPdf.ts` and `utils/whatsappReceipt.ts` produce the same receipt as a shareable PDF/WhatsApp message for agents without a paired printer.
 
-### First Time Setup
-
-Build the development version for Android:
-
-```bash
-pnpm exec expo run:android
-```
-
-This will:
-
-- Generate native Android code in the `/android` folder
-- Install all dependencies
-- Build and install the APK on your connected device/emulator
-- Start the Metro bundler
-
-### Subsequent Runs
-
-After the initial build, you can start the development server:
-
-```bash
-pnpm start
-```
-
-Then press `a` to open on Android device/emulator.
-
-**Or run directly:**
-
-```bash
-pnpm exec expo run:android
-```
-
-## Project Structure
+## Code structure
 
 ```
 pigmy-collector/
-├── app/
-│   ├── (tabs)/              # Tab navigation screens
-│   │   ├── dashboard.tsx    # Agent dashboard with stats
-│   │   ├── users.tsx        # Customer list
-│   │   ├── deposits.tsx     # New deposit form
-│   │   └── support.tsx      # Help & support
-│   ├── _layout.tsx          # Root layout with providers
-│   ├── index.tsx            # Sign-in/login screen
-│   └── userDetail.tsx       # Customer detail page
-├── components/
-│   └── PrinterManager.tsx   # Bluetooth printer UI
-├── contexts/
-│   └── PrinterContext.tsx   # Printer state management
-├── services/
-│   └── BluetoothPrinterService.ts  # Bluetooth printer service
-├── assets/
-│   └── images/
-├── package.json
-└── README.md
+├── app/                      # Expo Router screens (file-based routing)
+│   ├── _layout.tsx           # Root layout: providers, route protection, global snackbar
+│   ├── index.tsx             # Sign-in screen (phone number + password)
+│   ├── pinSetup.tsx / pinUnlock.tsx   # Local PIN gate
+│   ├── userDetail.tsx        # Deposit entry for one customer
+│   ├── printer.tsx           # Bluetooth printer pairing/settings (modal)
+│   └── (tabs)/                # Bottom-tab screens: dashboard, users, support
+├── components/                # Reusable UI (forms, dialogs, list items, avatars)
+├── contexts/                  # PrinterContext — Bluetooth printer connection state
+├── providers/                  # AuthProvider — the auth/session state machine
+├── hooks/                      # useCustomerPhoto, useCustomerVoiceSearch
+├── services/                   # Network + native-device integrations, no React
+│   ├── axios.ts, authRefresh.ts, tokenRefresh.ts, authStorage.ts, authSession.ts
+│   ├── login.ts, authenticate.ts, user.ts
+│   ├── banks/                  # Per-bank transaction adapters + registry
+│   ├── BluetoothPrinterService.ts, customerPhoto.ts, microphonePermission.ts
+├── store/                       # Legend State: observable state, persistence, sync
+│   ├── store.ts, persistence.ts, selectors.ts, actions.ts
+│   ├── syncEngine.ts, syncCoordinator.ts, outboxPolicy.ts, customerBalance.ts
+│   └── snackbarStore.ts         # zustand — UI-only, not app data
+├── db/                           # customerPhotoDb.ts — the one SQLite table
+├── types/                        # Zod schemas + inferred TS types (auth, user/transaction)
+├── utils/                         # Constants, routes, receipts, deposit rules, JWT decode
+├── modules/expo-thermal-printer/  # Custom native Expo module (Android Kotlin + JS bridge)
+└── __tests__/                      # Jest test suite
 ```
 
-## Navigation Structure
+See [AGENTS.md](AGENTS.md) for the condensed contributor-facing contract (folder conventions, coding style, commit/PR notes) and [CLAUDE.md](CLAUDE.md) for AI-assistant-specific command and architecture notes.
 
-- **Sign-in** (`/`) → Agent login with username/password or OTP
-- **Tabs** (`/(tabs)`)
-  - **Home** - Dashboard with collections and transactions
-  - **Users** - Customer list with search and filters
-  - **New Deposits** - Daily deposit entry form
-  - **Support** - Help and support resources
-- **User Detail** (`/userDetail`) - Individual customer deposit page
-- **Printer Settings** (`/printer`) - Bluetooth printer management (modal)
+## Setup
 
-## Key Features Details
+### Prerequisites
 
-### Bluetooth Printer Integration
+- Node.js 20+ and **pnpm** (`packageManager: pnpm@12.6.0` — don't use npm/yarn, the lockfile and `postinstall` patch step assume pnpm)
+- Java 17 (JDK) and Android Studio (SDK + an emulator, or a USB-debugging-enabled device) for Android
+- Xcode (macOS only) for iOS
 
-The app includes robust Bluetooth printer integration with:
-
-- Device scanning and pairing
-- Connection management
-- Receipt printing for ESCPOS thermal printers
-- Defensive error handling (app won't crash if Bluetooth unavailable)
-
-### Material Design 3 Theme
-
-Custom theme with:
-
-- Primary Color: `#4A90E2` (Blue)
-- Secondary Color: `#5856D6` (Purple)
-- Roboto font family (Regular, Medium, Bold)
-- Consistent elevation and border radius
-
-### Safe Area Handling
-
-All screens use `react-native-safe-area-context` to prevent content overlap with device notches and status bars.
-
-## Development
-
-### Hot Reload
-
-- Code changes automatically reload in the app
-- Fast refresh for React components
-
-### Clean Build
-
-If you encounter build issues:
+### Install
 
 ```bash
-cd android
-./gradlew clean
-cd ..
-pnpm exec expo run:android
+pnpm install
 ```
 
-### Debugging
+`postinstall` runs `patch-package` automatically — this repo ships patches under `patches/` (e.g. for `expo-dev-client`'s Gradle compatibility) that **must** survive any dependency bump; if you upgrade a patched package, regenerate its patch rather than discarding it.
 
-- Use React Native Debugger or Chrome DevTools
-- View logs in Metro bundler terminal
-- Check Android logcat: `adb logcat`
+## Running the app
 
-## Known Issues & Solutions
-
-### Bluetooth Printer Module
-
-Bluetooth printing is implemented in `modules/expo-thermal-printer` and only supports Android Bluetooth Classic thermal printers.
-
-### Gradle Build Issues
-
-The app includes patches for Expo Dev Client:
-
-```json
-"expo-dev-client": "~5.0.36+android-gradle-8.14.3"
-```
-
-This ensures compatibility with Gradle 8.14.3.
-
-## Build for Production
-
-To create a production APK:
+**Expo Go will not work** — the custom `expo-thermal-printer` native module requires a development client or a full native build.
 
 ```bash
+pnpm run android   # first run: builds and installs a dev client, then starts Metro
+pnpm run ios        # macOS only
+pnpm start          # subsequent runs, once a dev client is already installed
+```
+
+If native code or a patched dependency changes, do a clean rebuild:
+
+```bash
+cd android && ./gradlew clean && cd ..
+pnpm run android
+```
+
+## Testing & quality
+
+```bash
+pnpm run typecheck        # tsc --noEmit (strict mode, @/* root alias)
+pnpm run lint              # expo lint — run before handoff
+pnpm test                  # Jest, run in band
+pnpm test:coverage         # coverage over app/components/contexts/hooks/providers/services/store/utils
+npx jest __tests__/foo.test.ts -t "test name"   # a single file / test
+```
+
+`jest.setup.ts` mocks every native dependency the app touches (MMKV, SecureStore, NetInfo, the thermal printer module, etc.) — when a change introduces a new native dependency, add its mock there or tests using it will fail for reasons unrelated to your change.
+
+## Configuration
+
+All endpoints, SecureStore keys, and the MMKV encryption key live in `utils/constants.ts` (route-matching helpers in `utils/apiRoutes.ts`). The API base URL is resolved once at startup (`resolveApiBaseUrl`) from `EXPO_PUBLIC_API_BASE_URL`:
+
+- **Development**: falls back to `http://10.0.2.2:1010` (Android emulator loopback) or `http://localhost:1010` (iOS simulator) if the env var isn't set.
+- **Production**: the env var is required and **must** be an `https://` URL — the app throws at startup otherwise.
+
+## Building for production
+
+```bash
+pnpm add -g eas-cli   # once
 eas build --platform android --profile production
 ```
 
-(Requires EAS CLI: `pnpm add -g eas-cli`)
+---
 
-## Scripts
-
-- `pnpm start` - Start Expo development server
-- `pnpm run android` - Run on Android device/emulator
-- `pnpm run ios` - Run on iOS simulator (requires macOS)
-- `pnpm run web` - Run in web browser
-- `pnpm test` - Run tests
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the MIT License.
-
-## Support
-
-For issues and questions:
-
-- 📧 Email support
-- 📞 Call support
-- 🎫 Submit a ticket through the app's Support tab
-
-## Acknowledgments
-
-- Built with [Expo](https://expo.dev)
-- UI components from [React Native Paper](https://callstack.github.io/react-native-paper/)
-- Bluetooth printing via the local Expo module in `modules/expo-thermal-printer`
+Built with [Expo](https://expo.dev) and [React Native Paper](https://callstack.github.io/react-native-paper/). Bluetooth printing is implemented locally in `modules/expo-thermal-printer` (Android Bluetooth Classic / ESC-POS only).

@@ -1,3 +1,9 @@
+/**
+ * The encrypted MMKV instance `store/store.ts` persists to. The AES-256 key
+ * lives in SecureStore, generated once and verified on every subsequent
+ * launch; a key that can no longer open the store triggers a safe rebuild
+ * (the persisted data here is a cache/outbox, not the source of truth).
+ */
 import { MMKV_ENCRYPTION_KEY } from '@/utils/constants';
 import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';

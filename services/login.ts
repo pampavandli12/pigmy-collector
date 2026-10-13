@@ -1,3 +1,4 @@
+/** Posts phone number + password credentials and validates the login response into an `AuthUser`. */
 import { AuthUser, loginResponseSchema } from '@/types/auth';
 import { API_ENDPOINTS } from '@/utils/constants';
 import { api } from './axios';

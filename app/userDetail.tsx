@@ -1,3 +1,10 @@
+/**
+ * Deposit entry for one customer: enforces the collection-limit and
+ * grace-period gates, builds a `DepositDraft` via the agent's bank adapter
+ * (`services/banks/registry.ts`), and queues it through
+ * `actions.addTransaction` — all before any network call (see the outbox
+ * model in AGENTS.md / README.md).
+ */
 import { TransactionForm } from '@/components/TransactionForm';
 import {
   getRegisteredBankAdapter,
@@ -74,6 +81,8 @@ export default function UserDetail() {
       storedCustomer?.currentBalance ?? Number(firstParam(params.balance) || 0),
     account,
     mobilenumber: firstParam(params.mobilenumber),
+    branchCode: firstParam(params.branchCode),
+    vpncode: firstParam(params.vpncode),
   };
 
   const [amount, setAmount] = useState('');
@@ -170,6 +179,8 @@ export default function UserDetail() {
         transactionId: Crypto.randomUUID(),
         openingBalance,
         agentName: user?.agentName,
+        branchCode: customer.branchCode || undefined,
+        vpncode: customer.vpncode || undefined,
       });
       const parsedPayload = transactionPayloadSchema.safeParse(payload);
       if (!parsedPayload.success) {

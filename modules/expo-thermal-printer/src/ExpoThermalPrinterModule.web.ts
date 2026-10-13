@@ -1,3 +1,8 @@
+/**
+ * No-op web/non-Android implementation of the thermal-printer module — every
+ * action-taking method throws "only supported on Android" so a build for an
+ * unsupported platform fails loudly instead of silently doing nothing.
+ */
 import { registerWebModule, NativeModule } from 'expo';
 
 import {

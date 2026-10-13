@@ -1,3 +1,11 @@
+/**
+ * The auth/session state machine: `authStatus` (`loading → unauthenticated |
+ * pinSetupRequired | locked | unlocked`, plus a revoked path) drives route
+ * protection in `app/_layout.tsx`. Owns multi-account login/switch/logout,
+ * the local PIN gate and its re-lock on background/foreground, and reacts to
+ * `services/authSession.ts` events (a refresh succeeding or a session
+ * ending) without importing the axios/auth-refresh layer directly.
+ */
 import { authenticateAgent } from "@/services/authenticate";
 import { resetRefreshState } from "@/services/authRefresh";
 import {

@@ -1,3 +1,10 @@
+/**
+ * Guards against two outbox sync passes running concurrently
+ * (`beginOutboxSync`/`endOutboxSync`), coalesces a sync request that arrives
+ * mid-pass into one rerun (`takeOutboxRerun`) instead of running in parallel,
+ * and lets callers await an idle queue (`waitForOutboxIdle`, used before
+ * switching/logging out an agent).
+ */
 let syncing = false;
 let rerunRequested = false;
 let idleResolvers: (() => void)[] = [];

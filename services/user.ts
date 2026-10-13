@@ -1,3 +1,8 @@
+/**
+ * Core customer/transaction API calls: fetching the agent's customer list
+ * (tolerant of malformed individual records) and collection summary, and
+ * posting a queued deposit through the right `services/banks/` adapter.
+ */
 import { collectionSummarySchema, Customer, customerSchema, SyncableTransactionPayload } from '@/types/user';
 import { API_ENDPOINTS } from '@/utils/constants';
 import { showSnackbar } from '@/utils/snackbar';

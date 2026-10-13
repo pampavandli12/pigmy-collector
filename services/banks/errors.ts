@@ -1,3 +1,4 @@
+/** Thrown by `services/banks/registry.ts` for a `bankType` with no registered adapter; checked via `isUnsupportedBankTypeError` to mark an outbox failure as permanent (never auto-retried). */
 export class UnsupportedBankTypeError extends Error {
   readonly bankType: string;
 

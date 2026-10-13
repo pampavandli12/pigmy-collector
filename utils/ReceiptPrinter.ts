@@ -1,3 +1,12 @@
+/**
+ * Thermal-printer receipt formatting and printing.
+ *
+ * `ReceiptPrinter` is the printing API screens call (simple/QR/full receipts);
+ * `ReceiptData`/`toBankReceiptData` adapt this app's generic receipt shape into
+ * `utils/receiptFormatter.ts`'s bank-receipt layout, which does the actual
+ * ESC/POS-width text formatting before it's sent to
+ * `services/BluetoothPrinterService.ts`.
+ */
 import BluetoothPrinterService from "../services/BluetoothPrinterService";
 import {
   amountToWords,
