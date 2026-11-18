@@ -76,21 +76,29 @@ export default function Users() {
     return () => clearTimeout(timeout);
   }, [searchText]);
 
+  // Depend on the agentCode/bankCode primitives, not the `user` object
+  // itself: AuthProvider hands out a brand-new `user` reference on every
+  // token refresh (services/authRefresh.ts's proactive refresh), and
+  // depending on `user` directly turned that into a refresh -> refetch ->
+  // refresh infinite loop.
+  const agentCode = user?.agentCode;
+  const bankCode = user?.bankCode;
+
   const loadCustomers = useCallback(() => {
-    if (!user) {
+    if (agentCode === undefined || !bankCode) {
       return;
     }
-    void actions.syncCustomers(user.agentCode, user.bankCode);
-  }, [user]);
+    void actions.syncCustomers(agentCode, bankCode);
+  }, [agentCode, bankCode]);
 
   useEffect(() => {
-    if (!user) {
+    if (agentCode === undefined || !bankCode) {
       return;
     }
 
     setHasAttemptedInitialLoad(true);
     loadCustomers();
-  }, [loadCustomers, user]);
+  }, [agentCode, bankCode, loadCustomers]);
 
   const handleCustomerPress = useCallback(
     (customer: Customer) => {

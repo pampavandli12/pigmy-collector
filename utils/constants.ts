@@ -5,7 +5,7 @@
  * across the app. Keep new endpoints and storage keys here rather than
  * inlining them at call sites.
  */
-import { Platform } from 'react-native';
+import { Platform } from "react-native";
 
 const DEV_API_PORT = 1010;
 
@@ -21,13 +21,13 @@ export function resolveApiBaseUrl({
   const value = configured?.trim();
   if (isDev) {
     if (value) return value;
-    const host = platformOs === 'android' ? '10.0.2.2' : 'localhost';
+    const host = platformOs === "android" ? "10.0.2.2" : "localhost";
     return `http://${host}:${DEV_API_PORT}`;
   }
 
   if (!value || !/^https:\/\//i.test(value)) {
     throw new Error(
-      'EXPO_PUBLIC_API_BASE_URL must be an https URL in production builds.',
+      "EXPO_PUBLIC_API_BASE_URL must be an https URL in production builds.",
     );
   }
 
@@ -42,18 +42,18 @@ export const API_BASE_URL = resolveApiBaseUrl({
 
 export const API_ENDPOINTS = {
   LOGIN: `/pigmyMobile/v2/login`,
-  REFRESH_TOKEN: '/pigmyMobile/v2/login/refresh',
-  AUTHENTICATE_ME: '/pigmyMobile/v2/login/authenticate',
-  FETCH_CUSTOMERS: '/pigmyMobile/v2/user',
-  FETCH_COLLECTIONS: '/pigmyMobile/v2/transaction/fetchCollections',
-  ADD_TRANSACTION: '/pigmyMobile/v2/transaction',
-  ADD_TRANSACTION_PEOCIT: '/pigmyMobile/v2/transaction/peocit',
-  ADD_TRANSACTION_SLEDGER: '/pigmyMobile/v2/transaction/sledger',
+  REFRESH_TOKEN: "/pigmyMobile/v2/login/refresh",
+  AUTHENTICATE_ME: "/pigmyMobile/v2/login/authenticate",
+  FETCH_CUSTOMERS: "/pigmyMobile/v2/user",
+  FETCH_COLLECTIONS: "/pigmyMobile/v2/transaction/fetchCollections",
+  ADD_TRANSACTION: "/pigmyMobile/v2/transaction",
+  ADD_TRANSACTION_PEOCIT: "/pigmyMobile/v2/transaction/peocit",
+  ADD_TRANSACTION_SLEDGER: "/pigmyMobile/v2/transaction/sledger",
 } as const;
-export const SECURE_STORE_KEY = 'userInfo';
-export const AGENT_ACCOUNTS_SECURE_STORE_KEY = 'agentAccounts';
-export const PIN_SECURE_STORE_KEY = 'appPin';
-export const PIN_SALT_SECURE_STORE_KEY = 'appPinSalt';
-export const PIN_ATTEMPT_SECURE_STORE_KEY = 'appPinAttempts';
-export const MMKV_ENCRYPTION_KEY = 'mmkvEncryptionKey';
-export const DEFAULT_PRINTER_STORAGE_KEY = 'defaultPrinter';
+export const SECURE_STORE_KEY = "userInfo";
+export const AGENT_ACCOUNTS_SECURE_STORE_KEY = "agentAccounts";
+export const PIN_SECURE_STORE_KEY = "appPin";
+export const PIN_SALT_SECURE_STORE_KEY = "appPinSalt";
+export const PIN_ATTEMPT_SECURE_STORE_KEY = "appPinAttempts";
+export const MMKV_ENCRYPTION_KEY = "mmkvEncryptionKey";
+export const DEFAULT_PRINTER_STORAGE_KEY = "defaultPrinter";
