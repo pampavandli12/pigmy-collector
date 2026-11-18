@@ -35,7 +35,7 @@ import { showSnackbar } from '@/utils/snackbar';
 import { useSelector } from '@legendapp/state/react';
 import * as Crypto from 'expo-crypto';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { Button, Icon, IconButton, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -87,6 +87,19 @@ export default function UserDetail() {
 
   const [amount, setAmount] = useState('');
   const [scheme, setScheme] = useState('');
+  // The customer's own schemeId (from fetchCustomers) pre-fills and locks the
+  // dropdown only when it matches one of the agent's available schemes;
+  // otherwise the dropdown stays empty and freely editable as before.
+  const presetScheme = useMemo(
+    () => user?.schemes?.find((item) => item.schemeId === storedCustomer?.schemeId),
+    [user?.schemes, storedCustomer?.schemeId],
+  );
+
+  useEffect(() => {
+    if (presetScheme) {
+      setScheme(presetScheme.schemeId);
+    }
+  }, [presetScheme]);
   const [date] = useState(getDisplayDate);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submittingRef = useRef(false);
@@ -267,6 +280,7 @@ export default function UserDetail() {
             setAmount={setAmount}
             scheme={scheme}
             setScheme={setScheme}
+            schemeLocked={Boolean(presetScheme)}
             date={date}
             handleConfirm={handleConfirm}
             isTransactionLoading={isSubmitting}

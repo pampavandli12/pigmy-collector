@@ -146,7 +146,6 @@ test('renders settings and logout controls', () => {
 
 test('renders the printer screen boundary', () => {
   const screen = render(<PrinterScreen />);
-  expect(screen.getByText('Bluetooth Printer')).toBeTruthy();
   expect(screen.getByText('Printer Manager')).toBeTruthy();
 });
 

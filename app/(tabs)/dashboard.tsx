@@ -74,23 +74,33 @@ export default function Dashboard() {
     })),
   );
 
+  // Depend on the agentCode/bankCode/graceDays primitives, not the `user`
+  // object itself: AuthProvider hands out a brand-new `user` reference on
+  // every token refresh (services/authRefresh.ts's proactive refresh), and
+  // depending on `user` directly turned this into a refresh -> refetch ->
+  // refresh infinite loop (useFocusEffect re-runs whenever its callback's
+  // identity changes).
+  const agentCode = user?.agentCode;
+  const bankCode = user?.bankCode;
+  const graceDays = user?.graceDays;
+
   const loadCollectionSummary = useCallback(async () => {
-    if (!user) {
+    if (agentCode === undefined || !bankCode) {
       setCollectionSummary(emptySummary);
       return;
     }
 
     try {
       const summary = await fetchCollections({
-        agentCode: user.agentCode,
-        bankCode: user.bankCode,
-        graceDays: user.graceDays ?? 0,
+        agentCode,
+        bankCode,
+        graceDays: graceDays ?? 0,
       });
       setCollectionSummary(summary);
     } catch {
       showSnackbar("Unable to refresh collection summary.", { type: "error" });
     }
-  }, [user]);
+  }, [agentCode, bankCode, graceDays]);
 
   useFocusEffect(
     useCallback(() => {
