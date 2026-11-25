@@ -83,7 +83,7 @@ export const TransactionForm = ({
               name={customer.name}
               size={45}
               bankCode={customer.bankCode}
-              accountNumber={Number(customer.account)}
+              accountNumber={customer.account}
               editable
               style={styles.avatar}
             />

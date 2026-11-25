@@ -3,11 +3,16 @@
  * (tolerant of malformed individual records) and collection summary, and
  * posting a queued deposit through the right `services/banks/` adapter.
  */
-import { collectionSummarySchema, Customer, customerSchema, SyncableTransactionPayload } from '@/types/user';
-import { API_ENDPOINTS } from '@/utils/constants';
-import { showSnackbar } from '@/utils/snackbar';
-import { getBankAdapter } from './banks/registry';
-import { api } from './axios';
+import {
+  collectionSummarySchema,
+  Customer,
+  customerSchema,
+  SyncableTransactionPayload,
+} from "@/types/user";
+import { API_ENDPOINTS } from "@/utils/constants";
+import { showSnackbar } from "@/utils/snackbar";
+import { api } from "./axios";
+import { getBankAdapter } from "./banks/registry";
 
 export const fetchCustomers = async ({
   agentCode,
@@ -39,12 +44,14 @@ export const fetchCustomers = async ({
   }
 
   if (skipped > 0) {
-    console.warn(`Skipped ${skipped} malformed customer record(s) from the server.`);
+    console.warn(
+      `Skipped ${skipped} malformed customer record(s) from the server.`,
+    );
     // Silently dropping records left the agent with no way to know a customer
     // was missing from their list; surface a visible (if unobtrusive) signal.
     showSnackbar(
-      `${skipped} customer record${skipped === 1 ? '' : 's'} could not be loaded.`,
-      { type: 'error' },
+      `${skipped} customer record${skipped === 1 ? "" : "s"} could not be loaded.`,
+      { type: "error" },
     );
   }
 
@@ -66,7 +73,10 @@ export const fetchCollections = async ({
   return collectionSummarySchema.parse(response.data);
 };
 
-export const createTransaction = async (payload: SyncableTransactionPayload) => {
+export const createTransaction = async (
+  payload: SyncableTransactionPayload,
+) => {
+  console.log("Creating transaction with payload:", payload);
   const adapter = getBankAdapter(payload);
   const response = await api.post(adapter.endpoint, adapter.toRequest(payload));
   return response.data;

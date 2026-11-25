@@ -13,7 +13,7 @@ import { AuthUser } from '@/types/auth';
 import { getAgentAccountId } from '@/services/authStorage';
 
 interface AppState {
-  customers: Record<number, Customer>;
+  customers: Record<string, Customer>;
 
   outbox: Record<string, OutboxItem>;
 
@@ -89,9 +89,9 @@ export function activateAgentStore(user: AuthUser, migrateLegacy = false) {
 
   const hasScopedData = mmkv.getString(`${nextPrefix}:customers`) !== undefined;
   const customers = hasScopedData
-    ? loadStorage<Record<number, Customer>>(`${nextPrefix}:customers`, {})
+    ? loadStorage<Record<string, Customer>>(`${nextPrefix}:customers`, {})
     : migrateLegacy
-      ? loadStorage<Record<number, Customer>>('customers', {})
+      ? loadStorage<Record<string, Customer>>('customers', {})
       : {};
   const outbox = hasScopedData
     ? loadStorage<Record<string, OutboxItem>>(`${nextPrefix}:outbox`, {})

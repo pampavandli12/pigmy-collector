@@ -136,7 +136,7 @@ export default function Users() {
           bankCode: customer.bankCode,
           name: customer.customerName.trim(),
           balance: customer.currentBalance.toString(),
-          account: customer.accountNumber.toString(),
+          account: customer.accountNumber,
           // '' is this app's established "no phone on file" sentinel
           // (hasUsablePhoneNumber/TransactionSuccess's default already treat it
           // that way) — route params must be strings, so normalize null here.
@@ -200,7 +200,7 @@ export default function Users() {
       <FlatList
         data={customers}
         renderItem={renderCustomer}
-        keyExtractor={(customer) => customer.accountNumber.toString()}
+        keyExtractor={(customer) => customer.accountNumber}
         style={styles.content}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}

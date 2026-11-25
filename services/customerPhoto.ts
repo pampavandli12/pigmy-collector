@@ -22,7 +22,7 @@ const BASE64_PATTERN = /^[A-Za-z0-9+/]+={0,2}$/;
 
 export interface CustomerPhotoKey {
   bankCode: string;
-  accountNumber: number;
+  accountNumber: string;
 }
 
 type ExpoImageManipulator = typeof import('expo-image-manipulator');
@@ -104,9 +104,9 @@ export async function getCustomerPhotosBatch(
   if (keys.length === 0) return result;
 
   const bankCodes = Array.from(new Set(keys.map((key) => key.bankCode)));
-  const wantedAccountsByBank = new Map<string, Set<number>>();
+  const wantedAccountsByBank = new Map<string, Set<string>>();
   for (const key of keys) {
-    const set = wantedAccountsByBank.get(key.bankCode) ?? new Set<number>();
+    const set = wantedAccountsByBank.get(key.bankCode) ?? new Set<string>();
     set.add(key.accountNumber);
     wantedAccountsByBank.set(key.bankCode, set);
   }

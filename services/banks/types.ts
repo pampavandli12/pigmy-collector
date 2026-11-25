@@ -17,7 +17,7 @@ export interface DepositDraft {
   schemeId: string;
   collectiontype: string;
   customerName: string;
-  accountNumber: number;
+  accountNumber: string;
   openingBalance: number;
   agentName?: string;
   branchCode?: string;

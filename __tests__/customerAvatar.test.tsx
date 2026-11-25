@@ -64,7 +64,7 @@ test('falls back to initials when the image fails to decode', async () => {
 
 test('shows the camera badge only when editable and a photo key is resolvable', async () => {
   const notEditable = render(
-    <CustomerAvatar name='Customer One' bankCode='BANK' accountNumber={1} />,
+    <CustomerAvatar name='Customer One' bankCode='BANK' accountNumber='1' />,
     { wrapper },
   );
   await flush();
@@ -78,7 +78,7 @@ test('shows the camera badge only when editable and a photo key is resolvable', 
   expect(editableWithoutKey.queryByLabelText('Add customer photo')).toBeNull();
 
   const editableWithKey = render(
-    <CustomerAvatar name='Customer One' bankCode='BANK' accountNumber={1} editable />,
+    <CustomerAvatar name='Customer One' bankCode='BANK' accountNumber='1' editable />,
     { wrapper },
   );
   await flush();

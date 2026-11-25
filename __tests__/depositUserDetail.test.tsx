@@ -106,7 +106,7 @@ test('queues a banksoft deposit without finalAmount', () => {
     schemeId: '38',
     collectiontype: 'cash',
     customerName: 'Customer',
-    accountNumber: 3,
+    accountNumber: '3',
     transactionId: 'transaction-id',
     bankType: 'banksoft',
   });
@@ -127,7 +127,7 @@ test('queues a peocit deposit with finalAmount equal to collected amount plus ba
     schemeId: '38',
     collectiontype: 'cash',
     customerName: 'Customer',
-    accountNumber: 3,
+    accountNumber: '3',
     transactionId: 'transaction-id',
     bankType: 'peocit',
     agentName: 'Agent',
@@ -160,7 +160,7 @@ test('ignores a second confirm while the first deposit is still submitting', () 
 test('pre-selects and locks the scheme when the customer has a matching schemeId', () => {
   store$.customers.set({
     3: {
-      accountNumber: 3,
+      accountNumber: '3',
       customerName: 'Customer',
       currentBalance: 10,
       lastDepositDate: '2026-01-01',
@@ -181,7 +181,7 @@ test('pre-selects and locks the scheme when the customer has a matching schemeId
 test('leaves the scheme editable when the customer has no matching schemeId', () => {
   store$.customers.set({
     3: {
-      accountNumber: 3,
+      accountNumber: '3',
       customerName: 'Customer',
       currentBalance: 10,
       lastDepositDate: '2026-01-01',

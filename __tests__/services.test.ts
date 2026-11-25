@@ -10,6 +10,7 @@ import { peocitAdapter } from '../services/banks/peocit';
 import { sledgerAdapter } from '../services/banks/sledger';
 import { createTransaction, fetchCollections, fetchCustomers } from '../services/user';
 import { loginResponseSchema } from '../types/auth';
+import { buildCustomerPhotoKey } from '../services/customerPhoto';
 
 const mockedApi = api as jest.Mocked<typeof api>;
 
@@ -67,7 +68,7 @@ test('fetches customers with agent and bank parameters', async () => {
 
 test('skips malformed customer records instead of failing the whole list', async () => {
   const validCustomer = {
-    accountNumber: 2,
+    accountNumber: '2',
     customerName: 'Valid Customer',
     currentBalance: 100,
     lastDepositDate: '2026-08-01',
@@ -80,17 +81,18 @@ test('skips malformed customer records instead of failing the whole list', async
   // One malformed record (missing required fields) must not blank the list — the
   // valid record is still returned.
   mockedApi.get.mockResolvedValueOnce({
-    data: [{ accountNumber: 1 }, validCustomer],
+    data: [{ accountNumber: '1' }, validCustomer],
   });
   await expect(
     fetchCustomers({ agentCode: 7, bankCode: 'B1' }),
   ).resolves.toEqual([validCustomer]);
 });
 
-test('coerces a string accountNumber from the server instead of dropping the record', async () => {
-  // The backend sends accountNumber as a numeric string (e.g. "101"), not a number.
-  const customerWithStringAccountNumber = {
-    accountNumber: '104',
+test('preserves a leading-zero accountNumber from the server instead of coercing it to a number', async () => {
+  // The backend sends accountNumber as a string (e.g. "0104") that can have
+  // leading zeros; coercing it to a number would silently strip them.
+  const customerWithLeadingZeroAccountNumber = {
+    accountNumber: '0104',
     customerName: 'PEERSAB N',
     currentBalance: 200,
     lastDepositDate: '23.02.23',
@@ -100,15 +102,15 @@ test('coerces a string accountNumber from the server instead of dropping the rec
     mobilenumber: '',
     userId: 2155,
   };
-  mockedApi.get.mockResolvedValueOnce({ data: [customerWithStringAccountNumber] });
+  mockedApi.get.mockResolvedValueOnce({ data: [customerWithLeadingZeroAccountNumber] });
   await expect(
     fetchCustomers({ agentCode: 11, bankCode: 'AGT123' }),
-  ).resolves.toEqual([{ ...customerWithStringAccountNumber, accountNumber: 104 }]);
+  ).resolves.toEqual([customerWithLeadingZeroAccountNumber]);
 });
 
 test('accepts a null mobilenumber instead of dropping the whole customer record', async () => {
   const customerWithNoPhone = {
-    accountNumber: 3,
+    accountNumber: '3',
     customerName: 'No Phone Customer',
     currentBalance: 50,
     lastDepositDate: '2026-08-01',
@@ -128,7 +130,7 @@ test('shows a visible snackbar when customer records are skipped', async () => {
   const { showSnackbar } = jest.requireMock('../utils/snackbar') as {
     showSnackbar: jest.Mock;
   };
-  mockedApi.get.mockResolvedValueOnce({ data: [{ accountNumber: 1 }] });
+  mockedApi.get.mockResolvedValueOnce({ data: [{ accountNumber: '1' }] });
   await fetchCustomers({ agentCode: 7, bankCode: 'B1' });
   expect(showSnackbar).toHaveBeenCalledWith(
     '1 customer record could not be loaded.',
@@ -167,7 +169,7 @@ test('builds a peocit payload with final amount and a banksoft payload without i
     schemeId: '38',
     collectiontype: 'cash',
     customerName: 'Customer',
-    accountNumber: 101,
+    accountNumber: '101',
     openingBalance: 500,
     agentName: 'Agent',
     vpncode: '390879',
@@ -183,7 +185,7 @@ test('builds a peocit payload with final amount and a banksoft payload without i
     schemeId: '38',
     collectiontype: 'cash',
     customerName: 'Customer',
-    accountNumber: 101,
+    accountNumber: '101',
     bankType: 'peocit',
     agentName: 'Agent',
     finalAmount: 2000,
@@ -201,7 +203,7 @@ test('builds a peocit payload with final amount and a banksoft payload without i
     schemeId: '38',
     collectiontype: 'cash',
     customerName: 'Customer',
-    accountNumber: 101,
+    accountNumber: '101',
     bankType: 'banksoft',
   });
   expect(banksoftPayload).not.toHaveProperty('finalAmount');
@@ -219,7 +221,7 @@ test('builds a sledger payload with branch code and no final amount', () => {
     schemeId: '38',
     collectiontype: 'cash',
     customerName: 'Customer',
-    accountNumber: 101,
+    accountNumber: '101',
     openingBalance: 500,
     agentName: 'Agent',
     branchCode: '001',
@@ -236,7 +238,7 @@ test('builds a sledger payload with branch code and no final amount', () => {
     schemeId: '38',
     collectiontype: 'cash',
     customerName: 'Customer',
-    accountNumber: 101,
+    accountNumber: '101',
     bankType: 'sledger',
     agentName: 'Agent',
     branchCode: '001',
@@ -244,11 +246,39 @@ test('builds a sledger payload with branch code and no final amount', () => {
   expect(sledgerPayload).not.toHaveProperty('finalAmount');
 });
 
+test('preserves a leading-zero account number through every bank adapter and the photo cache key', () => {
+  const draft = {
+    transactionId: 'tx',
+    userId: 1,
+    agentCode: 2,
+    bankCode: 'B1',
+    collectedAmount: 1500,
+    schemename: 'Pigmy Deposit',
+    schemeId: '38',
+    collectiontype: 'cash',
+    customerName: 'Customer',
+    accountNumber: '0101',
+    openingBalance: 500,
+    agentName: 'Agent',
+    vpncode: '390879',
+    branchCode: '001',
+  };
+
+  expect(banksoftAdapter.toRequest(banksoftAdapter.buildPayload(draft)).accountNumber).toBe(
+    '0101',
+  );
+  expect(peocitAdapter.toRequest(peocitAdapter.buildPayload(draft)).accountNumber).toBe('0101');
+  expect(sledgerAdapter.toRequest(sledgerAdapter.buildPayload(draft)).accountNumber).toBe(
+    '0101',
+  );
+  expect(buildCustomerPhotoKey({ bankCode: 'B1', accountNumber: '0101' })).toBe('B1:0101');
+});
+
 test('posts banksoft transactions with scheme id and without peocit fields', async () => {
   const payload = {
     transactionId: 'tx', userId: 1, agentCode: 2, bankCode: 'B1',
     collectedAmount: 100, schemename: 'Pigmy Deposit', schemeId: '38', collectiontype: 'cash',
-    customerName: 'Customer', accountNumber: 3,
+    customerName: 'Customer', accountNumber: '3',
     bankType: 'banksoft', agentName: 'Agent', finalAmount: 250,
   };
   mockedApi.post.mockResolvedValueOnce({ data: { ok: true } });
@@ -262,7 +292,7 @@ test('posts banksoft transactions with scheme id and without peocit fields', asy
     schemeId: '38',
     collectiontype: 'cash',
     customerName: 'Customer',
-    accountNumber: 3,
+    accountNumber: '3',
     transactionId: 'tx',
   });
 });
@@ -271,7 +301,7 @@ test('posts older transactions without a bank type to the banksoft endpoint', as
   const payload = {
     transactionId: 'tx', userId: 1, agentCode: 2, bankCode: 'B1',
     collectedAmount: 100, schemename: 'Pigmy Deposit', schemeId: '38', collectiontype: 'cash',
-    customerName: 'Customer', accountNumber: 3,
+    customerName: 'Customer', accountNumber: '3',
   };
   mockedApi.post.mockResolvedValueOnce({ data: { ok: true } });
   await createTransaction(payload);
@@ -294,7 +324,7 @@ test('posts peocit transactions to the peocit endpoint', async () => {
     schemeId: '38',
     collectiontype: 'cash',
     customerName: 'Customer_101',
-    accountNumber: 101,
+    accountNumber: '101',
     bankType: 'peocit',
     vpncode: '390879',
   };
@@ -311,7 +341,7 @@ test('posts peocit transactions to the peocit endpoint', async () => {
     schemeId: '38',
     collectiontype: 'cash',
     customerName: 'Customer_101',
-    accountNumber: 101,
+    accountNumber: '101',
     transactionId: '3c00c185-0579-4cac-a144-660950138fd7',
     vpncode: '390879',
   });
@@ -329,7 +359,7 @@ test('posts sledger transactions to the sledger endpoint without schemename and 
     schemeId: 'PD001',
     collectiontype: 'cash',
     customerName: 'Customer_101',
-    accountNumber: 101,
+    accountNumber: '101',
     bankType: 'sledger',
     branchCode: '001',
   };
@@ -355,7 +385,7 @@ test('does not post an incomplete sledger transaction', async () => {
     createTransaction({
       transactionId: 'tx', userId: 1, agentCode: 2, bankCode: 'B1',
       collectedAmount: 100, schemename: 'Pigmy Deposit', schemeId: '38',
-      collectiontype: 'cash', customerName: 'Customer', accountNumber: 3,
+      collectiontype: 'cash', customerName: 'Customer', accountNumber: '3',
       bankType: 'sledger', agentName: 'Agent',
     }),
   ).rejects.toThrow('Sledger transaction is missing agent name or branch code.');
@@ -367,7 +397,7 @@ test('does not post an incomplete peocit transaction', async () => {
     createTransaction({
       transactionId: 'tx', userId: 1, agentCode: 2, bankCode: 'B1',
       collectedAmount: 100, schemename: 'Pigmy Deposit', schemeId: '38',
-      collectiontype: 'cash', customerName: 'Customer', accountNumber: 3,
+      collectiontype: 'cash', customerName: 'Customer', accountNumber: '3',
       bankType: 'peocit',
     }),
   ).rejects.toThrow(
@@ -381,7 +411,7 @@ test('does not post a peocit transaction missing only the vpn code', async () =>
     createTransaction({
       transactionId: 'tx', userId: 1, agentCode: 2, bankCode: 'B1',
       collectedAmount: 100, schemename: 'Pigmy Deposit', schemeId: '38',
-      collectiontype: 'cash', customerName: 'Customer', accountNumber: 3,
+      collectiontype: 'cash', customerName: 'Customer', accountNumber: '3',
       bankType: 'peocit', agentName: 'Agent', finalAmount: 250,
     }),
   ).rejects.toThrow(
@@ -395,7 +425,7 @@ test('does not post an empty bank type as a banksoft transaction', async () => {
     createTransaction({
       transactionId: 'tx', userId: 1, agentCode: 2, bankCode: 'B1',
       collectedAmount: 100, schemename: 'Pigmy Deposit', schemeId: '38',
-      collectiontype: 'cash', customerName: 'Customer', accountNumber: 3,
+      collectiontype: 'cash', customerName: 'Customer', accountNumber: '3',
       bankType: '',
     }),
   ).rejects.toThrow('Unsupported bank type: ');
@@ -407,7 +437,7 @@ test('does not post a transaction for an unsupported bank type', async () => {
     createTransaction({
       transactionId: 'tx', userId: 1, agentCode: 2, bankCode: 'B1',
       collectedAmount: 100, schemename: 'Pigmy Deposit', schemeId: '38',
-      collectiontype: 'cash', customerName: 'Customer', accountNumber: 3,
+      collectiontype: 'cash', customerName: 'Customer', accountNumber: '3',
       bankType: 'other',
     }),
   ).rejects.toThrow('Unsupported bank type: other');

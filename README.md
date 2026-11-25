@@ -97,7 +97,15 @@ pigmy-collector/
 └── __tests__/                      # Jest test suite
 ```
 
-See [AGENTS.md](AGENTS.md) for the condensed contributor-facing contract (folder conventions, coding style, commit/PR notes) and [CLAUDE.md](CLAUDE.md) for AI-assistant-specific command and architecture notes.
+### Documentation map
+
+| File | Audience / purpose |
+|---|---|
+| [AGENTS.md](AGENTS.md) | **Primary, self-contained architecture contract** for any coding agent (Claude, Codex, Cursor, etc.) — data flow, folder conventions, auth/PIN state machine, multi-bank adapters, deposit limits, offline-sync model, coding style, testing workflow, commit/PR notes. |
+| [CLAUDE.md](CLAUDE.md) | Claude-Code-specific command reference; defers to AGENTS.md for architecture. |
+| [PRINTER_README.md](PRINTER_README.md) | Bluetooth printer module API reference, in more depth than the "Receipts" section above. |
+| [NAVIGATION.md](NAVIGATION.md) | Quick route-tree map. |
+| `BUILD_GUIDE.md`, `ERROR_FIX.md`, `PAPER_SETUP.md` | Historical one-time setup notes from earlier in the project. If any of these ever disagree with this README or AGENTS.md, trust the latter two (and the code). |
 
 ## Setup
 

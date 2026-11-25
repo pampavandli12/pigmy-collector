@@ -25,7 +25,7 @@ test('customers and local transactions are restored only for their agent', () =>
   activateAgentStore(firstAgent);
   store$.customers.set({
     1001: {
-      accountNumber: 1001,
+      accountNumber: '1001',
       customerName: 'First customer',
       currentBalance: 50,
       lastDepositDate: '2026-08-06',
@@ -48,7 +48,7 @@ test('customers and local transactions are restored only for their agent', () =>
         schemeId: '38',
         collectiontype: 'cash',
         customerName: 'First customer',
-        accountNumber: 1001,
+        accountNumber: '1001',
       },
       status: 'pending',
       retryCount: 0,

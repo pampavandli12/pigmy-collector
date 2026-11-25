@@ -5,16 +5,16 @@
  * validated, written to the outbox as `pending`, and reflected in the
  * customer's balance immediately, all before any network call.
  */
-import { getAgentAccountId } from '@/services/authStorage';
-import { isRegisteredBankType } from '@/services/banks/registry';
-import { fetchCustomers } from '@/services/user';
-import { getActiveAgentId, store$ } from './store';
+import { getAgentAccountId } from "@/services/authStorage";
+import { isRegisteredBankType } from "@/services/banks/registry";
+import { fetchCustomers } from "@/services/user";
+import { getActiveAgentId, store$ } from "./store";
 
-import { Customer, OutboxItem, transactionPayloadSchema } from '@/types/user';
-import { isToday } from '@/utils/isToday';
-import { showSnackbar } from '@/utils/snackbar';
-import { updateCustomerBalanceForToday } from './customerBalance';
-import { cleanupOutbox, processOutbox } from './syncEngine';
+import { Customer, OutboxItem, transactionPayloadSchema } from "@/types/user";
+import { isToday } from "@/utils/isToday";
+import { showSnackbar } from "@/utils/snackbar";
+import { updateCustomerBalanceForToday } from "./customerBalance";
+import { cleanupOutbox, processOutbox } from "./syncEngine";
 
 function getTodaysUnsyncedTotalsByAccount() {
   const outbox = store$.outbox.peek();
@@ -26,8 +26,8 @@ function getTodaysUnsyncedTotalsByAccount() {
       // (store/syncEngine.ts) and must NOT be added back in here.
       if (
         !item ||
-        item.status === 'synced' ||
-        (item.status === 'failed' && item.permanent) ||
+        item.status === "synced" ||
+        (item.status === "failed" && item.permanent) ||
         !isToday(item.createdAt)
       ) {
         return acc;
@@ -41,7 +41,7 @@ function getTodaysUnsyncedTotalsByAccount() {
 
       return acc;
     },
-    {} as Record<number, number>,
+    {} as Record<string, number>,
   );
 }
 
@@ -60,7 +60,7 @@ function mergeFetchedCustomersWithLocalBalances(customers: Customer[]) {
 
       return acc;
     },
-    {} as Record<number, Customer>,
+    {} as Record<string, Customer>,
   );
 }
 
@@ -77,15 +77,16 @@ export const actions = {
         agentCode,
         bankCode,
       });
+      console.log("Fetched customers:", customers);
       const mapped = mergeFetchedCustomersWithLocalBalances(customers);
 
       store$.customers.set(mapped);
 
       store$.lastCustomerSync.set(Date.now());
     } catch (error) {
-      console.warn('Failed to refresh customers:', error);
-      showSnackbar('Unable to refresh customers. Showing offline data.', {
-        type: 'error',
+      console.warn("Failed to refresh customers:", error);
+      showSnackbar("Unable to refresh customers. Showing offline data.", {
+        type: "error",
       });
     } finally {
       store$.isRefreshingCustomers.set(false);
@@ -106,15 +107,19 @@ export const actions = {
     if (
       getActiveAgentId() !== null &&
       getActiveAgentId() !==
-      getAgentAccountId({ agentCode: validPayload.agentCode, bankCode: validPayload.bankCode })
+        getAgentAccountId({
+          agentCode: validPayload.agentCode,
+          bankCode: validPayload.bankCode,
+        })
     ) {
-      showSnackbar('The active agent changed. Please reopen the customer.', {
-        type: 'error',
+      showSnackbar("The active agent changed. Please reopen the customer.", {
+        type: "error",
       });
       return false;
     }
 
-    const existingTransaction = store$.outbox[validPayload.transactionId].peek();
+    const existingTransaction =
+      store$.outbox[validPayload.transactionId].peek();
 
     if (existingTransaction) {
       return false;
@@ -125,7 +130,7 @@ export const actions = {
     const transaction: OutboxItem = {
       payload: validPayload,
 
-      status: 'pending',
+      status: "pending",
 
       retryCount: 0,
 
@@ -150,9 +155,9 @@ export const actions = {
       const item = outbox[txId];
       // Skip permanent rejections (4xx / unsupported bank type): they will only
       // immediately re-fail. Only revive transient failures.
-      if (item?.status === 'failed' && !item.permanent) {
+      if (item?.status === "failed" && !item.permanent) {
         store$.outbox[txId].assign({
-          status: 'pending',
+          status: "pending",
           retryCount: 0,
           retryHeld: false,
           nextRetryAt: undefined,

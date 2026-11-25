@@ -51,7 +51,7 @@ test('save then get round-trips the compressed photo as a data URI', async () =>
   const { saveCustomerPhoto, getCustomerPhoto } = require('../services/customerPhoto');
 
   const saved = await saveCustomerPhoto(
-    { bankCode: 'BANK', accountNumber: 101 },
+    { bankCode: 'BANK', accountNumber: '101' },
     'file:///photo.jpg',
     fakeManipulator,
   );
@@ -62,7 +62,7 @@ test('save then get round-trips the compressed photo as a data URI', async () =>
     expect.objectContaining({ compress: 0.5, format: 'jpeg', base64: true }),
   );
 
-  const fetched = await getCustomerPhoto({ bankCode: 'BANK', accountNumber: 101 });
+  const fetched = await getCustomerPhoto({ bankCode: 'BANK', accountNumber: '101' });
   expect(fetched).toBe('data:image/jpeg;base64,ZmFrZQ==');
 });
 
@@ -80,13 +80,13 @@ test('a DB open failure degrades every call to a safe default, never throws', as
   } = require('../services/customerPhoto');
 
   await expect(
-    saveCustomerPhoto({ bankCode: 'B', accountNumber: 1 }, 'file:///x.jpg', fakeManipulator),
+    saveCustomerPhoto({ bankCode: 'B', accountNumber: '1' }, 'file:///x.jpg', fakeManipulator),
   ).resolves.toBeNull();
   await expect(
-    getCustomerPhoto({ bankCode: 'B', accountNumber: 1 }),
+    getCustomerPhoto({ bankCode: 'B', accountNumber: '1' }),
   ).resolves.toBeNull();
   await expect(
-    getCustomerPhotosBatch([{ bankCode: 'B', accountNumber: 1 }]),
+    getCustomerPhotosBatch([{ bankCode: 'B', accountNumber: '1' }]),
   ).resolves.toEqual({});
 });
 
@@ -103,10 +103,10 @@ test('a query failure after a successful open also degrades gracefully', async (
   const { saveCustomerPhoto, getCustomerPhoto } = require('../services/customerPhoto');
 
   await expect(
-    saveCustomerPhoto({ bankCode: 'B', accountNumber: 1 }, 'file:///x.jpg', fakeManipulator),
+    saveCustomerPhoto({ bankCode: 'B', accountNumber: '1' }, 'file:///x.jpg', fakeManipulator),
   ).resolves.toBeNull();
   await expect(
-    getCustomerPhoto({ bankCode: 'B', accountNumber: 1 }),
+    getCustomerPhoto({ bankCode: 'B', accountNumber: '1' }),
   ).resolves.toBeNull();
 });
 
@@ -114,7 +114,7 @@ test('a corrupt stored value is treated as no photo rather than a broken URI', a
   mockDb({
     getFirstAsync: jest.fn(async () => ({
       bank_code: 'B',
-      account_number: 1,
+      account_number: '1',
       photo_base64: 'not valid base64 !!',
       mime_type: 'image/jpeg',
     })),
@@ -123,7 +123,7 @@ test('a corrupt stored value is treated as no photo rather than a broken URI', a
   const { getCustomerPhoto } = require('../services/customerPhoto');
 
   await expect(
-    getCustomerPhoto({ bankCode: 'B', accountNumber: 1 }),
+    getCustomerPhoto({ bankCode: 'B', accountNumber: '1' }),
   ).resolves.toBeNull();
 });
 
@@ -140,16 +140,16 @@ test('a compression failure returns null without throwing or writing a row', asy
   };
 
   await expect(
-    saveCustomerPhoto({ bankCode: 'B', accountNumber: 1 }, 'file:///x.jpg', throwingManipulator),
+    saveCustomerPhoto({ bankCode: 'B', accountNumber: '1' }, 'file:///x.jpg', throwingManipulator),
   ).resolves.toBeNull();
   expect(runAsync).not.toHaveBeenCalled();
 });
 
 test('batch lookup intersects bank-scoped rows against the requested account numbers', async () => {
   const allRows = [
-    { bank_code: 'B', account_number: 1, photo_base64: 'YQ==', mime_type: 'image/jpeg' },
-    { bank_code: 'B', account_number: 2, photo_base64: 'Yg==', mime_type: 'image/jpeg' },
-    { bank_code: 'B', account_number: 3, photo_base64: 'Yw==', mime_type: 'image/jpeg' },
+    { bank_code: 'B', account_number: '1', photo_base64: 'YQ==', mime_type: 'image/jpeg' },
+    { bank_code: 'B', account_number: '2', photo_base64: 'Yg==', mime_type: 'image/jpeg' },
+    { bank_code: 'B', account_number: '3', photo_base64: 'Yw==', mime_type: 'image/jpeg' },
   ];
   mockDb({ getAllAsync: jest.fn(async () => allRows) });
 
@@ -159,15 +159,15 @@ test('batch lookup intersects bank-scoped rows against the requested account num
   } = require('../services/customerPhoto');
 
   const result = await getCustomerPhotosBatch([
-    { bankCode: 'B', accountNumber: 1 },
-    { bankCode: 'B', accountNumber: 3 },
+    { bankCode: 'B', accountNumber: '1' },
+    { bankCode: 'B', accountNumber: '3' },
   ]);
 
   expect(Object.keys(result).sort()).toEqual(
     [
-      buildCustomerPhotoKey({ bankCode: 'B', accountNumber: 1 }),
-      buildCustomerPhotoKey({ bankCode: 'B', accountNumber: 3 }),
+      buildCustomerPhotoKey({ bankCode: 'B', accountNumber: '1' }),
+      buildCustomerPhotoKey({ bankCode: 'B', accountNumber: '3' }),
     ].sort(),
   );
-  expect(result[buildCustomerPhotoKey({ bankCode: 'B', accountNumber: 2 })]).toBeUndefined();
+  expect(result[buildCustomerPhotoKey({ bankCode: 'B', accountNumber: '2' })]).toBeUndefined();
 });
