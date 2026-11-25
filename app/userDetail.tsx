@@ -67,7 +67,7 @@ export default function UserDetail() {
     (Array.isArray(value) ? value[0] : value) ?? '';
 
   const account = firstParam(params.account);
-  const accountNumber = Number(account);
+  const accountNumber = account;
   const storedCustomer = useSelector(store$.customers[accountNumber]);
   const todaysCollected = useSelector(todaysCollectionAmount$);
 
@@ -188,7 +188,7 @@ export default function UserDetail() {
         schemeId: selectedScheme.schemeId,
         collectiontype: 'cash',
         customerName: customer.name,
-        accountNumber: Number(customer.account),
+        accountNumber: customer.account,
         transactionId: Crypto.randomUUID(),
         openingBalance,
         agentName: user?.agentName,

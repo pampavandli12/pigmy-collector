@@ -17,7 +17,7 @@ export function useCustomerPhoto(key: CustomerPhotoKey | null) {
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
-    if (!key || !key.bankCode || !Number.isFinite(key.accountNumber)) {
+    if (!key || !key.bankCode || !key.accountNumber) {
       setPhotoUri(null);
       return;
     }

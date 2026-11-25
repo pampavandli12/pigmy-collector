@@ -35,7 +35,7 @@ interface TransactionSuccessProps {
   customerId?: string;
   accountNumber?: string;
   bankCode?: string;
-  customerAccountNumber?: number;
+  customerAccountNumber?: string;
   amount?: string;
   openingBalance: number;
   totalBalance: number;

@@ -27,7 +27,7 @@ type CustomerAvatarProps = {
   size?: number;
   labelMode?: 'firstLetter' | 'initials';
   bankCode?: string;
-  accountNumber?: number;
+  accountNumber?: string;
   // Controlled photo — when provided (even null), the component never
   // self-fetches and just renders whatever is passed (used by list/dashboard
   // screens that batch-fetch photos once for many rows).
@@ -55,13 +55,13 @@ export function CustomerAvatar({
 
   const isControlled = controlledPhotoUri !== undefined;
   const photoKey: CustomerPhotoKey | null =
-    !isControlled && bankCode && Number.isFinite(accountNumber)
-      ? { bankCode, accountNumber: accountNumber as number }
+    !isControlled && bankCode && accountNumber
+      ? { bankCode, accountNumber }
       : null;
 
   const { photoUri: fetchedPhotoUri, refresh } = useCustomerPhoto(photoKey);
   const resolvedPhotoUri = isControlled ? controlledPhotoUri : fetchedPhotoUri;
-  const canEdit = editable && Boolean(bankCode) && Number.isFinite(accountNumber);
+  const canEdit = editable && Boolean(bankCode) && Boolean(accountNumber);
   const displayUri = imageFailed ? null : resolvedPhotoUri;
 
   const label = useMemo(
@@ -73,11 +73,11 @@ export function CustomerAvatar({
   );
 
   const handlePick = async (sourceUri: string) => {
-    if (!bankCode || !Number.isFinite(accountNumber)) return;
+    if (!bankCode || !accountNumber) return;
     setUploading(true);
     try {
       const saved = await saveCustomerPhoto(
-        { bankCode, accountNumber: accountNumber as number },
+        { bankCode, accountNumber },
         sourceUri,
       );
       if (!saved) {

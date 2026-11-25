@@ -17,7 +17,7 @@ beforeEach(() => {
 
 test('syncs and indexes fetched customers by account number', async () => {
   (fetchCustomers as jest.Mock).mockResolvedValue([
-    { accountNumber: 10, customerName: 'A', currentBalance: 100, lastDepositDate: '', schemeId: 'P', agentCode: 1, bankCode: 'B', mobilenumber: '9', userId: 2 },
+    { accountNumber: '10', customerName: 'A', currentBalance: 100, lastDepositDate: '', schemeId: 'P', agentCode: 1, bankCode: 'B', mobilenumber: '9', userId: 2 },
   ]);
   await actions.syncCustomers(1, 'B');
   expect(store$.customers[10].customerName.peek()).toBe('A');
@@ -31,7 +31,7 @@ test('shows a snackbar when customer refresh fails', async () => {
 });
 
 test('adds a transaction only once and updates selectors', () => {
-  const payload = { transactionId: 'tx', userId: 1, agentCode: 2, bankCode: 'B', collectedAmount: 75, schemename: 'P', schemeId: '38', collectiontype: 'cash', customerName: 'A', accountNumber: 3, bankType: 'banksoft' };
+  const payload = { transactionId: 'tx', userId: 1, agentCode: 2, bankCode: 'B', collectedAmount: 75, schemename: 'P', schemeId: '38', collectiontype: 'cash', customerName: 'A', accountNumber: '3', bankType: 'banksoft' };
   actions.addTransaction(payload);
   actions.addTransaction(payload);
   expect(todaysTransactionCount$.peek()).toBe(1);
@@ -45,13 +45,13 @@ test('adds a transaction only once and updates selectors', () => {
 
 test('excludes a permanently-failed deposit from the daily collection amount but keeps it in history', () => {
   store$.outbox.old.set({
-    payload: { transactionId: 'ok', userId: 1, agentCode: 2, bankCode: 'B', collectedAmount: 100, schemename: 'P', schemeId: '38', collectiontype: 'cash', customerName: 'A', accountNumber: 3 },
+    payload: { transactionId: 'ok', userId: 1, agentCode: 2, bankCode: 'B', collectedAmount: 100, schemename: 'P', schemeId: '38', collectiontype: 'cash', customerName: 'A', accountNumber: '3' },
     status: 'synced',
     retryCount: 0,
     createdAt: Date.now(),
   });
   store$.outbox.rejected.set({
-    payload: { transactionId: 'rejected', userId: 1, agentCode: 2, bankCode: 'B', collectedAmount: 250, schemename: 'P', schemeId: '38', collectiontype: 'cash', customerName: 'A', accountNumber: 3 },
+    payload: { transactionId: 'rejected', userId: 1, agentCode: 2, bankCode: 'B', collectedAmount: 250, schemename: 'P', schemeId: '38', collectiontype: 'cash', customerName: 'A', accountNumber: '3' },
     status: 'failed',
     permanent: true,
     retryCount: 1,
@@ -66,14 +66,14 @@ test('excludes a permanently-failed deposit from the daily collection amount but
 
 test('excludes a permanently-failed deposit from unsynced balance totals on refresh', async () => {
   store$.outbox.rejected.set({
-    payload: { transactionId: 'rejected', userId: 1, agentCode: 2, bankCode: 'B', collectedAmount: 250, schemename: 'P', schemeId: '38', collectiontype: 'cash', customerName: 'A', accountNumber: 10 },
+    payload: { transactionId: 'rejected', userId: 1, agentCode: 2, bankCode: 'B', collectedAmount: 250, schemename: 'P', schemeId: '38', collectiontype: 'cash', customerName: 'A', accountNumber: '10' },
     status: 'failed',
     permanent: true,
     retryCount: 1,
     createdAt: Date.now(),
   });
   (fetchCustomers as jest.Mock).mockResolvedValue([
-    { accountNumber: 10, customerName: 'A', currentBalance: 1000, lastDepositDate: '', schemeId: 'P', agentCode: 1, bankCode: 'B', mobilenumber: '9', userId: 2 },
+    { accountNumber: '10', customerName: 'A', currentBalance: 1000, lastDepositDate: '', schemeId: 'P', agentCode: 1, bankCode: 'B', mobilenumber: '9', userId: 2 },
   ]);
   await actions.syncCustomers(1, 'B');
   expect(store$.customers[10].currentBalance.peek()).toBe(1000);
@@ -83,7 +83,7 @@ test('keeps previous-day transactions out of today selectors', () => {
   const old = new Date();
   old.setDate(old.getDate() - 1);
   store$.outbox.old.set({
-    payload: { transactionId: 'old', userId: 1, agentCode: 2, bankCode: 'B', collectedAmount: 25, schemename: 'P', schemeId: '38', collectiontype: 'cash', customerName: 'A', accountNumber: 3 },
+    payload: { transactionId: 'old', userId: 1, agentCode: 2, bankCode: 'B', collectedAmount: 25, schemename: 'P', schemeId: '38', collectiontype: 'cash', customerName: 'A', accountNumber: '3' },
     status: 'synced',
     retryCount: 0,
     createdAt: old.getTime(),
@@ -104,7 +104,7 @@ test('refuses deposits that are not a positive finite amount', () => {
     schemeId: '38',
     collectiontype: 'cash',
     customerName: 'A',
-    accountNumber: 3,
+    accountNumber: '3',
     bankType: 'banksoft' as const,
   };
 
@@ -125,7 +125,7 @@ test('stores peocit final amount and rejects it on banksoft payloads', () => {
     schemeId: '38',
     collectiontype: 'cash',
     customerName: 'A',
-    accountNumber: 3,
+    accountNumber: '3',
   };
 
   expect(
@@ -151,7 +151,7 @@ test('stores peocit final amount and rejects it on banksoft payloads', () => {
     agentName: 'Agent',
     finalAmount: 175,
     vpncode: '123456',
-    accountNumber: 3,
+    accountNumber: '3',
   });
   expect(store$.outbox.peek()).not.toHaveProperty('tx');
 });
@@ -167,7 +167,7 @@ test('refuses a new deposit for a missing or unknown bank type', () => {
     schemeId: '38',
     collectiontype: 'cash',
     customerName: 'A',
-    accountNumber: 3,
+    accountNumber: '3',
   };
 
   expect(actions.addTransaction(payload)).toBe(false);
@@ -187,10 +187,10 @@ test('adds only unsynced today amounts on top of the server balance', async () =
     schemeId: '38',
     collectiontype: 'cash',
     customerName: 'A',
-    accountNumber: 10,
+    accountNumber: '10',
   };
   store$.customers[10].set({
-    accountNumber: 10,
+    accountNumber: '10',
     customerName: 'A',
     currentBalance: 999,
     lastDepositDate: '',
@@ -222,7 +222,7 @@ test('adds only unsynced today amounts on top of the server balance', async () =
   });
   (fetchCustomers as jest.Mock).mockResolvedValue([
     {
-      accountNumber: 10,
+      accountNumber: '10',
       customerName: 'A',
       currentBalance: 150,
       lastDepositDate: '',
@@ -251,7 +251,7 @@ test('clears the retry hold when a failed transaction is retried', () => {
       schemeId: '38',
       collectiontype: 'cash',
       customerName: 'A',
-      accountNumber: 3,
+      accountNumber: '3',
     },
     status: 'failed',
     retryCount: 5,

@@ -26,7 +26,7 @@ function item(status: OutboxItem['status'], createdAt: number): OutboxItem {
       schemeId: '38',
       collectiontype: 'cash',
       customerName: 'Customer',
-      accountNumber: 3,
+      accountNumber: '3',
     },
   };
 }

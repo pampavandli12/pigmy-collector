@@ -55,17 +55,17 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
   <PaperProvider>{children}</PaperProvider>
 );
 
-function makeCustomer(accountNumber: number): Customer {
+function makeCustomer(seed: number): Customer {
   return {
-    accountNumber,
-    customerName: `Customer ${accountNumber}`,
-    currentBalance: accountNumber,
+    accountNumber: String(seed),
+    customerName: `Customer ${seed}`,
+    currentBalance: seed,
     lastDepositDate: '2026-01-01',
     schemeId: 'PIGMY',
     agentCode: 11,
     bankCode: 'BANK',
     mobilenumber: '9876543210',
-    userId: accountNumber,
+    userId: seed,
   };
 }
 

@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 /**
  * Zod schemas and inferred types for customers and deposit transactions,
@@ -7,7 +7,7 @@ import { z } from 'zod';
  * looser `SyncableTransactionPayload` shape persisted in the outbox.
  */
 export interface Customer {
-  accountNumber: number;
+  accountNumber: string;
   customerName: string;
   currentBalance: number;
   lastDepositDate: string;
@@ -35,7 +35,7 @@ export interface SyncableTransactionPayload {
   schemeId: string;
   collectiontype: string;
   customerName: string;
-  accountNumber: number;
+  accountNumber: string;
   bankType?: string;
   agentName?: string;
   finalAmount?: number;
@@ -43,7 +43,7 @@ export interface SyncableTransactionPayload {
   vpncode?: string;
 }
 
-export type SyncStatus = 'pending' | 'syncing' | 'failed' | 'synced';
+export type SyncStatus = "pending" | "syncing" | "failed" | "synced";
 
 export interface OutboxItem {
   payload: SyncableTransactionPayload;
@@ -72,13 +72,15 @@ export interface OutboxItem {
   balanceReverted?: boolean;
 }
 
-export const INVALID_DEPOSIT_MESSAGE = 'Enter an amount greater than zero.';
-export const UNABLE_TO_SAVE_DEPOSIT_MESSAGE = 'Unable to save this deposit.';
-export const SCHEME_REQUIRED_MESSAGE = 'Select a scheme.';
+export const INVALID_DEPOSIT_MESSAGE = "Enter an amount greater than zero.";
+export const UNABLE_TO_SAVE_DEPOSIT_MESSAGE = "Unable to save this deposit.";
+export const SCHEME_REQUIRED_MESSAGE = "Select a scheme.";
 
 export const customerSchema = z.object({
-  // The server sends this as a numeric string (e.g. "101"), not a number.
-  accountNumber: z.coerce.number().int(),
+  // The server sends this as a string (e.g. "0101") that can have leading
+  // zeros; coercing it to a number would silently strip them, so it's kept
+  // as a string end-to-end (store, deposits, outbox, every bank adapter).
+  accountNumber: z.string().min(1),
   customerName: z.string().min(1),
   currentBalance: z.number().finite(),
   lastDepositDate: z.string(),
@@ -107,20 +109,20 @@ const transactionFields = {
   schemeId: z.string().min(1),
   collectiontype: z.string().min(1),
   customerName: z.string().min(1),
-  accountNumber: z.number().int(),
+  accountNumber: z.string().min(1),
 };
 
 export const banksoftTransactionSchema = z
   .object({
     ...transactionFields,
-    bankType: z.literal('banksoft'),
+    bankType: z.literal("banksoft"),
   })
   .strict();
 
 export const peocitTransactionSchema = z
   .object({
     ...transactionFields,
-    bankType: z.literal('peocit'),
+    bankType: z.literal("peocit"),
     agentName: z.string().min(1),
     finalAmount: z.number().finite(),
     vpncode: z.string().min(1),
@@ -130,13 +132,13 @@ export const peocitTransactionSchema = z
 export const sledgerTransactionSchema = z
   .object({
     ...transactionFields,
-    bankType: z.literal('sledger'),
+    bankType: z.literal("sledger"),
     agentName: z.string().min(1),
     branchCode: z.string().min(1),
   })
   .strict();
 
-export const transactionPayloadSchema = z.discriminatedUnion('bankType', [
+export const transactionPayloadSchema = z.discriminatedUnion("bankType", [
   banksoftTransactionSchema,
   peocitTransactionSchema,
   sledgerTransactionSchema,

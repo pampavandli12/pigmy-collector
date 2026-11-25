@@ -17,7 +17,7 @@ const DATABASE_NAME = 'customer-photos.db';
 const CREATE_TABLE_SQL = `
 CREATE TABLE IF NOT EXISTS customer_photos (
   bank_code TEXT NOT NULL,
-  account_number INTEGER NOT NULL,
+  account_number TEXT NOT NULL,
   photo_base64 TEXT NOT NULL,
   mime_type TEXT NOT NULL DEFAULT 'image/jpeg',
   updated_at INTEGER NOT NULL,
@@ -25,9 +25,12 @@ CREATE TABLE IF NOT EXISTS customer_photos (
 );
 `;
 
+// Bumped whenever a migration below needs to run against an existing table.
+const SCHEMA_VERSION = 2;
+
 export interface CustomerPhotoRow {
   bank_code: string;
-  account_number: number;
+  account_number: string;
   photo_base64: string;
   mime_type: string;
   updated_at: number;
@@ -39,9 +42,49 @@ let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 // expo-sqlite) doesn't get hammered on every avatar render.
 let dbUnavailable = false;
 
+// `account_number` was originally declared INTEGER, which gives the column
+// INTEGER affinity: SQLite silently converts a string like "0284" to the
+// integer 284 on insert, stripping leading zeros, regardless of the JS-level
+// type. `CREATE TABLE IF NOT EXISTS` is a no-op against a table that already
+// exists on-device, so existing installs need this migrated explicitly.
+// Rows written before this migration already lost their leading zeros when
+// first stored as an integer; that's accepted here as a one-time cache miss
+// (re-prompt to add the photo) rather than something to recover.
+async function migrateAccountNumberToText(db: SQLite.SQLiteDatabase): Promise<void> {
+  const columns = await db.getAllAsync<{ name: string; type: string }>(
+    'PRAGMA table_info(customer_photos)',
+    [],
+  );
+  const accountNumberColumn = columns.find((column) => column.name === 'account_number');
+  if (!accountNumberColumn || accountNumberColumn.type.toUpperCase() === 'TEXT') {
+    return;
+  }
+
+  await db.execAsync('DROP TABLE IF EXISTS customer_photos_old');
+  await db.execAsync('BEGIN TRANSACTION');
+  await db.execAsync('ALTER TABLE customer_photos RENAME TO customer_photos_old');
+  await db.execAsync(CREATE_TABLE_SQL);
+  await db.execAsync(`
+    INSERT INTO customer_photos (bank_code, account_number, photo_base64, mime_type, updated_at)
+    SELECT bank_code, CAST(account_number AS TEXT), photo_base64, mime_type, updated_at
+    FROM customer_photos_old
+  `);
+  await db.execAsync('DROP TABLE customer_photos_old');
+  await db.execAsync('COMMIT');
+}
+
 async function openDb(): Promise<SQLite.SQLiteDatabase> {
   const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
   await db.execAsync(CREATE_TABLE_SQL);
+  const versionRow = await db.getFirstAsync<{ user_version: number }>(
+    'PRAGMA user_version',
+    [],
+  );
+  const currentVersion = versionRow?.user_version ?? 0;
+  if (currentVersion < SCHEMA_VERSION) {
+    await migrateAccountNumberToText(db);
+    await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+  }
   return db;
 }
 
@@ -66,7 +109,7 @@ function normalizeBankCode(bankCode: string): string {
 
 export async function getPhotoRow(
   bankCode: string,
-  accountNumber: number,
+  accountNumber: string,
 ): Promise<CustomerPhotoRow | null> {
   const db = await getDb();
   if (!db) return null;
@@ -100,7 +143,7 @@ export async function getPhotoRowsForBank(
 
 export async function upsertPhotoRow(row: {
   bankCode: string;
-  accountNumber: number;
+  accountNumber: string;
   photoBase64: string;
   mimeType: string;
 }): Promise<boolean> {
