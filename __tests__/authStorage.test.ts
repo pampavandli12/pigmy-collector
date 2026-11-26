@@ -25,7 +25,7 @@ test('migrates a legacy stored user without losing its session', async () => {
   }));
   await expect(getStoredUser()).resolves.toMatchObject({
     accessToken: 'legacy-token', refreshToken: null, limitAmount: null,
-    bankType: '', schemes: [],
+    bankType: '', schemes: [], offlineTransactionLimit: null,
   });
   expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
     'userInfo', expect.stringContaining('"accessToken":"legacy-token"'),
@@ -49,6 +49,7 @@ test('replaces both stored tokens without changing user metadata', async () => {
     phoneNumber: '9876543210', lastDepositDate: '2026-06-19', limitAmount: 50000,
     graceDays: 0, accessToken: 'old-access', refreshToken: 'old-refresh',
     bankType: 'peocit', schemes: [{ schemeId: '38', schemeName: 'Pigmy Deposit' }],
+    offlineTransactionLimit: 5,
   };
   (SecureStore.getItemAsync as jest.Mock).mockResolvedValue(
     JSON.stringify(storedUser),
@@ -81,6 +82,7 @@ test('updates stored agent profile fields for the active account', async () => {
     lastDepositDate: '2026-06-19',
     limitAmount: 50000,
     graceDays: 0,
+    offlineTransactionLimit: 5,
     accessToken: 'access',
     refreshToken: 'refresh',
     bankType: 'peocit',
@@ -95,11 +97,13 @@ test('updates stored agent profile fields for the active account', async () => {
       limitAmount: 40000,
       lastDepositDate: '2026-08-06',
       graceDays: 2,
+      offlineTransactionLimit: 3,
     }),
   ).resolves.toEqual({
     ...storedUser,
     limitAmount: 40000,
     lastDepositDate: '2026-08-06',
     graceDays: 2,
+    offlineTransactionLimit: 3,
   });
 });

@@ -40,6 +40,10 @@ export const authUserSchema = z
     refreshToken: z.string().min(1).nullable(),
     bankType: z.string(),
     schemes: z.array(agentSchemeSchema),
+    // Defaults to null (rather than being required) because this schema also
+    // re-validates sessions persisted before this field existed; without a
+    // default, every such stored session would fail to parse on app launch.
+    offlineTransactionLimit: z.number().int().nonnegative().nullable().default(null),
   })
   .strict();
 
@@ -73,6 +77,8 @@ export const authenticateMeResponseSchema = z
     isAgentRevoked: z.boolean(),
     lastDepositDate: z.string().min(1).nullable(),
     graceDays: z.number().int().nonnegative().nullable(),
+    // Optional: older backends omit this field; absent means "no cap" (fail open).
+    offlineTransactionLimit: z.number().int().nonnegative().nullable().default(null),
   })
   .strict();
 
@@ -92,6 +98,8 @@ export const loginResponseSchema = z
     lastDepositDate: z.string().min(1).nullable(),
     limitAmount: z.number().nonnegative().nullable(),
     graceDays: z.number().int().nonnegative().nullable(),
+    // Optional: older backends omit this field; absent means "no cap" (fail open).
+    offlineTransactionLimit: z.number().int().nonnegative().nullable().default(null),
     refreshToken: z.string().min(1),
     accessToken: z.string().min(1),
     bankType: z.string().min(1),
@@ -115,6 +123,7 @@ export const legacyAuthUserSchema = z
       lastDepositDate: null,
       limitAmount: null,
       graceDays: null,
+      offlineTransactionLimit: null,
       accessToken: token,
       refreshToken: null,
       bankType: '',

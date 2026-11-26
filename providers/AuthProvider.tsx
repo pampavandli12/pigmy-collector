@@ -187,6 +187,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         limitAmount: authStatus.limitAmount,
         lastDepositDate: authStatus.lastDepositDate,
         graceDays: authStatus.graceDays,
+        offlineTransactionLimit: authStatus.offlineTransactionLimit,
       });
 
       setUser(updatedUser);

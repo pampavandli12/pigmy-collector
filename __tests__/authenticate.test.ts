@@ -13,6 +13,7 @@ const authenticateResponse = {
   isAgentRevoked: false,
   lastDepositDate: '2026-06-19',
   graceDays: 0,
+  offlineTransactionLimit: 5,
 };
 
 beforeEach(() => jest.clearAllMocks());
@@ -21,6 +22,14 @@ test('parses the authenticate-me response shape', () => {
   expect(authenticateMeResponseSchema.parse(authenticateResponse)).toEqual(
     authenticateResponse,
   );
+});
+
+test('defaults offlineTransactionLimit to null when the backend omits it', () => {
+  const { offlineTransactionLimit: _omitted, ...withoutLimit } = authenticateResponse;
+  expect(authenticateMeResponseSchema.parse(withoutLimit)).toEqual({
+    ...withoutLimit,
+    offlineTransactionLimit: null,
+  });
 });
 
 test('fetches agent status with the stored phone number', async () => {

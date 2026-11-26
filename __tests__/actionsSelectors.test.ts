@@ -4,7 +4,7 @@ jest.mock('../utils/snackbar', () => ({ showSnackbar: jest.fn() }));
 
 import { fetchCustomers } from '../services/user';
 import { actions } from '../store/actions';
-import { todaysCollectionAmount$, todaysTransactionCount$, todaysTransactions$, totalCustomerCount$ } from '../store/selectors';
+import { pendingOutboxCount$, todaysCollectionAmount$, todaysTransactionCount$, todaysTransactions$, totalCustomerCount$ } from '../store/selectors';
 import { store$ } from '../store/store';
 import { showSnackbar } from '../utils/snackbar';
 
@@ -237,6 +237,68 @@ test('adds only unsynced today amounts on top of the server balance', async () =
   await actions.syncCustomers(1, 'B');
 
   expect(store$.customers[10].currentBalance.peek()).toBe(170);
+});
+
+test('counts pending outbox items regardless of age, unlike todaysTransactionCount$', () => {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const basePayload = {
+    userId: 1,
+    agentCode: 2,
+    bankCode: 'B',
+    collectedAmount: 10,
+    schemename: 'P',
+    schemeId: '38',
+    collectiontype: 'cash',
+    customerName: 'A',
+    accountNumber: '3',
+  };
+
+  store$.outbox.set({
+    oldPending: {
+      payload: { ...basePayload, transactionId: 'old-pending' },
+      status: 'pending',
+      retryCount: 0,
+      createdAt: yesterday.getTime(),
+    },
+    todayPending: {
+      payload: { ...basePayload, transactionId: 'today-pending' },
+      status: 'pending',
+      retryCount: 0,
+      createdAt: Date.now(),
+    },
+    todaySynced: {
+      payload: { ...basePayload, transactionId: 'today-synced' },
+      status: 'synced',
+      retryCount: 0,
+      createdAt: Date.now(),
+    },
+    todayFailed: {
+      payload: { ...basePayload, transactionId: 'today-failed' },
+      status: 'failed',
+      permanent: true,
+      retryCount: 1,
+      createdAt: Date.now(),
+    },
+    todayRetryableFailed: {
+      payload: { ...basePayload, transactionId: 'today-retryable-failed' },
+      status: 'failed',
+      retryCount: 1,
+      createdAt: Date.now(),
+    },
+    todaySyncing: {
+      payload: { ...basePayload, transactionId: 'today-syncing' },
+      status: 'syncing',
+      retryCount: 0,
+      createdAt: Date.now(),
+    },
+  });
+
+  // Every still-unsynced item counts (pending, syncing, retryable failed),
+  // including yesterday's — pendingOutboxCount$ has no date filter, unlike
+  // todaysTransactionCount$ below. Synced and permanently-failed items don't.
+  expect(pendingOutboxCount$.peek()).toBe(4);
+  expect(todaysTransactionCount$.peek()).toBe(5);
 });
 
 test('clears the retry hold when a failed transaction is retried', () => {

@@ -23,6 +23,7 @@ const latestLoginResponse = {
   lastDepositDate: '2026-08-06',
   limitAmount: 50000,
   graceDays: 0,
+  offlineTransactionLimit: 0,
   bankType: 'peocit',
   schemes: [{ schemeID: '38', schemeName: 'Pigmy Deposit' }],
   refreshToken:
@@ -40,6 +41,14 @@ const storedLoginUser = {
 
 test('parses the latest login API response shape', () => {
   expect(loginResponseSchema.parse(latestLoginResponse)).toEqual(storedLoginUser);
+});
+
+test('defaults offlineTransactionLimit to null when the login response omits it', () => {
+  const { offlineTransactionLimit: _omitted, ...withoutLimit } = latestLoginResponse;
+  expect(loginResponseSchema.parse(withoutLimit)).toEqual({
+    ...storedLoginUser,
+    offlineTransactionLimit: null,
+  });
 });
 
 test('posts normalized login credentials', async () => {

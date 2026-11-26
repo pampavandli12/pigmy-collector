@@ -364,7 +364,10 @@ export async function updateStoredTokens(
 
 export function updateStoredAgentProfile(
   accountId: string,
-  profile: Pick<AuthUser, 'limitAmount' | 'lastDepositDate' | 'graceDays'>,
+  profile: Pick<
+    AuthUser,
+    'limitAmount' | 'lastDepositDate' | 'graceDays' | 'offlineTransactionLimit'
+  >,
 ): Promise<AuthUser> {
   return serializeAccountWrite(async () => {
     const accounts = await readStoredAccounts();

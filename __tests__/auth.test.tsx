@@ -38,6 +38,7 @@ const user = {
   refreshToken: 'refresh-token',
   bankType: 'peocit',
   schemes: [{ schemeId: '38', schemeName: 'Pigmy Deposit' }],
+  offlineTransactionLimit: 5,
 };
 
 beforeEach(() => {
@@ -49,6 +50,7 @@ beforeEach(() => {
     isAgentRevoked: false,
     lastDepositDate: '2026-06-19',
     graceDays: 0,
+    offlineTransactionLimit: 5,
   });
 });
 
@@ -79,6 +81,7 @@ test('logs out revoked agents when the lock screen loads', async () => {
     isAgentRevoked: true,
     lastDepositDate: '2026-06-19',
     graceDays: 0,
+    offlineTransactionLimit: 5,
   });
   (SecureStore.getItemAsync as jest.Mock).mockImplementation((key: string) =>
     Promise.resolve(
@@ -162,6 +165,7 @@ test('unlockWithPin ends the session when the agent is revoked at the moment of 
     isAgentRevoked: true,
     lastDepositDate: '2026-06-19',
     graceDays: 0,
+    offlineTransactionLimit: 5,
   });
 
   await act(async () => {
@@ -322,6 +326,7 @@ test('locks onto the fallback account when the active agent is revoked', async (
     isAgentRevoked: true,
     lastDepositDate: '2026-06-19',
     graceDays: 0,
+    offlineTransactionLimit: 5,
   });
 
   const wrapper = ({ children }: { children: React.ReactNode }) => (

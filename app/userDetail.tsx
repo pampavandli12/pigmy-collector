@@ -13,7 +13,7 @@ import {
 import { TransactionSuccess } from '@/components/TransactionSuccess';
 import { useAuth } from '@/providers/AuthProvider';
 import { actions } from '@/store/actions';
-import { todaysCollectionAmount$ } from '@/store/selectors';
+import { pendingOutboxCount$, todaysCollectionAmount$ } from '@/store/selectors';
 import { store$ } from '@/store/store';
 import {
   INVALID_DEPOSIT_MESSAGE,
@@ -29,10 +29,15 @@ import {
   evaluateGracePeriod,
   GRACE_PERIOD_EXCEEDED_MESSAGE,
 } from '@/utils/gracePeriod';
+import {
+  evaluateOfflineTransactionLimit,
+  OFFLINE_TRANSACTION_LIMIT_EXCEEDED_MESSAGE,
+} from '@/utils/offlineTransactionLimit';
 import { parseDepositAmount } from '@/utils/depositAmount';
 import { getErrorMessage } from '@/utils/errors';
 import { showSnackbar } from '@/utils/snackbar';
 import { useSelector } from '@legendapp/state/react';
+import { useNetInfo } from '@react-native-community/netinfo';
 import * as Crypto from 'expo-crypto';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -70,6 +75,11 @@ export default function UserDetail() {
   const accountNumber = account;
   const storedCustomer = useSelector(store$.customers[accountNumber]);
   const todaysCollected = useSelector(todaysCollectionAmount$);
+  const pendingOutboxCount = useSelector(pendingOutboxCount$);
+  const netInfo = useNetInfo();
+  // Mirrors store/syncEngine.ts isOffline(); unknown connectivity counts as offline.
+  const isOnline =
+    netInfo.isConnected === true && netInfo.isInternetReachable !== false;
 
   // Parse customer data from params
   const customer = {
@@ -111,11 +121,19 @@ export default function UserDetail() {
     user?.limitAmount,
     todaysCollected,
   );
+  const offlineLimit = evaluateOfflineTransactionLimit(
+    user?.offlineTransactionLimit,
+    pendingOutboxCount,
+    0,
+    isOnline,
+  );
   const blockedMessage = !gracePeriod.allowed
     ? GRACE_PERIOD_EXCEEDED_MESSAGE
     : !collectionLimit.allowed
       ? COLLECTION_LIMIT_EXCEEDED_MESSAGE
-      : null;
+      : !offlineLimit.allowed
+        ? OFFLINE_TRANSACTION_LIMIT_EXCEEDED_MESSAGE
+        : null;
 
   const handleConfirm = () => {
     if (submittingRef.current) {
@@ -158,6 +176,23 @@ export default function UserDetail() {
 
       if (!currentCollectionLimit.allowed) {
         showSnackbar(COLLECTION_LIMIT_EXCEEDED_MESSAGE, {
+          type: 'error',
+          duration: 6000,
+        });
+        release();
+        return;
+      }
+      const currentOfflineLimit = evaluateOfflineTransactionLimit(
+        user?.offlineTransactionLimit,
+        // Read the live count, not the render-time snapshot, so a deposit
+        // queued (or a sync) since the last render is accounted for.
+        pendingOutboxCount$.peek(),
+        1,
+        isOnline,
+      );
+
+      if (!currentOfflineLimit.allowed) {
+        showSnackbar(OFFLINE_TRANSACTION_LIMIT_EXCEEDED_MESSAGE, {
           type: 'error',
           duration: 6000,
         });

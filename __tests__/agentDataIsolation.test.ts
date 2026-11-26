@@ -11,6 +11,7 @@ function agent(agentCode: number): AuthUser {
     lastDepositDate: null,
     limitAmount: null,
     graceDays: null,
+    offlineTransactionLimit: null,
     accessToken: `access-${agentCode}`,
     refreshToken: `refresh-${agentCode}`,
     bankType: 'peocit',

@@ -82,3 +82,22 @@ export const todaysTransactionCount$ = computed(() => {
 export const totalCustomerCount$ = computed(() => {
   return Object.keys(store$.customers.get()).length;
 });
+
+/**
+ * Pending Outbox Count
+ *
+ * Feeds the offline-deposit-limit check (utils/offlineTransactionLimit.ts).
+ * Counts every outbox item that is still unsynced and may yet sync: `pending`,
+ * `syncing`, and retryable (non-permanent) `failed` items. Only `synced` items
+ * and permanent rejections are excluded — the same filter store/actions.ts uses
+ * for optimistic balances. Unlike todaysTransactions$, there is no date filter:
+ * the limit is about outstanding unsynced deposits, not today's activity.
+ */
+export const pendingOutboxCount$ = computed(() => {
+  return Object.values(store$.outbox.get()).filter(
+    (item) =>
+      isValidOutboxItem(item) &&
+      item.status !== 'synced' &&
+      !(item.status === 'failed' && item.permanent),
+  ).length;
+});

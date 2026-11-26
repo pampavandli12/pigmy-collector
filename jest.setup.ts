@@ -18,6 +18,20 @@ jest.mock('react-native-mmkv', () => {
   };
 });
 
+// Default: offline. Tests that need other connectivity (or NetInfo.fetch /
+// addEventListener behaviour) override this with their own jest.mock.
+jest.mock('@react-native-community/netinfo', () => {
+  const offline = { isConnected: false, isInternetReachable: false };
+  return {
+    __esModule: true,
+    default: {
+      fetch: jest.fn(() => Promise.resolve(offline)),
+      addEventListener: jest.fn(() => jest.fn()),
+    },
+    useNetInfo: jest.fn(() => offline),
+  };
+});
+
 jest.mock('expo-secure-store', () => ({
   getItemAsync: jest.fn(),
   setItemAsync: jest.fn(),
