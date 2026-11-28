@@ -4,19 +4,13 @@
  * the confirm action. Pure presentation — submission/queueing logic lives in
  * the screen, not here.
  */
-import { CustomerAvatar } from '@/components/CustomerAvatar';
-import { useAuth } from '@/providers/AuthProvider';
-import { parseDepositAmount } from '@/utils/depositAmount';
-import { Picker } from '@react-native-picker/picker';
-import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
-import {
-  Button,
-  Card,
-  HelperText,
-  Text,
-  TextInput,
-} from 'react-native-paper';
+import { CustomerAvatar } from "@/components/CustomerAvatar";
+import { useAuth } from "@/providers/AuthProvider";
+import { parseDepositAmount } from "@/utils/depositAmount";
+import { Picker } from "@react-native-picker/picker";
+import { useMemo, useState } from "react";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { Button, Card, HelperText, Text, TextInput } from "react-native-paper";
 
 interface TransactionFormProps {
   customer: {
@@ -49,9 +43,9 @@ export const TransactionForm = ({
   isTransactionLoading,
 }: TransactionFormProps) => {
   const { user } = useAuth();
-  const [reconfirmAmount, setReconfirmAmount] = useState('');
+  const [reconfirmAmount, setReconfirmAmount] = useState("");
   const schemeOptions = user?.schemes ?? [];
-  const quickAmounts = ['100', '200', '500'];
+  const quickAmounts = ["100", "200", "500"];
 
   const selectQuickAmount = (value: string) => {
     setAmount(value);
@@ -61,7 +55,8 @@ export const TransactionForm = ({
   const parsedAmount = parseDepositAmount(amount);
   const parsedReconfirmAmount = parseDepositAmount(reconfirmAmount);
   const bothAmountsEntered =
-    String(amount ?? '').trim() !== '' && String(reconfirmAmount ?? '').trim() !== '';
+    String(amount ?? "").trim() !== "" &&
+    String(reconfirmAmount ?? "").trim() !== "";
   const amountMismatch = useMemo(() => {
     return bothAmountsEntered && parsedAmount !== parsedReconfirmAmount;
   }, [bothAmountsEntered, parsedAmount, parsedReconfirmAmount]);
@@ -88,15 +83,18 @@ export const TransactionForm = ({
               style={styles.avatar}
             />
             <View style={styles.customerInfo}>
-              <Text variant='titleLarge' style={styles.customerName}>
+              <Text variant="titleLarge" style={styles.customerName}>
                 {customer.name}
               </Text>
-              <Text variant='bodyMedium' style={styles.customerId}>
-                Account No: {customer.account}
+              <Text variant="bodyMedium" style={styles.customerId}>
+                Account No: {Number(customer.account)}
               </Text>
 
-              <Text variant='bodyMedium' style={styles.customerId}>
+              <Text variant="bodyMedium" style={styles.customerId}>
                 Current Balance: ₹{customer.balance}
+              </Text>
+              <Text variant="bodyMedium" style={styles.customerId}>
+                Scheme ID: {scheme}
               </Text>
             </View>
           </Card.Content>
@@ -104,13 +102,13 @@ export const TransactionForm = ({
 
         {/* Deposit Details Section */}
         <View style={styles.detailsSection}>
-          <Text variant='titleLarge' style={styles.sectionTitle}>
+          <Text variant="titleLarge" style={styles.sectionTitle}>
             Deposit Details
           </Text>
 
           {/* Amount Field */}
           <View style={styles.fieldContainer}>
-            <Text variant='bodyMedium' style={styles.fieldLabel}>
+            <Text variant="bodyMedium" style={styles.fieldLabel}>
               Amount
             </Text>
             <View style={styles.quickAmountRow}>
@@ -120,7 +118,7 @@ export const TransactionForm = ({
                 return (
                   <Button
                     key={quickAmount}
-                    mode={isSelected ? 'contained' : 'outlined'}
+                    mode={isSelected ? "contained" : "outlined"}
                     onPress={() => selectQuickAmount(quickAmount)}
                     style={styles.quickAmountButton}
                     contentStyle={styles.quickAmountButtonContent}
@@ -132,17 +130,17 @@ export const TransactionForm = ({
               })}
             </View>
             <TextInput
-              mode='flat'
+              mode="flat"
               value={amount}
               onChangeText={setAmount}
-              keyboardType='decimal-pad'
-              accessibilityLabel='Amount'
+              keyboardType="decimal-pad"
+              accessibilityLabel="Amount"
               style={styles.amountInput}
               contentStyle={styles.amountInputContent}
               underlineStyle={{ height: 0 }}
             />
             <HelperText
-              type='error'
+              type="error"
               visible={amountMismatch}
               style={styles.helperText}
             >
@@ -152,21 +150,21 @@ export const TransactionForm = ({
 
           {/* Reconfirm amount field */}
           <View style={styles.fieldContainer}>
-            <Text variant='bodyMedium' style={styles.fieldLabel}>
+            <Text variant="bodyMedium" style={styles.fieldLabel}>
               Reconfirm Amount
             </Text>
             <TextInput
-              mode='flat'
+              mode="flat"
               value={reconfirmAmount}
               onChangeText={setReconfirmAmount}
-              keyboardType='decimal-pad'
-              accessibilityLabel='Reconfirm Amount'
+              keyboardType="decimal-pad"
+              accessibilityLabel="Reconfirm Amount"
               style={styles.amountInput}
               contentStyle={styles.amountInputContent}
               underlineStyle={{ height: 0 }}
             />
             <HelperText
-              type='error'
+              type="error"
               visible={amountMismatch}
               style={styles.helperText}
             >
@@ -175,27 +173,29 @@ export const TransactionForm = ({
           </View>
           {/* Scheme Field */}
           <View style={styles.fieldContainer}>
-            <Text variant='bodyMedium' style={styles.fieldLabel}>
+            <Text variant="bodyMedium" style={styles.fieldLabel}>
               Scheme
             </Text>
             <View
-              testID='scheme-picker-container'
+              testID="scheme-picker-container"
               style={[
                 styles.pickerContainer,
                 schemeLocked && styles.pickerContainerLocked,
               ]}
               // `enabled` on the Picker itself is Android-only, so pointerEvents
               // is what actually blocks interaction on iOS too.
-              pointerEvents={schemeLocked ? 'none' : 'auto'}
+              pointerEvents={schemeLocked ? "none" : "auto"}
             >
               <Picker
-                testID='scheme-picker'
+                testID="scheme-picker"
                 selectedValue={scheme}
-                onValueChange={(itemValue) => setScheme(String(itemValue ?? ''))}
+                onValueChange={(itemValue) =>
+                  setScheme(String(itemValue ?? ""))
+                }
                 enabled={!schemeLocked}
                 style={styles.picker}
               >
-                <Picker.Item label='Select scheme' value='' />
+                <Picker.Item label="Select scheme" value="" />
                 {schemeOptions.map((option) => (
                   <Picker.Item
                     key={option.schemeId}
@@ -209,11 +209,11 @@ export const TransactionForm = ({
 
           {/* Date Field */}
           <View style={styles.fieldContainer}>
-            <Text variant='titleMedium' style={styles.fieldLabel}>
+            <Text variant="titleMedium" style={styles.fieldLabel}>
               Date
             </Text>
             <View style={styles.dateContainer}>
-              <Text variant='titleMedium' style={styles.dateValue}>
+              <Text variant="titleMedium" style={styles.dateValue}>
                 {date}
               </Text>
             </View>
@@ -224,7 +224,7 @@ export const TransactionForm = ({
       {/* Bottom Button */}
       <View style={styles.bottomContainer}>
         <Button
-          mode='contained'
+          mode="contained"
           onPress={handleConfirm}
           disabled={disableConfirm || isTransactionLoading}
           style={styles.confirmButton}
@@ -242,27 +242,27 @@ export const TransactionForm = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: "#F5F5F5",
   },
   keyboardView: {
     flex: 1,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 8,
     paddingVertical: 8,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: "#F5F5F5",
   },
   backButton: {
     margin: 0,
   },
   headerTitle: {
-    fontWeight: '700',
-    color: '#000',
+    fontWeight: "700",
+    color: "#000",
     flex: 1,
-    textAlign: 'center',
+    textAlign: "center",
   },
   headerSpacer: {
     width: 48,
@@ -274,13 +274,13 @@ const styles = StyleSheet.create({
   customerCard: {
     marginTop: 16,
     marginBottom: 24,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 12,
     elevation: 1,
   },
   customerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 12,
   },
   avatar: {
@@ -293,12 +293,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   customerName: {
-    fontWeight: '700',
-    color: '#000',
+    fontWeight: "700",
+    color: "#000",
     marginBottom: 4,
   },
   customerId: {
-    color: '#999',
+    color: "#999",
   },
   chevron: {
     margin: 0,
@@ -308,19 +308,19 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   sectionTitle: {
-    fontWeight: '700',
-    color: '#000',
+    fontWeight: "700",
+    color: "#000",
   },
   fieldContainer: {
-    position: 'relative',
+    position: "relative",
   },
   fieldLabel: {
-    color: '#999',
+    color: "#999",
     marginBottom: 8,
     fontSize: 14,
   },
   amountInput: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 8,
     paddingHorizontal: 0,
     height: 60,
@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
     paddingLeft: 8,
   },
   quickAmountRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
     marginBottom: 12,
   },
@@ -344,44 +344,44 @@ const styles = StyleSheet.create({
     bottom: -24,
     left: 0,
     margin: 0,
-    position: 'absolute',
+    position: "absolute",
   },
   dateContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 8,
     paddingVertical: 16,
     paddingHorizontal: 16,
   },
   dateValue: {
-    color: '#000',
+    color: "#000",
     fontSize: 16,
   },
   bottomContainer: {
     padding: 16,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: "#F5F5F5",
   },
   pickerContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 8,
     height: 60,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   pickerContainerLocked: {
-    backgroundColor: '#F0F0F0',
+    backgroundColor: "#F0F0F0",
   },
   picker: {
     height: 60,
-    color: '#000',
+    color: "#000",
   },
   confirmButton: {
     borderRadius: 12,
-    backgroundColor: '#4A90E2',
+    backgroundColor: "#4A90E2",
   },
   confirmButtonContent: {
     paddingVertical: 12,
   },
   confirmButtonText: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });

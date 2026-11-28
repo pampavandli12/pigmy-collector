@@ -5,45 +5,48 @@
  * `actions.addTransaction` — all before any network call (see the outbox
  * model in AGENTS.md / README.md).
  */
-import { TransactionForm } from '@/components/TransactionForm';
+import { TransactionForm } from "@/components/TransactionForm";
+import { TransactionSuccess } from "@/components/TransactionSuccess";
+import { useAuth } from "@/providers/AuthProvider";
 import {
   getRegisteredBankAdapter,
   UNSUPPORTED_BANK_DEPOSIT_MESSAGE,
-} from '@/services/banks/registry';
-import { TransactionSuccess } from '@/components/TransactionSuccess';
-import { useAuth } from '@/providers/AuthProvider';
-import { actions } from '@/store/actions';
-import { pendingOutboxCount$, todaysCollectionAmount$ } from '@/store/selectors';
-import { store$ } from '@/store/store';
+} from "@/services/banks/registry";
+import { actions } from "@/store/actions";
+import {
+  pendingOutboxCount$,
+  todaysCollectionAmount$,
+} from "@/store/selectors";
+import { store$ } from "@/store/store";
 import {
   INVALID_DEPOSIT_MESSAGE,
   SCHEME_REQUIRED_MESSAGE,
   transactionPayloadSchema,
   UNABLE_TO_SAVE_DEPOSIT_MESSAGE,
-} from '@/types/user';
+} from "@/types/user";
 import {
   COLLECTION_LIMIT_EXCEEDED_MESSAGE,
   evaluateCollectionLimit,
-} from '@/utils/collectionLimit';
+} from "@/utils/collectionLimit";
+import { parseDepositAmount } from "@/utils/depositAmount";
+import { getErrorMessage } from "@/utils/errors";
 import {
   evaluateGracePeriod,
   GRACE_PERIOD_EXCEEDED_MESSAGE,
-} from '@/utils/gracePeriod';
+} from "@/utils/gracePeriod";
 import {
   evaluateOfflineTransactionLimit,
   OFFLINE_TRANSACTION_LIMIT_EXCEEDED_MESSAGE,
-} from '@/utils/offlineTransactionLimit';
-import { parseDepositAmount } from '@/utils/depositAmount';
-import { getErrorMessage } from '@/utils/errors';
-import { showSnackbar } from '@/utils/snackbar';
-import { useSelector } from '@legendapp/state/react';
-import { useNetInfo } from '@react-native-community/netinfo';
-import * as Crypto from 'expo-crypto';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
-import { Button, Icon, IconButton, Text } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+} from "@/utils/offlineTransactionLimit";
+import { showSnackbar } from "@/utils/snackbar";
+import { useSelector } from "@legendapp/state/react";
+import { useNetInfo } from "@react-native-community/netinfo";
+import * as Crypto from "expo-crypto";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { KeyboardAvoidingView, Platform, StyleSheet, View } from "react-native";
+import { Button, Icon, IconButton, Text } from "react-native-paper";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 interface TransactionSuccessSnapshot {
   amount: number;
@@ -52,10 +55,10 @@ interface TransactionSuccessSnapshot {
 }
 
 function getDisplayDate() {
-  return new Date().toLocaleDateString('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
+  return new Date().toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
   });
 }
 
@@ -69,7 +72,7 @@ export default function UserDetail() {
   // restore). Coerce every field defensively so a missing param renders a safe
   // empty state instead of crashing (e.g. `customer.name.charAt(0)`).
   const firstParam = (value: string | string[] | undefined): string =>
-    (Array.isArray(value) ? value[0] : value) ?? '';
+    (Array.isArray(value) ? value[0] : value) ?? "";
 
   const account = firstParam(params.account);
   const accountNumber = account;
@@ -95,13 +98,14 @@ export default function UserDetail() {
     vpncode: firstParam(params.vpncode),
   };
 
-  const [amount, setAmount] = useState('');
-  const [scheme, setScheme] = useState('');
+  const [amount, setAmount] = useState("");
+  const [scheme, setScheme] = useState("");
   // The customer's own schemeId (from fetchCustomers) pre-fills and locks the
   // dropdown only when it matches one of the agent's available schemes;
   // otherwise the dropdown stays empty and freely editable as before.
   const presetScheme = useMemo(
-    () => user?.schemes?.find((item) => item.schemeId === storedCustomer?.schemeId),
+    () =>
+      user?.schemes?.find((item) => item.schemeId === storedCustomer?.schemeId),
     [user?.schemes, storedCustomer?.schemeId],
   );
 
@@ -155,7 +159,7 @@ export default function UserDetail() {
 
       if (!currentGracePeriod.allowed) {
         showSnackbar(GRACE_PERIOD_EXCEEDED_MESSAGE, {
-          type: 'error',
+          type: "error",
           duration: 6000,
         });
         release();
@@ -164,7 +168,7 @@ export default function UserDetail() {
 
       const numericAmount = parseDepositAmount(amount);
       if (numericAmount === null) {
-        showSnackbar(INVALID_DEPOSIT_MESSAGE, { type: 'error' });
+        showSnackbar(INVALID_DEPOSIT_MESSAGE, { type: "error" });
         release();
         return;
       }
@@ -176,7 +180,7 @@ export default function UserDetail() {
 
       if (!currentCollectionLimit.allowed) {
         showSnackbar(COLLECTION_LIMIT_EXCEEDED_MESSAGE, {
-          type: 'error',
+          type: "error",
           duration: 6000,
         });
         release();
@@ -193,7 +197,7 @@ export default function UserDetail() {
 
       if (!currentOfflineLimit.allowed) {
         showSnackbar(OFFLINE_TRANSACTION_LIMIT_EXCEEDED_MESSAGE, {
-          type: 'error',
+          type: "error",
           duration: 6000,
         });
         release();
@@ -203,13 +207,13 @@ export default function UserDetail() {
         (item) => item.schemeId === String(scheme),
       );
       if (!selectedScheme) {
-        showSnackbar(SCHEME_REQUIRED_MESSAGE, { type: 'error' });
+        showSnackbar(SCHEME_REQUIRED_MESSAGE, { type: "error" });
         release();
         return;
       }
       const adapter = getRegisteredBankAdapter(user?.bankType);
       if (!adapter) {
-        showSnackbar(UNSUPPORTED_BANK_DEPOSIT_MESSAGE, { type: 'error' });
+        showSnackbar(UNSUPPORTED_BANK_DEPOSIT_MESSAGE, { type: "error" });
         release();
         return;
       }
@@ -221,7 +225,7 @@ export default function UserDetail() {
         collectedAmount: numericAmount,
         schemename: selectedScheme.schemeName,
         schemeId: selectedScheme.schemeId,
-        collectiontype: 'cash',
+        collectiontype: "cash",
         customerName: customer.name,
         accountNumber: customer.account,
         transactionId: Crypto.randomUUID(),
@@ -232,7 +236,7 @@ export default function UserDetail() {
       });
       const parsedPayload = transactionPayloadSchema.safeParse(payload);
       if (!parsedPayload.success) {
-        showSnackbar(UNABLE_TO_SAVE_DEPOSIT_MESSAGE, { type: 'error' });
+        showSnackbar(UNABLE_TO_SAVE_DEPOSIT_MESSAGE, { type: "error" });
         release();
         return;
       }
@@ -247,28 +251,28 @@ export default function UserDetail() {
       });
     } catch (error: unknown) {
       showSnackbar(getErrorMessage(error, UNABLE_TO_SAVE_DEPOSIT_MESSAGE), {
-        type: 'error',
+        type: "error",
       });
       release();
     }
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         {/* Header */}
         <View style={styles.header}>
           <IconButton
-            icon='arrow-left'
+            icon="arrow-left"
             size={24}
-            iconColor='#000'
+            iconColor="#000"
             onPress={() => router.back()}
             style={styles.backButton}
           />
-          <Text variant='headlineSmall' style={styles.headerTitle}>
+          <Text variant="headlineSmall" style={styles.headerTitle}>
             New Deposit
           </Text>
           <View style={styles.headerSpacer} />
@@ -292,7 +296,7 @@ export default function UserDetail() {
             totalBalance={transactionSuccess.totalBalance}
             scheme={
               user?.schemes?.find((item) => item.schemeId === String(scheme))
-                ?.schemeName ?? ''
+                ?.schemeName ?? ""
             }
             date={date}
             mobilenumber={customer.mobilenumber}
@@ -300,11 +304,11 @@ export default function UserDetail() {
           />
         ) : blockedMessage ? (
           <View style={styles.blockedContainer}>
-            <Icon source='alert-circle' size={56} color='#C62828' />
-            <Text variant='titleMedium' style={styles.blockedMessage}>
+            <Icon source="alert-circle" size={56} color="#C62828" />
+            <Text variant="titleMedium" style={styles.blockedMessage}>
               {blockedMessage}
             </Text>
-            <Button mode='contained' onPress={() => router.back()}>
+            <Button mode="contained" onPress={() => router.back()}>
               Back to Users
             </Button>
           </View>
@@ -329,40 +333,40 @@ export default function UserDetail() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: "#F5F5F5",
   },
   keyboardView: {
     flex: 1,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 8,
     paddingVertical: 8,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: "#F5F5F5",
   },
   backButton: {
     margin: 0,
   },
   headerTitle: {
-    fontWeight: '700',
-    color: '#000',
+    fontWeight: "700",
+    color: "#000",
     flex: 1,
-    textAlign: 'center',
+    textAlign: "center",
   },
   headerSpacer: {
     width: 48,
   },
   blockedContainer: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 32,
   },
   blockedMessage: {
-    color: '#C62828',
-    textAlign: 'center',
+    color: "#C62828",
+    textAlign: "center",
     marginTop: 16,
     marginBottom: 24,
   },
